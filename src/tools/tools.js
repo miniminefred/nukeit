@@ -146,6 +146,8 @@ export class Extinguisher {
         _dir.x * s + (Math.random() - 0.5) * 2, _dir.y * s + (Math.random() - 0.5) * 2, _dir.z * s + (Math.random() - 0.5) * 2);
     }
     ctx.fire.extinguish(ctx.camera.position, _dir, 7.5, 0.3, dt);
+    // And it blows the dust away: a way to see through a collapse cloud.
+    ctx.particles.blow(ctx.camera.position, _dir, 11, 0.32, dt);
   }
 
   unequip(ctx) { if (this.on) { this.on = false; ctx.audio?.foam(false); } }

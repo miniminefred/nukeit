@@ -66,8 +66,8 @@ const KINDS = {
   flamelet: { life: [0.25, 0.5], size: [0.09, 0.2], grow: -0.08, drag: 2.5, grav: -2.2, colour: 0xff8a2a, alpha: 0.6, add: true, shape: 1 },
   spark: { life: [0.3, 0.8], size: [0.06, 0.12], grow: 0, drag: 0.5, grav: 9.8, colour: 0xffc060, alpha: 1, add: true },
   flash: { life: [0.12, 0.2], size: [6, 9], grow: 20, drag: 0, grav: 0, colour: 0xffd9a0, alpha: 1, add: true },
-  paint: { life: [0.25, 0.45], size: [0.08, 0.16], grow: 0.3, drag: 2.5, grav: 1, colour: 0xffffff, alpha: 0.8, add: false },
-  foam:  { life: [0.5, 1.0], size: [0.25, 0.45], grow: 1.2, drag: 2.2, grav: 1.5, colour: 0xf2f4f5, alpha: 0.75, add: false },
+  paint: { life: [0.25, 0.45], size: [0.08, 0.16], grow: 0.3, drag: 2.5, grav: 1, colour: 0xffffff, alpha: 0.8, add: false, blow: false },
+  foam:  { life: [0.5, 1.0], size: [0.25, 0.45], grow: 1.2, drag: 2.2, grav: 1.5, colour: 0xf2f4f5, alpha: 0.75, add: false, blow: false },
 };
 
 class Pool {
@@ -85,6 +85,7 @@ class Pool {
     this.grav = new Float32Array(max);
     this.alpha0 = new Float32Array(max);
     this.info = new Float32Array(max * 2);
+    this.blowable = new Uint8Array(max);
     const g = new THREE.BufferGeometry();
     this.aPos = new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage);
     this.aTint = new THREE.BufferAttribute(this.tint, 4).setUsage(THREE.DynamicDrawUsage);
@@ -120,6 +121,7 @@ class Pool {
     this.tint[p * 4 + 3] = k.alpha;
     this.alpha0[p] = k.alpha;
     this.info[p * 2] = k.shape ?? 0;
+    this.blowable[p] = k.blow === false ? 0 : 1;
     this.info[p * 2 + 1] = 0;
     this.size[p] = r(k.size);
     this.age[p] = 0;
@@ -173,10 +175,37 @@ class Pool {
     this.grav[to] = this.grav[from];
     this.alpha0[to] = this.alpha0[from];
     this.info[to * 2] = this.info[from * 2];
+    this.blowable[to] = this.blowable[from];
     this.info[to * 2 + 1] = this.info[from * 2 + 1];
   }
 
   clear() { this.n = 0; this.geometry.setDrawRange(0, 0); }
+
+  // Push every particle inside a cone along it, and age it faster, so a cloud
+  // in the way is shoved aside and thins out.
+  blow(o, d, range, spread, dt) {
+    let hit = 0;
+    for (let p = 0; p < this.n; p++) {
+      if (!this.blowable[p]) continue;
+      const i = p * 3;
+      const rx = this.pos[i] - o.x, ry = this.pos[i + 1] - o.y, rz = this.pos[i + 2] - o.z;
+      const along = rx * d.x + ry * d.y + rz * d.z;
+      if (along < 0 || along > range) continue;
+      const px = rx - d.x * along, py = ry - d.y * along, pz = rz - d.z * along;
+      const off = Math.hypot(px, py, pz);
+      const reach = 0.5 + along * spread + this.size[p] * 0.3;
+      if (off > reach) continue;
+      const k = (1 - along / range) * (1 - off / reach);
+      // Along the jet, and out from its middle.
+      const push = 26 * k * dt, side = 12 * k * dt / Math.max(0.2, off);
+      this.vel[i] += d.x * push + px * side;
+      this.vel[i + 1] += d.y * push + py * side;
+      this.vel[i + 2] += d.z * push + pz * side;
+      this.age[p] += dt * 2.2 * k * this.life[p];
+      hit++;
+    }
+    return hit;
+  }
 }
 
 export class Particles {
@@ -207,6 +236,12 @@ export class Particles {
   update(dt) {
     this.normal.update(dt);
     this.glow.update(dt);
+  }
+
+  // A blast of air from `origin` along `dir` — the extinguisher — clears the
+  // dust and smoke in front of it. Flames are left to the fire.
+  blow(origin, dir, range, spread, dt) {
+    return this.normal.blow(origin, dir, range, spread, dt);
   }
 
   clear() {

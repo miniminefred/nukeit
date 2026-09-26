@@ -71,6 +71,13 @@ export class Pieces {
     };
     p.kind = p.parts[0].kind;
     for (const q of p.parts) {
+      // Box, cylinder and extrude geometries come with one group per face,
+      // each naming a material slot. A part has one material, so the groups
+      // mean nothing — until a cut keeps them and hands CSG a one-material
+      // list, and five faces of every cut box render with no material at
+      // all: the thing you hit went invisible. Only a cut adds groups back,
+      // and then it supplies a material for every one.
+      if (!q.materials) q.geometry.clearGroups();
       q.geometry.computeBoundingBox();
       p.localBox.union(q.geometry.boundingBox);
     }

@@ -276,6 +276,15 @@ hidden and has no real frame loop.
 
 ## Things already learned here
 
+- **Clear a geometry's groups before it becomes a piece.** Box, cylinder and
+  extrude geometries carry one group per face, each naming a material slot.
+  A cut kept them and handed CSG a one-material list, so five faces of every
+  box rendered with no material: things went invisible the moment they were
+  hit. `Pieces.add` clears them; only a cut adds groups, with a material each.
+- **The extinguisher is also a fan.** `particles.blow` pushes and thins every
+  dust and smoke particle in its cone (foam and paint are exempt), which is the
+  way to see through a collapse cloud.
+
 - **`Color.set()` already converts sRGB to linear.** Converting again turned everything black.
 - **Toggling a light's visibility recompiles every material.** Fire lights stay in the
   scene and switch off by intensity.
