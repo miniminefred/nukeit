@@ -78,7 +78,8 @@ export class Blast {
         if (near > 0.3) {
           const hit = p.box.clampPoint(at, new THREE.Vector3());
           damage._bite(p, hit, out.clone().negate(), out.clone(), r * 0.45 * near, r * 0.5, p.kind);
-          if (near > 0.85) damage.fracture(p, hit, out.clone(), 3);
+          // Only something the size of a transformer breaks a whole floor bay.
+          if (near > 0.85 && r >= 5) damage.fracture(p, hit, out.clone(), 3);
         }
         continue;
       }

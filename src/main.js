@@ -293,7 +293,7 @@ if (import.meta.env.DEV) {
   window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, heap, particles, audio, ctx, get tools() { return tools; }, start, measure,
     get state() { return state; }, set state(s) { state = s; },
     // Run whole frames by hand, for a tab that is not on screen.
-    step: (dt = 1 / 60, n = 1) => { for (let i = 0; i < n; i++) frame(dt); } };
+    step: (dt = 1 / 60, n = 1) => { for (let i = 0; i < n; i++) frame(dt); }, select };
 }
 
 const timer = new Timer();

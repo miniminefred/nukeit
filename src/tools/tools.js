@@ -135,7 +135,7 @@ export class Extinguisher {
     const on = ctx.input.mouse.left && ctx.input.mouse.locked;
     if (on !== this.on) { this.on = on; ctx.audio?.foam(on); }
     const kick = on ? Math.sin(performance.now() * 0.05) * 0.004 : 0;
-    this.model.position.set(0.3, -0.42 + kick, -0.55);
+    this.model.position.set(0.36, -0.5 + kick, -0.8);
     this.model.rotation.set(0.05, -0.4, 0.05);
     if (!on) return;
     ctx.camera.getWorldDirection(_dir);
@@ -145,7 +145,7 @@ export class Extinguisher {
       ctx.particles.spawn('foam', nozzle.x, nozzle.y, nozzle.z,
         _dir.x * s + (Math.random() - 0.5) * 2, _dir.y * s + (Math.random() - 0.5) * 2, _dir.z * s + (Math.random() - 0.5) * 2);
     }
-    ctx.fire.extinguish(ctx.camera.position, _dir, 7.5, 0.86, dt);
+    ctx.fire.extinguish(ctx.camera.position, _dir, 7.5, 0.3, dt);
   }
 
   unequip(ctx) { if (this.on) { this.on = false; ctx.audio?.foam(false); } }

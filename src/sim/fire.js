@@ -19,6 +19,7 @@ const MAX = 400;
 const LIGHTS = 6;
 const _v = new THREE.Vector3();
 const _c = new THREE.Vector3();
+const _near = new THREE.Box3();
 
 export class Fire {
   constructor(scene, pieces, physics, fx) {
@@ -58,17 +59,24 @@ export class Fire {
     });
   }
 
-  // Spray from `origin` along `dir`: knock down every fire in the cone.
-  extinguish(origin, dir, range, cosHalf, dt) {
+  // Spray from `origin` along `dir`: knock down every fire the spray reaches.
+  // The spray is a cone, so walk along it and test each burning piece's
+  // nearest point — a 5 m carpet bay is hit where the foam lands on it, not
+  // judged by its middle.
+  extinguish(origin, dir, range, spread, dt) {
     let hit = 0;
+    const steps = Math.ceil(range / 0.5);
     for (const [p, b] of this.burning) {
+      if (p.box.distanceToPoint(origin) > range + 1) continue;
+      let reached = -1;
+      for (let s = 1; s <= steps; s++) {
+        const d = s * 0.5;
+        _v.copy(origin).addScaledVector(dir, d);
+        if (p.box.distanceToPoint(_v) < 0.25 + d * spread) { reached = d; break; }
+      }
+      if (reached < 0) continue;
       p.box.getCenter(_c);
-      const d = _v.copy(_c).sub(origin);
-      const len = d.length();
-      const near = p.box.distanceToPoint(origin);
-      if (near > range) continue;
-      if (len > 0.6 && d.dot(dir) / len < cosHalf) continue;
-      b.heat -= dt * 1.6 * (1 - near / range * 0.5);
+      b.heat -= dt * 1.8 * (1 - reached / range * 0.5);
       hit++;
       if (b.heat <= 0) {
         this.burning.delete(p);
@@ -108,12 +116,18 @@ export class Fire {
       }
       const near = box.distanceToPoint(_v.set(pos.x, pos.y + 0.9, pos.z));
       if (near < 1.0) dps = Math.max(dps, 28 * b.heat * (1 - near));
-      if (spread && Math.random() < b.heat * 0.4) {
+      // Slowly: an office floor takes minutes to go, not seconds.
+      if (spread && Math.random() < b.heat * 0.14) {
         box.getCenter(_c);
         const size = box.getSize(_v);
         const r = Math.max(size.x, size.y, size.z) / 2 + 0.5;
+        // Only to what it is actually touching, give or take a hand's width.
+        // Testing a sphere round a 5 m carpet bay lit every desk standing on
+        // it at once.
+        _near.copy(box).expandByScalar(0.15);
+        const chance = p.kind.name === 'carpet' ? 0.08 : 0.3;
         this.physics.overlapSphere(_c, r, (o) => {
-          if (o && o.parts && o !== p && Math.random() < 0.5) this.ignite(o, 0.15);
+          if (o && o.parts && o !== p && o.box.intersectsBox(_near) && Math.random() < chance) this.ignite(o, 0.1);
         });
       }
       if (b.fuel <= 0) burnt.push(p);
@@ -145,7 +159,7 @@ export class Fire {
       if (!e) { l.intensity = 0; continue; }
       e[0].box.getCenter(l.position);
       l.position.y = e[0].box.max.y + 0.4;
-      l.intensity = (8 + e[1] * 30) * (0.75 + Math.random() * 0.5);
+      l.intensity = (3 + e[1] * 10) * (0.75 + Math.random() * 0.5);
     }
   }
 
