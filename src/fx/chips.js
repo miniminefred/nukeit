@@ -7,8 +7,8 @@ import { blob } from '../damage/cutter.js';
 //
 // They are not rigid bodies — there are far too many — but they do fall, bounce
 // off the real geometry (one physics ray per moving chip per frame), and come to
-// rest on whatever they land on. Then they stay, so the floor under a wall you
-// have been working at ends up covered in what came off it.
+// rest on whatever they land on. A few seconds later they shrink away: small
+// broken bits do not pile up, only the big chunks (which are pieces) stay.
 
 const MAX = 5000;
 const COLOURS = {
@@ -17,6 +17,8 @@ const COLOURS = {
   soil: 0x5a4430, leaves: 0x3f6a2f, brass: 0xc9a043, paper: 0xe8e0d0, leather: 0x3a2a20,
 };
 // How each kind's chips are proportioned: wood comes off in slivers, glass in flakes.
+const LINGER = 4;          // s a chip lies still before it goes
+const SHRINK = 0.7;        // s it takes to go
 const SHAPES = { wood: [3.2, 0.35, 0.5], plaster: [1, 0.55, 0.9], glass: [1, 0.1, 0.8], concrete: [1, 0.75, 0.85] };
 
 export class Chips {
@@ -70,6 +72,16 @@ export class Chips {
   }
 
   update(dt) {
+    // Chips that have lain still long enough shrink and go.
+    for (const key of ['solid', 'glass']) {
+      const list = this.items[key];
+      let changed = false;
+      for (const c of list) if (c.rest) { c.t = (c.t ?? 0) + dt; if (c.t > LINGER) changed = true; }
+      if (changed) {
+        this.items[key] = list.filter((c) => !(c.rest && c.t > LINGER + SHRINK));
+        this.dirty[key] = true;
+      }
+    }
     // Ray tests are the whole cost, so only so many chips get one each frame;
     // the rest coast for a frame and take their turn next time.
     let rays = 160;
@@ -111,7 +123,7 @@ export class Chips {
         if (c.y < -2) c.rest = true;
       }
       if (moving || this.dirty[key]) this._write(key);
-      this.dirty[key] = moving;
+      this.dirty[key] = moving || list.some((c) => c.rest && c.t > LINGER);
     }
   }
 
@@ -120,7 +132,8 @@ export class Chips {
     for (let i = 0; i < list.length; i++) {
       const c = list[i];
       this._q.setFromEuler(this._e.set(c.rx, c.ry, c.rz));
-      this._s.set(c.w, c.h, c.d);
+      const k = c.rest && c.t > LINGER ? Math.max(0.01, 1 - (c.t - LINGER) / SHRINK) : 1;
+      this._s.set(c.w * k, c.h * k, c.d * k);
       this._m.compose(this._s.clone().set(c.x, c.y, c.z), this._q, this._s);
       mesh.setMatrixAt(i, this._m);
       if (key === 'solid') mesh.setColorAt(i, this._c.set(c.colour));

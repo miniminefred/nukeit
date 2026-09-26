@@ -11,6 +11,8 @@
 //  * **Only structure carries structure.** A slab may rest on a column or a
 //    core wall, never on a partition, a pane of glass or a filing cabinet.
 //    Anything may rest on structure.
+//  * **Cracked things carry less.** A column or slab worn below a quarter of
+//    its durability no longer holds structure up.
 //  * **Nothing hangs off a chain of non-structure.** A monitor on a desk on a
 //    floor is fine; a stack of glass on spandrel on mullion on glass, twenty
 //    storeys of it, is not a building. Non-structural things may be at most
@@ -28,7 +30,8 @@ const TOL = 0.06;
 const MIN_OVERLAP = 0.005;   // a 2 cm glass rail on a slab edge still counts
 const CELL = 2;
 const MAX_DEPTH = 3;
-const SMALL_BAY = 12;       // m^2: a bay this small can cantilever
+const SMALL_BAY = 12;
+const WEAK = 0.25;          // below this fraction of its durability a support carries nothing       // m^2: a bay this small can cantilever
 
 export function link(pieces) {
   const grid = new Map();
@@ -97,7 +100,10 @@ export function unsupported(pieces) {
   standing.sort((a, b) => a.box.min.y - b.box.min.y);
   for (const p of standing) { p.sup = false; p.direct = false; p.depth = 99; }
 
-  const holds = (p, q) => q.state === 'static' && q.sup && (p.structural ? q.structural : q.depth < MAX_DEPTH);
+  // A support worn down to a quarter of its durability is too cracked to carry
+  // structure: it may still stand, but the slab on it no longer counts it.
+  const sound = (q) => q.hpMax === null || q.hp > q.hpMax * WEAK;
+  const holds = (p, q) => q.state === 'static' && q.sup && (p.structural ? q.structural && sound(q) : q.depth < MAX_DEPTH);
   // How many non-structural steps a piece is from structure, once it stands.
   const depthOf = (p) => {
     if (p.structural) return 0;

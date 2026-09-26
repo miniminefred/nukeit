@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { subtract, split, chunkOff } from './cutter.js';
 import { addSplinters } from './splinters.js';
-import { crack, shatter } from './glass.js';
+import { crack as crackGlass, shatter } from './glass.js';
+import { crack } from './cracks.js';
 import { insideMaterial } from '../render/materials.js';
 import { box } from '../render/geometry.js';
 
@@ -11,18 +12,20 @@ import { box } from '../render/geometry.js';
 // it was travelling, and how much energy it carried (a sledge swing is about 1).
 // What happens next depends on what the piece is made of:
 //
-//   wood, plaster, fabric   a jagged hole, deeper than it is wide, straight
-//                           through anything thin; splinters round the rim of
-//                           wood; chips and dust everywhere
-//   concrete, marble        a small bite, a lot of grit. Columns and core walls
-//                           keep count, and when one has taken enough it gives
-//                           way: the middle crumbles, a stub stays standing, the
-//                           reinforcing bars stick out of it
-//   metal, brass            a ring and some sparks. Nothing comes away
-//   glass                   cracks, then shatters
-//   loose furniture         it moves — knocked across the room if it is light
+// Everything has **durability** — so many blows, by material and size (see
+// HITS in render/materials.js) — and every blow uses some up. The less is left,
+// the bigger the next bite and the more cracked it looks (damage/cracks.js),
+// the less it can carry (building/support.js) and the more easily something
+// falling on it breaks it (sim/impacts.js). At none it gives way.
 //
-// Pieces that have had too much taken out of them come apart into fragments.
+//   wood, plaster, fabric   most of what you hit is gone: a big jagged hole,
+//                           splinters round the rim of wood
+//   concrete, marble        a head-sized lump comes away and falls. Columns and
+//                           core walls give way sooner the more they carry,
+//                           leaving a stub with its bars sticking out
+//   metal, brass            dents and sparks; after many blows it snaps
+//   glass                   cracks, then shatters
+//   loose furniture         it moves as well — knocked across the room if light
 
 const _inv = new THREE.Quaternion();
 const _v = new THREE.Vector3();
@@ -91,32 +94,33 @@ export class Damage {
       }
     }
 
+    // Durability. Every blow uses some up, and how much is left decides both
+    // how big a bite the next one takes and how many cracks the piece shows —
+    // a fresh wall gives up a hole, a cracked one gives up half of itself.
+    p.hp -= energy;
+    const weak = 1 - THREE.MathUtils.clamp(p.hp / p.hpMax, 0, 1);
     const tough = kind.toughness;
-    if (tough >= 30) {
-      // Steel, bronze, brass: rings and sparks.
+    if (kind.metal) {
+      // Metal dents, cracks, and in the end snaps.
       particles.burst('spark', point.x, point.y, point.z, 14, 4);
-      return kind;
+      const r = 0.05 + weak * 0.07;
+      this._bite(p, point, normal, dir, r, r * 0.8, kind, { chips: false });
+    } else if (tough >= 8) {
+      // Stone: a head-sized lump comes away, bigger as it weakens.
+      this._chunk(p, point, normal, dir, (0.19 + weak * 0.14 + Math.random() * 0.04) * Math.sqrt(energy), kind);
+    } else {
+      // Soft things lose most of what you hit.
+      const r = THREE.MathUtils.clamp((0.36 + weak * 0.3) * Math.sqrt(energy), 0.2, 0.8);
+      this._bite(p, point, normal, dir, r, r * (kind.splinters ? 2.2 : 1.8), kind);
     }
-    // Concrete and stone: a lump comes away and falls. Columns and core walls
-    // keep count, and the structure decides when one has had enough — sooner
-    // the more storeys it is carrying.
-    if (tough >= 8) {
-      // Fist- to brick-sized.
-      const r = THREE.MathUtils.clamp(0.07 + Math.random() * 0.06, 0.06, 0.2) * Math.sqrt(energy);
-      this._chunk(p, point, normal, dir, r, kind);
-      if (p.hp !== null && (p.role === 'column' || p.role === 'core')) {
-        p.hp -= energy;
-        if (p.hp <= 0 || this.fx.mustFail?.(p)) this.fail(p, point, dir);
-      } else if (p.bites > 40) this.fracture(p, point, dir, energy);
-      return kind;
-    }
-    // How big a bite: soft things give a lot, hard things a little.
-    const radius = THREE.MathUtils.clamp(0.24 * Math.sqrt(energy / tough), 0.035, 0.55);
-    const depth = radius * (kind.splinters ? 2.4 : 1.7);
-    this._bite(p, point, normal, dir, radius, depth, kind);
+    if (p.state === 'dead') return kind;
+    crack(this.pieces, p, point, normal, 0.7 + weak * 1.6);
+    if (p.structural || p.role === 'slab') this.onStructure?.();
 
-    if (p.damage > p.volume * 0.35 || p.bites > 36) {
-      this.fracture(p, point, dir, energy);
+    const load = p.role === 'column' || p.role === 'core';
+    if (p.hp <= 0 || (load && this.fx.mustFail?.(p))) {
+      if (load) this.fail(p, point, dir);
+      else this.fracture(p, point, dir, energy + 1);
     }
     return kind;
   }
@@ -148,8 +152,8 @@ export class Damage {
       g.translate(-c.x, -c.y, -c.z);
       // Start it a little proud of the face and moving away, or it sits in the
       // exact hole it came out of and friction holds it there.
-      const pos = c.clone().applyQuaternion(p.quat).add(p.pos).addScaledVector(normal, 0.04);
-      const vel = normal.clone().multiplyScalar(2.2 + Math.random() * 1.5).add(new THREE.Vector3(0, 0.3, 0));
+      const pos = c.clone().applyQuaternion(p.quat).add(p.pos).addScaledVector(normal, radius * 0.7);
+      const vel = normal.clone().multiplyScalar(3 + Math.random() * 1.5).add(new THREE.Vector3(0, 0.5, 0));
       this.pieces.spawn({ parts: [{ kind: q.kind.name, geometry: g, materials: out.chunk.materials }], pos, quat: p.quat, role: 'fragment', floor: p.floor, structural: false, hull: true },
         { dynamic: true, vel, spin: { x: Math.random() * 6 - 3, y: Math.random() * 6 - 3, z: Math.random() * 6 - 3 }, debris: true });
     }
@@ -158,7 +162,7 @@ export class Damage {
   }
 
   // Take a bite out of a piece where it was hit.
-  _bite(p, point, normal, dir, radius, depth, kind) {
+  _bite(p, point, normal, dir, radius, depth, kind, { chips: throwChips = true } = {}) {
     const { chips, particles } = this.fx;
     const local = this.toLocal(p, point);
     const ldir = this.dirToLocal(p, dir);
@@ -184,7 +188,7 @@ export class Damage {
     // What comes off: chips back towards you, and out of the far side if it
     // went through; dust hangs in the air.
     const back = normal.clone();
-    chips.burst(chipKind(kind), point, back, Math.round(6 + radius * 40), 2.5, Math.min(0.06, radius * 0.25));
+    if (throwChips) chips.burst(chipKind(kind), point, back, Math.round(6 + radius * 40), 2.5, Math.min(0.06, radius * 0.25));
     if (through) {
       const exit = point.clone().addScaledVector(dir, thin);
       chips.burst(chipKind(kind), exit, dir, Math.round(8 + radius * 50), 3.5, Math.min(0.07, radius * 0.3));
@@ -207,7 +211,7 @@ export class Damage {
     if (!pane) { this.fracture(p, point, dir, energy); return p.kind; }
     const chip = (at, push) => this.fx.chips.burst('glass', at, push ?? dir, 3, 2, 0.025);
     if (!p.crack && energy < 1.6) {
-      crack(this.pieces, p, local, 0.8 + energy * 0.4);
+      crackGlass(this.pieces, p, local, 0.8 + energy * 0.4);
       return p.kind;
     }
     this.fx.audio?.hit('glass', point.x, point.y, point.z, 1.4);

@@ -173,6 +173,29 @@ kind), a pose, a role (`slab`, `column`, `core`, `glass`, `mullion`, `spandrel`,
 - **Masses are real kilograms** (`setDensity(kind.density)`). They were tonnes once, so a
   desk weighed half a kilo and a sledge sent it across the room.
 
+### Durability, cracks, and falling things
+
+This is the owner's model of destruction, in their words: a blow takes most of
+what it hits and leaves the rest cracked; the more cracked, the weaker; weak
+things carry less; big falling things break what they land on; small bits go.
+
+- **Every piece has durability** (`hp`/`hpMax`): blows by material, from `HITS`
+  in `render/materials.js`, scaled by the cube root of its size. A column takes
+  about five, a plaster wall two, a desk one or two, a steel beam a dozen.
+- **The weaker it is, the bigger the bite.** Soft materials lose most of what
+  you hit; concrete loses a head-sized lump that falls; metal dents and sparks.
+- **Cracks show it** (`damage/cracks.js`): a crack decal at every blow, bigger
+  the weaker the piece, drawn only on faces that point at the blow (a decal box
+  also catches a column's sides, and cracks seen edge-on float in the air).
+- **Cracked supports carry nothing** below a quarter of their durability (`WEAK`
+  in `support.js`).
+- **Falling things deal blows** (`sim/impacts.js`): energy / 560 J (one swing)
+  goes to whatever they land on, which cracks and may break, and what broke
+  falls in turn. A 1.6 t lump dropped 6 m broke a slab bay and itself.
+- **Small bits go.** Fragments under 25 kg fade about four seconds after they
+  break off, by simulation time (a heap of them jostles for ever and never
+  counts as resting); chips fade four seconds after they land.
+
 ### How things break
 
 `damage/damage.js` is the only thing that turns a blow into damage:

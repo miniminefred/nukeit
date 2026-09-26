@@ -142,7 +142,7 @@ function columns(P, f) {
       if (f === 0 && Math.abs(x) < 3.2 && z > 11) continue;      // the doorway
       if (!tower && x > ATRIUM.x0 && x < ATRIUM.x1 && z > ATRIUM.z0 && z < ATRIUM.z1) continue;
       // Marble in the lobby and the penthouse, bare concrete everywhere else.
-      block(P, f === 0 || f >= PENTHOUSE ? 'marble' : 'concrete', x - s, T(f), z - s, x + s, U(f), z + s, 'column', { floor: f, hp: 10, load: ROOF - f });
+      block(P, f === 0 || f >= PENTHOUSE ? 'marble' : 'concrete', x - s, T(f), z - s, x + s, U(f), z + s, 'column', { floor: f, load: ROOF - f });
     }
 }
 
@@ -152,7 +152,7 @@ function core(P, f) {
   // for a wall to stand on, so each storey's walls stand on the ones below.
   const y0 = f === 0 ? T(0) : f * FLOOR_H, y1 = U(f);
   const kind = f === 0 ? 'marble' : 'concrete';
-  const wall = (a0, b0, a1, b1, ya = y0, yb = y1) => block(P, kind, a0, ya, b0, a1, yb, b1, 'core', { floor: f, hp: 14, load: ROOF - f });
+  const wall = (a0, b0, a1, b1, ya = y0, yb = y1) => block(P, kind, a0, ya, b0, a1, yb, b1, 'core', { floor: f, load: ROOF - f });
   wall(x0, z0, x0 + t, z1);
   wall(x1 - t, z0, x1, z1);
   wall(x0 + t, z0, x1 - t, z0 + t);
@@ -166,7 +166,7 @@ function core(P, f) {
   wall(3.4, z1 - t, x1 - t, z1, y0, head);
   wall(x0 + t, z1 - t, x1 - t, z1, head, y1);
   // Between stair and lift.
-  block(P, 'concrete', -0.2, y0, z0 + t, 0.2, y1, z1 - t, 'core', { floor: f, hp: 14, load: ROOF - f });
+  block(P, 'concrete', -0.2, y0, z0 + t, 0.2, y1, z1 - t, 'core', { floor: f, load: ROOF - f });
   // Brass lift doors — the only thing between the lobby and the shaft.
   // They stand just outside the wall, on the corridor slab: there is no floor
   // inside the shaft for them to stand on.

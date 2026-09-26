@@ -59,8 +59,8 @@ export class Pieces {
       volume: 0,
       damage: 0,          // volume taken out, m^3
       bites: 0,
-      hp: spec.hp ?? null,
-      hpMax: spec.hp ?? null,
+      hp: null,
+      hpMax: null,
       load: spec.load ?? 0,        // storeys this piece carries, for columns and core
       burning: 0,
       charred: 0,
@@ -76,6 +76,10 @@ export class Pieces {
     }
     const s = p.localBox.getSize(new THREE.Vector3());
     p.volume = s.x * s.y * s.z;
+    // Durability: the weakest-part-weighted blows it can take. A cracked piece
+    // is one with less of this left; see damage/damage.js.
+    const hits = Math.max(...p.parts.map((q) => q.kind.hits));
+    p.hpMax = p.hp = spec.hp ?? +(hits * THREE.MathUtils.clamp(Math.cbrt(p.volume / 0.5), 0.5, 3)).toFixed(2);
     this._updateBox(p);
     this.list.push(p);
     return p;
