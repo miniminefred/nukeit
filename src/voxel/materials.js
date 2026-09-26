@@ -17,7 +17,7 @@ const TABLE = [
   ['air',          '#000000', 0,   false, 0,  0],
   ['concrete',     '#a9a49b', 2.2, true,  0,  0],
   ['steel',        '#4b4239', 4.0, true,  0,  0],
-  ['glass',        '#2c2a26', 0.5, false, 0,  0],
+  ['glass',        '#5e5440', 0.5, false, 0,  0],
   ['drywall',      '#d9d4c8', 0.7, false, 9,  0],
   ['wood',         '#7a5230', 1.0, false, 14, 0],
   ['carpet',       '#5b4a44', 0.8, false, 8,  0],
@@ -28,7 +28,8 @@ const TABLE = [
   ['soil',         '#5a4431', 1.0, false, 0,  0],
   ['gastank',      '#b8322a', 1.5, false, 0,  3.5],
   ['transformer',  '#6d7468', 2.5, false, 0,  5.0],
-  ['spandrel',     '#1d1b18', 1.5, true,  0,  0],
+  ['spandrel',     '#2f2a23', 1.5, false, 0,  0],
+  ['mullion',      '#8f7550', 1.8, false, 0,  0],
   ['fabric',       '#394a66', 0.6, false, 5,  0],
   ['roofing',      '#3b3a38', 1.5, true,  0,  0],
 ];
@@ -54,7 +55,7 @@ for (const m of MATERIALS) {
 // Spray paint colours. Index 0 means unpainted.
 export const PAINTS = ['', '#d8262b', '#f2c12e', '#2f7fe0', '#39b54a', '#f0f0f0', '#e0529c', '#111111'];
 
-// Vertex colours are linear, so the sRGB colours above are converted once here.
+// Vertex colours are linear; THREE.Color converts the sRGB strings above.
 // Row c of the palette is material (c & 31) under paint (c >> 5).
 export const PALETTE = new Float32Array(256 * 3);
 {
@@ -66,7 +67,8 @@ export const PALETTE = new Float32Array(256 * 3);
     // A painted surface keeps a little of what is underneath, so a spray over
     // glass still reads as glass.
     if (paint) col.lerp(new THREE.Color(MATERIALS[mat].colour), 0.15);
-    col.convertSRGBToLinear();
+    // No convertSRGBToLinear here: Color.set already lands in the linear working
+    // space, and converting a second time turned the whole tower black.
     PALETTE[c * 3] = col.r;
     PALETTE[c * 3 + 1] = col.g;
     PALETTE[c * 3 + 2] = col.b;

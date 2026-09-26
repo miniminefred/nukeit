@@ -14,10 +14,10 @@ export const CHUNK_MASK = CHUNK - 1;
 // the ground.
 export const MIN_X = -32, MAX_X = 32;
 export const MIN_Z = -24, MAX_Z = 24;
-export const MIN_Y = 0, MAX_Y = 108;
+export const MIN_Y = 0, MAX_Y = 112;
 
 export const NX = Math.round((MAX_X - MIN_X) / VOXEL);   // 256
-export const NY = Math.round((MAX_Y - MIN_Y) / VOXEL);   // 432
+export const NY = Math.round((MAX_Y - MIN_Y) / VOXEL);   // 448
 export const NZ = Math.round((MAX_Z - MIN_Z) / VOXEL);   // 192
 
 export const CX = NX >> CHUNK_SHIFT;

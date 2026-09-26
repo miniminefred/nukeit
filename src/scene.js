@@ -32,13 +32,17 @@ export function createLights(scene) {
   scene.add(hemi);
 
   const sun = new THREE.DirectionalLight(0xfff1dc, 2.5);
-  sun.position.set(40, 80, 25);
+  // Far enough out that the shadow camera sits above the 104 m roof.
+  sun.position.set(90, 160, 70);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(4096, 4096);
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.05;
   const s = sun.shadow.camera;
-  s.left = s.bottom = -60;
-  s.right = s.top = 60;
-  s.far = 200;
+  s.left = s.bottom = -75;
+  s.right = s.top = 75;
+  s.near = 10;
+  s.far = 420;
   scene.add(sun);
 
   return { hemi, sun };
