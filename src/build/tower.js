@@ -88,7 +88,7 @@ export function buildTower(field) {
       facade(field, f, j0, i0, i1, k0, k1);
       terraceRails(field, f, j0, i0, i1, k0, k1);
       stairs(field, j0);
-      fitOut(field, f, j0);
+      fitOut(interior(field, f), f, j0);
     }
   }
   core(field);
@@ -148,14 +148,14 @@ function isEdge(f, x, z) {
   return !inside(f, x + d, z) || !inside(f, x - d, z) || !inside(f, x, z + d) || !inside(f, x, z - d);
 }
 
-// The curtain wall: bronze glass, a mullion every 1.5 m, and a dark spandrel
+// The curtain wall: bronze glass, a mullion every 3 m, and a dark spandrel
 // band across the slab edge.
 function facade(field, f, j0, i0, i1, k0, k1) {
   for (let i = i0; i <= i1; i++)
     for (let k = k0; k <= k1; k++) {
       const x = cxOf(i), z = czOf(k);
       if (!inside(f, x, z) || !isEdge(f, x, z)) continue;
-      const mullion = (i + k) % 6 === 0;
+      const mullion = (i + k) % 12 === 0;
       for (let dj = 1; dj < FV; dj++) {
         let m = dj >= FV - 3 ? M.SPANDREL : mullion ? M.MULLION : M.GLASS;
         if (f === 0 && z > PODIUM.z1 - 0.3 && x >= ENTRANCE.x0 && x < ENTRANCE.x1 && dj * VOXEL <= ENTRANCE.h) m = AIR;
@@ -216,6 +216,24 @@ function stairs(field, j0) {
 }
 
 // ---------------------------------------------------------------- contents
+
+// A view of the field that only takes writes strictly inside storey f's floor
+// plate. Furniture is placed on a grid and the sawtooth pulls the glass in and
+// out under it, so without this a partition or a chair pokes out through the
+// curtain wall wherever a notch comes past.
+function interior(field, f) {
+  return {
+    set(i, j, k, m) {
+      const x = cxOf(i), z = czOf(k);
+      if (inside(f, x, z) && !isEdge(f, x, z)) field.set(i, j, k, m);
+    },
+    fill(i0, j0, k0, i1, j1, k1, m) {
+      for (let j = j0; j <= j1; j++)
+        for (let k = k0; k <= k1; k++)
+          for (let i = i0; i <= i1; i++) this.set(i, j, k, m);
+    },
+  };
+}
 
 function fitOut(field, f, j0) {
   const y = (j0 + 1) * VOXEL;

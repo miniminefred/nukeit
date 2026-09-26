@@ -17,7 +17,7 @@ const TABLE = [
   ['air',          '#000000', 0,   false, 0,  0],
   ['concrete',     '#a9a49b', 2.2, true,  0,  0],
   ['steel',        '#4b4239', 4.0, true,  0,  0],
-  ['glass',        '#5e5440', 0.5, false, 0,  0],
+  ['glass',        '#403a31', 0.5, false, 0,  0],
   ['drywall',      '#d9d4c8', 0.7, false, 9,  0],
   ['wood',         '#7a5230', 1.0, false, 14, 0],
   ['carpet',       '#5b4a44', 0.8, false, 8,  0],
@@ -29,7 +29,7 @@ const TABLE = [
   ['gastank',      '#b8322a', 1.5, false, 0,  3.5],
   ['transformer',  '#6d7468', 2.5, false, 0,  5.0],
   ['spandrel',     '#2f2a23', 1.5, false, 0,  0],
-  ['mullion',      '#8f7550', 1.8, false, 0,  0],
+  ['mullion',      '#6b5a42', 1.8, false, 0,  0],
   ['fabric',       '#394a66', 0.6, false, 5,  0],
   ['roofing',      '#3b3a38', 1.5, true,  0,  0],
 ];
