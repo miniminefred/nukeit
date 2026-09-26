@@ -108,7 +108,7 @@ export class Structure {
       if (f.low >= f.list.length) break;
     }
     if (crushed) {
-      f.v *= Math.max(0.55, 1 - crushed / 300);
+      f.v *= Math.max(0.8, 1 - crushed / 600);
       fx.shake?.add(Math.min(0.5, crushed / 200));
       fx.audio?.rumble(Math.min(1, 0.4 + crushed / 150));
       // The dust front at the crush line.
@@ -147,7 +147,7 @@ export class Structure {
     b.min.y += offset; b.max.y += offset;
     const vol = p.volume * (p.kind.density > 1500 ? 0.35 : 0.08);
     if (p.role === 'slab' || p.role === 'column' || p.role === 'core' || p.role === 'stair') this.fx.heap.add(b, vol);
-    if (p.kind.name === 'glass' && Math.random() < 0.3) this.fx.chips.burst('glass', b.getCenter(new THREE.Vector3()), new THREE.Vector3(0, 1, 0), 6, 4, 0.03);
+    if (p.kind.name === 'glass' && Math.random() < 0.08) this.fx.chips.burst('glass', b.getCenter(new THREE.Vector3()), new THREE.Vector3(0, 1, 0), 4, 4, 0.03);
     if ((p.role === 'slab' || p.role === 'column') && Math.random() < 0.08 && this.pieces.physics.dynamic.size < 350) {
       const c = b.getCenter(new THREE.Vector3());
       const out = c.clone().sub(f.foot.getCenter(new THREE.Vector3())).setY(0).normalize();

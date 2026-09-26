@@ -11,6 +11,11 @@
 //  * **Only structure carries structure.** A slab may rest on a column or a
 //    core wall, never on a partition, a pane of glass or a filing cabinet.
 //    Anything may rest on structure.
+//  * **Nothing hangs off a chain of non-structure.** A monitor on a desk on a
+//    floor is fine; a stack of glass on spandrel on mullion on glass, twenty
+//    storeys of it, is not a building. Non-structural things may be at most
+//    three steps from real structure. Without this rule the curtain wall held
+//    itself up from the first floor after everything behind it had gone.
 //  * **Slabs span, a little.** A bay with nothing under it still stands if it
 //    is tied to a bay that is itself resting on something — up to two bays
 //    out. So knocking out one column leaves the floor sagging on its
@@ -21,6 +26,7 @@
 const TOL = 0.06;
 const MIN_OVERLAP = 0.005;   // a 2 cm glass rail on a slab edge still counts
 const CELL = 2;
+const MAX_DEPTH = 3;
 
 export function link(pieces) {
   const grid = new Map();
@@ -87,9 +93,16 @@ function relate(A, B) {
 export function unsupported(pieces) {
   const standing = pieces.filter((p) => p.state === 'static');
   standing.sort((a, b) => a.box.min.y - b.box.min.y);
-  for (const p of standing) { p.sup = false; p.direct = false; }
+  for (const p of standing) { p.sup = false; p.direct = false; p.depth = 99; }
 
-  const holds = (p, q) => q.state === 'static' && q.sup && (!p.structural || q.structural);
+  const holds = (p, q) => q.state === 'static' && q.sup && (p.structural ? q.structural : q.depth < MAX_DEPTH);
+  // How many non-structural steps a piece is from structure, once it stands.
+  const depthOf = (p) => {
+    if (p.structural) return 0;
+    let d = 99;
+    for (const q of p.rests) if (holds(p, q) && q.depth + 1 < d) d = q.depth + 1;
+    return p.box.min.y < 0.05 ? 1 : d;
+  };
 
   let n = 0;
   while (n < standing.length) {
@@ -100,21 +113,21 @@ export function unsupported(pieces) {
     for (let i = n; i < m; i++) {
       const p = standing[i];
       if (p.hang) continue;
-      if (p.box.min.y < 0.05 || p.rests.some((q) => holds(p, q))) { p.sup = true; p.direct = true; }
+      if (p.box.min.y < 0.05 || p.rests.some((q) => holds(p, q))) { p.sup = true; p.direct = true; p.depth = depthOf(p); }
     }
     // Spans: two bays out from anything resting directly on support.
     for (let hop = 0; hop < 2; hop++) {
       for (let i = n; i < m; i++) {
         const p = standing[i];
         if (p.sup || !p.lateral) continue;
-        if (p.sides.some((q) => q.state === 'static' && q.sup && (hop === 0 ? q.direct : true))) p.sup = true;
+        if (p.sides.some((q) => q.state === 'static' && q.sup && (hop === 0 ? q.direct : true))) { p.sup = true; p.depth = 0; }
       }
     }
     n = m;
   }
   // Lamps last: what they hang from is above them.
   for (const p of standing) {
-    if (p.hang) p.sup = p.rests.some((q) => q.state === 'static' && q.sup);
+    if (p.hang) { p.sup = p.rests.some((q) => q.state === 'static' && q.sup); p.depth = 1; }
   }
   return standing.filter((p) => !p.sup);
 }

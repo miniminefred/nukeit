@@ -1,19 +1,26 @@
 import * as THREE from 'three';
+import { surface } from '../render/textures.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // The city round the job: a street, pavements and the blocks on either side.
 //
-// None of it is matter. The job site is the only part of the world made of
-// voxels; this is stage scenery, and nothing you do reaches it.
+// None of it can be broken. The job site is the only part of the world made of
+// pieces; this is stage scenery, and nothing you do reaches it.
 
 export function buildCity(scene) {
   const group = new THREE.Group();
   group.name = 'city';
 
-  const flat = (w, d, colour, x, z, y = 0) => {
-    const m = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, d),
-      new THREE.MeshLambertMaterial({ color: colour }),
-    );
+  // Ground surfaces are PBR like the building, so they take the sky's light in
+  // shade instead of going black. `surf` tiles every `tile` metres.
+  const flat = (w, d, colour, x, z, y = 0, surf = null, tile = 2) => {
+    let mat;
+    if (surf) {
+      const s = surface(surf);
+      const rep = (t) => { const c = t.clone(); c.needsUpdate = true; c.repeat.set(w / tile, d / tile); return c; };
+      mat = new THREE.MeshStandardMaterial({ map: rep(s.map), normalMap: rep(s.normalMap), roughnessMap: rep(s.roughnessMap), color: colour });
+    } else mat = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.9 });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
     m.rotation.x = -Math.PI / 2;
     m.position.set(x, y, z);
     m.receiveShadow = true;
@@ -22,22 +29,25 @@ export function buildCity(scene) {
   };
 
   // Ground, the plot itself, the avenue in front and pavement between.
-  flat(1200, 1200, 0x55524c, 0, 0, -0.02);
-  flat(60, 44, 0x6f6b64, 0, 0, 0.001);              // the plot: paving
-  flat(1200, 16, 0x2b2b2d, 0, 34, 0.002);           // avenue
-  flat(1200, 8, 0x8c877f, 0, 22, 0.003);            // pavement, our side
-  flat(1200, 8, 0x8c877f, 0, 46, 0.003);            // pavement, far side
-  for (let x = -600; x < 600; x += 6) flat(3, 0.2, 0xd8d2c0, x, 34, 0.004);  // centre line
+  flat(1200, 1200, 0x77736c, 0, 0, -0.02, 'paving', 8);
+  flat(60, 44, 0xffffff, 0, 0, 0.001, 'paving', 4);        // the plot
+  flat(600, 16, 0xffffff, 0, 34, 0.002, 'asphalt', 6);     // Fifth Avenue
+  flat(600, 8, 0xe8e2d8, 0, 22, 0.003, 'paving', 2);       // pavement, our side
+  flat(600, 8, 0xe8e2d8, 0, 46, 0.003, 'paving', 2);       // pavement, far side
+  // The centre line: one mesh of dashes, not a hundred.
+  const dashes = [];
+  for (let x = -300; x < 300; x += 6) dashes.push(new THREE.PlaneGeometry(3, 0.18).rotateX(-Math.PI / 2).translate(x, 0.004, 34));
+  group.add(new THREE.Mesh(mergeGeometries(dashes), new THREE.MeshStandardMaterial({ color: 0xd8d2c0, roughness: 0.7 })));
 
-  // City blocks. Kept clear of the voxel region (x +/-32, z +/-24) so nothing
-  // here stands in anything you can break.
+  // City blocks, kept clear of the job site (x +/-32, z +/-24) so nothing here
+  // stands in anything you can break.
   const windows = windowTexture();
   const rand = mulberry(7);
   const tower = (x, z, w, d, h, tint) => {
     const tex = windows.clone();
     tex.needsUpdate = true;
     tex.repeat.set(Math.max(1, Math.round(w / 3)), Math.max(1, Math.round(h / 3.6)));
-    const mat = new THREE.MeshLambertMaterial({ color: tint, map: tex });
+    const mat = new THREE.MeshStandardMaterial({ color: tint, map: tex, roughness: 0.85 });
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     m.position.set(x, h / 2, z);
     m.castShadow = true;

@@ -70,6 +70,9 @@ export class Chips {
   }
 
   update(dt) {
+    // Ray tests are the whole cost, so only so many chips get one each frame;
+    // the rest coast for a frame and take their turn next time.
+    let rays = 160;
     for (const key of ['solid', 'glass']) {
       const list = this.items[key];
       let moving = false;
@@ -80,7 +83,10 @@ export class Chips {
         const nx = c.x + c.vx * dt, ny = c.y + c.vy * dt, nz = c.z + c.vz * dt;
         const dx = nx - c.x, dy = ny - c.y, dz = nz - c.z;
         const len = Math.hypot(dx, dy, dz);
-        if (len > 1e-5) {
+        const test = rays > 0 || c.skipped > 2;
+        c.skipped = test ? 0 : (c.skipped ?? 0) + 1;
+        if (test) rays--;
+        if (len > 1e-5 && test) {
           this._org.x = c.x; this._org.y = c.y; this._org.z = c.z;
           this._dir.x = dx / len; this._dir.y = dy / len; this._dir.z = dz / len;
           const hit = this.physics.raycast(this._org, this._dir, len + 0.01);

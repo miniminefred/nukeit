@@ -287,8 +287,10 @@ function lobby(P, y) {
   for (const x of [-17, 7.5]) F.plant(P, x, y, 10.8, true);
   F.plant(P, -5.8, y, 4.3, true);
   F.plant(P, 5.8, y, 4.3, true);
-  // The waterfall wall at the back of the atrium: pink marble, four storeys.
-  block(P, 'marble', 10.3, y, -6.95, 14.7, 16, -6.6, 'wall', { floor: 0 });
+  // The waterfall wall at the back of the atrium: pink marble, two storeys.
+  // Cladding, not structure: marble counts as load-bearing, and a decorative
+  // wall four storeys tall was quietly holding the whole podium up.
+  block(P, 'marble', 10.3, y, -6.95, 14.7, 8, -6.6, 'wall', { floor: 0, structural: false });
   F.chandelier(P, -3, U(0), 8);
   F.chandelier(P, 3, U(0), 8);
   // Escalator up to the first floor, stepping down into the atrium.
