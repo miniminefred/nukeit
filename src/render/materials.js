@@ -42,6 +42,11 @@ const KINDS = {
   transformer: { surf: 'metal', repeat: 1, density: 3000, toughness: 12, explodes: 6, metal: 0.5, tint: 0x6f7a6c, sound: 'steel' },
   screen:      { surf: 'plastic', repeat: 0.5, density: 900, toughness: 0.8, burns: 12, inside: 'plastic', sound: 'glass', emissive: 0x1c2a3a },
   lamp:        { density: 300, toughness: 0.5, sound: 'glass', light: true },
+  // A home and a restaurant need a few things an office does not.
+  ceramic:     { surf: 'plaster', repeat: 0.8, density: 2300, toughness: 1.6, inside: 'gypsum', metal: 0, rough: 0.25, sound: 'glass' },
+  lacquer:     { surf: 'plastic', repeat: 0.6, density: 700, toughness: 2, burns: 25, inside: 'rawwood', splinters: true, rough: 0.2, tint: 0x0b0b0c, sound: 'wood' },
+  linen:       { surf: 'fabric', repeat: 0.5, density: 250, toughness: 0.4, burns: 7, inside: 'fabric', tint: 0xf1ede4, sound: 'drywall' },
+  gold:        { surf: 'brass', repeat: 1, density: 12000, toughness: 40, metal: 1, rough: 0.6, tint: 0xffe08a, sound: 'brass' },
 };
 
 export const KIND = {};

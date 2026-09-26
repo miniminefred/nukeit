@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { block, panel, plate, assembly } from './kit.js';
 import * as F from './furniture.js';
+import { fitOut as furnish } from './interiors.js';
+import { FLOOR_H, SLAB, PODIUM_FLOORS, TOP_FLOOR, ROOF, PENTHOUSE, T, U, CORE, ATRIUM, podiumFront, OUTLINE, inPoly, inCore, rectPoly } from './plan.js';
 
 // Trump Tower, at 100 m.
 //
@@ -15,51 +17,12 @@ import * as F from './furniture.js';
 // every slab. Glass, partitions and furniture carry nothing (building/support.js).
 // Break the columns and the core on one storey and everything above comes down.
 //
-//                 x: -20            0              20
-//     z -12   +---------------------------------------+   podium, floors 0-5
-//             | plant  |    +--core--+    | atrium |   |   (steps back on 4, 5)
-//             | room   |    |stair|lift   |  void  |   |
-//             |        |    +--------+    |        |   |
-//     z  12   +--------------[ door ]-----------------+
-//                         TRUMP TOWER
-//
-//     tower, floors 6-24: x -14..10, z -9..7, with a sawtooth of 45-degree
-//     teeth out to x = 12 and z = 9.
+// The floor plan is in plan.js; what is on each floor is in interiors.js.
 
-export const FLOOR_H = 4;
-const SLAB = 0.3;
-export const PODIUM_FLOORS = 6;
-export const TOP_FLOOR = 24;
-const ROOF = TOP_FLOOR + 1;
-
-const T = (f) => f * FLOOR_H + SLAB;        // top of floor f's slab
-const U = (f) => (f + 1) * FLOOR_H;         // underside of the slab above it
-
-const CORE = { x0: -5, x1: 5, z0: -3.5, z1: 3.5, t: 0.4 };
-const ATRIUM = { x0: 10, x1: 15, z0: -7, z1: 7 };
-const podiumFront = (f) => (f <= 3 ? 12 : f === 4 ? 10.5 : 9);
-
-// The tower's outline, anticlockwise from above (+x right, +z towards you).
-const OUTLINE = (() => {
-  const pts = [[-14, -9], [10, -9]];
-  for (const b of [-9, -5, -1, 3]) pts.push([12, b + 2], [10, b + 4]);
-  for (const a of [6, 2, -2, -6, -10, -14]) pts.push([a + 2, 9], [a, 7]);
-  return pts.map(([x, z]) => new THREE.Vector3(x, 0, z));
-})();
+export { FLOOR_H, PODIUM_FLOORS, TOP_FLOOR } from './plan.js';
 
 export const SITE = { x0: -21, x1: 21, z0: -13, z1: 14 };      // what the job measures
 export const ENTRY = { x: 0, z: 20, yaw: 0 };                   // where you arrive, facing the door
-
-function inPoly(poly, x, z) {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const a = poly[i], b = poly[j];
-    if ((a.z > z) !== (b.z > z) && x < ((b.x - a.x) * (z - a.z)) / (b.z - a.z) + a.x) inside = !inside;
-  }
-  return inside;
-}
-const inCore = (x, z, m = 0) => x > CORE.x0 - m && x < CORE.x1 + m && z > CORE.z0 - m && z < CORE.z1 + m;
-const rectPoly = (x0, z0, x1, z1) => [new THREE.Vector3(x0, 0, z0), new THREE.Vector3(x1, 0, z0), new THREE.Vector3(x1, 0, z1), new THREE.Vector3(x0, 0, z1)];
 
 export function buildTower(P) {
   for (let f = 0; f <= ROOF; f++) {
@@ -69,7 +32,7 @@ export function buildTower(P) {
       core(P, f);
       stair(P, f);
       facade(P, f);
-      fitOut(P, f);
+      furnish(P, f);
     }
   }
   terraces(P);
@@ -85,17 +48,18 @@ function slabs(P, f) {
   const y0 = f * FLOOR_H, y1 = T(f);
   // Every slab bay gets a suspended ceiling under it (the ceiling of the floor
   // below), and on the office floors carpet over it.
-  const offices = f >= PODIUM_FLOORS && f !== ROOF;
+  // Carpet on the office floors, marble in the penthouse.
+  const finish = f >= PODIUM_FLOORS && f !== ROOF ? (f >= PENTHOUSE ? 'marble' : 'carpet') : null;
   const add = (x0, z0, x1, z1, kind) => {
     const s = block(P, kind, x0, y0, z0, x1, y1, z1, 'slab', { floor: f, lateral: true });
     if (f >= 1) block(P, 'plaster', x0, y0 - 0.03, z0, x1, y0, z1, 'ceiling', { floor: f - 1, hang: true, tint: 0xf2efe8 });
-    if (offices) block(P, 'carpet', x0, y1, z0, x1, y1 + 0.02, z1, 'carpet', { floor: f });
+    if (finish) block(P, finish, x0, y1, z0, x1, y1 + 0.02, z1, 'carpet', { floor: f, structural: false });
     return s;
   };
   const addPlate = (poly, kind) => {
     plate(P, kind, poly, y0, y1, 'slab', { floor: f, lateral: true });
     plate(P, 'plaster', poly, y0 - 0.03, y0, 'ceiling', { floor: f - 1, hang: true, tint: 0xf2efe8 });
-    if (offices) plate(P, 'carpet', poly, y1, y1 + 0.02, 'carpet', { floor: f });
+    if (finish) plate(P, finish, poly, y1, y1 + 0.02, 'carpet', { floor: f, structural: false });
   };
 
   if (f < PODIUM_FLOORS || f === PODIUM_FLOORS) {
@@ -175,7 +139,8 @@ function columns(P, f) {
       if (inCore(x, z, 0.5)) continue;
       if (f === 0 && Math.abs(x) < 3.2 && z > 11) continue;      // the doorway
       if (!tower && x > ATRIUM.x0 && x < ATRIUM.x1 && z > ATRIUM.z0 && z < ATRIUM.z1) continue;
-      block(P, f === 0 ? 'marble' : 'concrete', x - s, T(f), z - s, x + s, U(f), z + s, 'column', { floor: f, hp: 10, load: ROOF - f });
+      // Marble in the lobby and the penthouse, bare concrete everywhere else.
+      block(P, f === 0 || f >= PENTHOUSE ? 'marble' : 'concrete', x - s, T(f), z - s, x + s, U(f), z + s, 'column', { floor: f, hp: 10, load: ROOF - f });
     }
 }
 
@@ -204,8 +169,12 @@ function core(P, f) {
   // They stand just outside the wall, on the corridor slab: there is no floor
   // inside the shaft for them to stand on.
   const yd = T(f);
-  block(P, 'brass', 0.9, yd, z1, 2.15, yd + 2.4, z1 + 0.04, 'furniture', { floor: f });
-  block(P, 'brass', 2.15, yd, z1, 3.4, yd + 2.4, z1 + 0.04, 'furniture', { floor: f });
+  // A brass sill across the lift doorway, so there is floor between the car
+  // and the landing. It rests on the core wall below.
+  if (f >= 1) block(P, 'brass', 0.9, f * FLOOR_H, 3.05, 3.4, T(f), z1, 'furniture', { floor: f, structural: false });
+  // Tagged so the lift can find them and slide them open.
+  block(P, 'brass', 0.9, yd, z1, 2.15, yd + 2.4, z1 + 0.04, 'liftdoor', { floor: f, tag: 'left', structural: false });
+  block(P, 'brass', 2.15, yd, z1, 3.4, yd + 2.4, z1 + 0.04, 'liftdoor', { floor: f, tag: 'right', structural: false });
 }
 
 // A switchback of twenty 20 cm risers per storey. One piece per storey, with
@@ -261,130 +230,6 @@ function facade(P, f) {
     // Spandrel: the dark band that hides the next slab's edge.
     if (f < (tower ? TOP_FLOOR + 1 : PODIUM_FLOORS)) panel(P, 'bronze', A, B, yTop, ySp1, 0.19, -out * 0.025, 'spandrel', { floor: f, tint: 0x6a5a48 });
   }
-}
-
-// ---------------------------------------------------------------- fit-out
-
-const COLS_T = [];
-for (const x of [-13.6, -9.5, -5, 0, 5, 9.6]) for (const z of [-8.6, -3.5, 3.5, 6.6]) if (!inCore(x, z, 0.5)) COLS_T.push([x, z]);
-const nearColumn = (x, z, d) => COLS_T.some(([a, b]) => Math.abs(a - x) < d && Math.abs(b - z) < d);
-
-function fitOut(P, f) {
-  const y = T(f);
-  if (f === 0) lobby(P, y);
-  else if (f < PODIUM_FLOORS) shops(P, f, y);
-  else offices(P, f, y);
-  // Ceiling lights on every floor.
-  const top = U(f);
-  const tower = f >= PODIUM_FLOORS;
-  const xs = tower ? [-11.5, -8, 7.5] : [-17, -12, -7, 7, 17.5];
-  const zs = tower ? [-6.5, -0.5, 5] : [-9.5, -5, 0, 5, 9];
-  for (const x of xs) for (const z of zs) {
-    if (!tower && (z > podiumFront(f) - 1 || (x > ATRIUM.x0 && x < ATRIUM.x1 && z > ATRIUM.z0 && z < ATRIUM.z1))) continue;
-    if (inCore(x, z, 1)) continue;
-    F.ceilingLight(P, x, top, z);
-  }
-  for (const x of [-2.5, 2.5]) for (const z of [-5.5, 5]) if (tower || z < podiumFront(f) - 1) F.ceilingLight(P, x, top, z);
-}
-
-function lobby(P, y) {
-  F.receptionDesk(P, -9, y, 5.4, 0);
-  F.bench(P, 6, y, 9.5, 0);
-  F.bench(P, -14, y, 9.5, 0);
-  for (const x of [-17, 7.5]) F.plant(P, x, y, 10.8, true);
-  F.plant(P, -5.8, y, 4.3, true);
-  F.plant(P, 5.8, y, 4.3, true);
-  // The waterfall wall at the back of the atrium: pink marble, two storeys.
-  // Cladding, not structure: marble counts as load-bearing, and a decorative
-  // wall four storeys tall was quietly holding the whole podium up.
-  block(P, 'marble', 10.3, y, -6.95, 14.7, 8, -6.6, 'wall', { floor: 0, structural: false });
-  F.chandelier(P, -3, U(0), 8);
-  F.chandelier(P, 3, U(0), 8);
-  // Escalator up to the first floor, stepping down into the atrium.
-  const steps = [];
-  for (let n = 1; n <= 20; n++) {
-    const x1 = 16 - (n - 1) * 0.3, x0 = x1 - 0.3, top = n * 0.2;
-    steps.push([x0, top - 0.3, -1.2, x1, top, 0]);
-  }
-  assembly(P, 0, y, 0, 0, [
-    { kind: 'metal', boxes: steps, tint: 0x6b6f73 },
-    { kind: 'brass', boxes: [[10, 0.9, -1.3, 16, 1.0, -1.2], [10, 0.9, 0, 16, 1.0, 0.1]] },
-  ], 'stair', { floor: 0, colliders: steps, structural: false });
-  // The plant room: two transformers, the gas, the switchgear.
-  block(P, 'plaster', -14.2, y, -11.6, -14, U(0), -6.8, 'wall', { floor: 0 });
-  block(P, 'plaster', -19.6, y, -7, -17, U(0), -6.8, 'wall', { floor: 0 });
-  block(P, 'plaster', -15.6, y, -7, -14.2, U(0), -6.8, 'wall', { floor: 0 });
-  block(P, 'wood', -17, y, -6.95, -15.6, y + 2.2, -6.85, 'furniture', { floor: 0, tint: 0x5a6a5a });
-  F.transformer(P, -18.4, y, -10.4, 0);
-  F.transformer(P, -15.8, y, -10.4, 0);
-  for (const x of [-19.2, -18.8, -18.4]) F.gasTank(P, x, y, -7.6);
-  F.electricalCabinet(P, -14.7, y, -9, Math.PI / 2);
-}
-
-function shops(P, f, y) {
-  const front = podiumFront(f);
-  for (let x = -17; x <= 6; x += 3.2)
-    for (const z of [-9.2, 5.6]) {
-      if (z > front - 1.5 || inCore(x, z, 1.2) || (x < -13.5 && z < -6.5)) continue;
-      if (Math.abs(x - -14) < 1 || Math.abs(x - -9.5) < 1 || Math.abs(x - -5) < 1 || Math.abs(x - 0) < 1 || Math.abs(x - 5) < 1) {
-        F.displayTable(P, x + 1.5, y, z + (z < 0 ? 1.2 : -1.2), 0);
-      } else F.clothesRack(P, x, y, z, 0);
-    }
-  for (const x of [-12, -7.5, 7.5]) F.mannequin(P, x, y, front - 1.2, Math.PI);
-  F.counter(P, 16.5, y, front - 3, Math.PI / 2, 2.4);
-  F.plant(P, 18.6, y, -11, false);
-  // A kitchen at the back on the even floors, with its gas.
-  if (f % 2 === 0) {
-    F.counter(P, -17, y, -9, 0, 2.4);
-    F.cooker(P, -18.6, y, -11.2, 0);
-    F.gasTank(P, -17.6, y, -11.4);
-    F.fridge(P, -15.4, y, -11.2, 0);
-  }
-  // A glass balustrade with a brass rail round the atrium.
-  const { x0, x1, z0, z1 } = ATRIUM;
-  for (const [a, b] of [[[x0, z0], [x1, z0]], [[x1, z1], [x0, z1]], [[x0, z1], [x0, z0]]]) {
-    const A = new THREE.Vector3(a[0], 0, a[1]), B = new THREE.Vector3(b[0], 0, b[1]);
-    panel(P, 'glass', A, B, y, y + 1.0, 0.02, -0.03, 'glass', { floor: f });
-    panel(P, 'brass', A, B, y + 1.0, y + 1.06, 0.06, -0.03, 'furniture', { floor: f });
-  }
-}
-
-function offices(P, f, y) {
-  // Two rows of desks along the long faces, each with a chair, a monitor and a
-  // keyboard, turned to face into the room.
-  for (let x = -12.4; x <= 8.6; x += 2.1) {
-    for (const [z, face] of [[-7.4, 0], [5.3, Math.PI]]) {
-      if (nearColumn(x, z, 1.1) || inCore(x, z, 1.4)) continue;
-      F.desk(P, x, y, z, face);
-      const s = face === 0 ? 1 : -1;
-      F.monitor(P, x, y + 0.74, z - 0.18 * s, face);
-      F.keyboard(P, x, y + 0.74, z + 0.12 * s, face);
-      F.officeChair(P, x, y, z + 0.75 * s, face + Math.PI, f % 3 === 0 ? 0x5a2a2a : 0x2d3a55);
-    }
-  }
-  // A meeting room in the west end, walled off in plaster.
-  block(P, 'plaster', -6.4, y, -2.9, -6.3, U(f), -0.6, 'wall', { floor: f });
-  block(P, 'plaster', -6.4, y, 0.6, -6.3, U(f), 2.9, 'wall', { floor: f });
-  block(P, 'plaster', -13.9, y, -2.95, -6.3, U(f), -2.85, 'wall', { floor: f });
-  block(P, 'plaster', -13.9, y, 2.85, -6.3, U(f), 2.95, 'wall', { floor: f });
-  block(P, 'wood', -6.42, y, -0.6, -6.28, y + 2.2, 0.3, 'furniture', { floor: f });
-  F.meetingTable(P, -10, y, 0, 0);
-  for (const dx of [-1, 0, 1]) {
-    F.officeChair(P, -10 + dx * 1, y, -0.95, 0, 0x333333);
-    F.officeChair(P, -10 + dx * 1, y, 0.95, Math.PI, 0x333333);
-  }
-  // A pantry in the east end.
-  F.counter(P, 8, y, -2.3, Math.PI / 2, 2.4);
-  F.fridge(P, 8.2, y, 0.4, -Math.PI / 2);
-  F.waterCooler(P, 8.4, y, 1.6, -Math.PI / 2);
-  F.sofa(P, 6.2, y, 2.6, Math.PI);
-  if (f % 3 === 0) F.gasTank(P, 8.5, y, -4.0);
-  // Filing and books along the core.
-  for (const x of [-4.2, -3.6, -3.0]) F.filingCabinet(P, x, y, -3.85, Math.PI);
-  F.bookshelf(P, 3.4, y, -3.8, Math.PI);
-  F.bookshelf(P, 2.3, y, -3.8, Math.PI);
-  F.plant(P, -13.3, y, -5.5, true);
-  F.plant(P, 8.2, y, -5.6, true);
 }
 
 // ---------------------------------------------------------------- outside

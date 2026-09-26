@@ -244,6 +244,21 @@ export class Pieces {
     if (!quiet) this.onChange?.();
   }
 
+  // Slide a standing piece to a new position — a lift door opening. Its
+  // colliders go with it.
+  move(p, pos) {
+    if (p.state !== 'static') return;
+    p.pos.copy(pos);
+    this._updateBox(p);
+    if (p.object) p.object.position.copy(pos);
+    else {
+      _m.compose(p.pos, p.quat, _one);
+      for (const q of p.parts) q.batch.setMatrixAt(q.instance, _m);
+    }
+    this._removeFixedColliders(p);
+    this._addFixedCollider(p);
+  }
+
   // A piece of debris that has stopped moving: out of the simulation, but
   // still there, still solid, still something you can hit.
   freeze(p) {

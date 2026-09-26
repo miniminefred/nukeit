@@ -15,6 +15,7 @@ import { Structure } from './sim/structure.js';
 import { Fire } from './sim/fire.js';
 import { Blast } from './sim/blast.js';
 import { Impacts } from './sim/impacts.js';
+import { Lift } from './sim/lift.js';
 import { TOOL_CLASSES } from './tools/tools.js';
 import { Menu } from './ui/menu.js';
 import { Hud, screens } from './ui/hud.js';
@@ -103,6 +104,9 @@ structure.fx.throwChunk = (p, at, vel) => {
 };
 structure.onCrushPlayer = () => player.damage(500, 'crushed');
 
+const lift = new Lift(scene, physics);
+let liftTip = null;
+
 const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene };
 
 // ---------------------------------------------------------------- state
@@ -141,6 +145,7 @@ async function start(jobId, toolIds) {
   screens.loading(`Building ${job.title}`, 0.3);
   await frames(2);
   world.load(job.build);
+  lift.attach(pieces);
   screens.loading('Wiring the gas and the lights', 0.85);
   await frames(2);
   tools = toolIds.filter((id) => TOOL_CLASSES[id]).map((id) => new TOOL_CLASSES[id]());
@@ -236,7 +241,11 @@ function frame(dt) {
     if (w && tools.length) select((current + (w > 0 ? 1 : -1) + tools.length) % tools.length);
   }
   if (state === 'play' || state === 'paused' || state === 'done') {
-    if (playing) player.update(dt);
+    if (playing) {
+      liftTip = player.dead ? null : lift.control(input, player);
+      lift.update(dt, player, structure);
+      player.update(dt);
+    } else lift.update(dt, null, structure);
     const t = tools[current];
     for (const tool of tools) {
       tool.model.visible = tool === t && playing && !player.dead;
@@ -282,7 +291,7 @@ function frame(dt) {
     hud.setSlots(tools, current);
     hud.update(dt, {
       health: player.health, height, fires: fire.count, done: doneT >= 0,
-      tip: tipFor(t),
+      tip: liftTip ?? tipFor(t),
     });
   }
   input.endFrame();
@@ -311,7 +320,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, heap, particles, audio, ctx, get tools() { return tools; }, start, measure, impacts,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, heap, particles, audio, ctx, get tools() { return tools; }, start, measure, impacts, lift,
     get state() { return state; }, set state(s) { state = s; },
     // Run whole frames by hand, for a tab that is not on screen.
     step: (dt = 1 / 60, n = 1) => { for (let i = 0; i < n; i++) frame(dt); }, select };
