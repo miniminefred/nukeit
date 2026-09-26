@@ -19,6 +19,7 @@ import { Lift } from './sim/lift.js';
 import { TOOL_CLASSES } from './tools/tools.js';
 import { Menu } from './ui/menu.js';
 import { Hud, screens } from './ui/hud.js';
+import { Quality } from './render/quality.js';
 import { job as jobById, tool as toolById } from './data/catalog.js';
 import { progress } from './data/progress.js';
 
@@ -37,6 +38,7 @@ const camera = createCamera();
 const lights = createLights(scene);
 const post = createPost(renderer, scene, camera);
 handleResize(renderer, camera, post);
+const quality = new Quality(renderer, post, lights);
 
 // What is in your hands is drawn after everything else, in a scene of its own,
 // so the sledge never pokes through a wall you are standing against.
@@ -119,6 +121,7 @@ let height = null, heightT = 0, doneT = -1, started = 0, downT = 0;
 
 const menu = new Menu(document.getElementById('menu'), {
   onClick: () => audio.click(),
+  quality,
   onStart: (jobId, toolIds) => start(jobId, toolIds),
 });
 
@@ -320,7 +323,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, heap, particles, audio, ctx, get tools() { return tools; }, start, measure, impacts, lift,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, heap, particles, audio, ctx, get tools() { return tools; }, start, measure, impacts, lift, quality,
     get state() { return state; }, set state(s) { state = s; },
     // Run whole frames by hand, for a tab that is not on screen.
     step: (dt = 1 / 60, n = 1) => { for (let i = 0; i < n; i++) frame(dt); }, select };
@@ -330,7 +333,10 @@ const timer = new Timer();
 function animate() {
   requestAnimationFrame(animate);
   timer.update();
-  frame(Math.min(timer.getDelta(), 0.05));
+  const dt = timer.getDelta();
+  // Only a frame that was really drawn on screen says anything about speed.
+  if (state === 'play') quality.sample(dt);
+  frame(Math.min(dt, 0.05));
 }
 openMenu();
 animate();

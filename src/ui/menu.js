@@ -17,8 +17,9 @@ const el = (tag, cls, html) => {
 };
 
 export class Menu {
-  constructor(root, { onStart, onClick }) {
+  constructor(root, { onStart, onClick, quality }) {
     this.root = root;
+    this.quality = quality;
     this.onStart = onStart;
     this.onClick = onClick;
     this.jobId = 'trump';
@@ -37,7 +38,19 @@ export class Menu {
   render() {
     this.root.innerHTML = '';
     const frame = el('div', 'menu-frame');
-    frame.append(el('div', 'menu-head', `<h1>NUKE<span>IT</span></h1><div class="steps"><b class="${this.page === 'jobs' ? 'on' : ''}">1 · Job</b><b class="${this.page === 'tools' ? 'on' : ''}">2 · Tools</b></div>`));
+    const head = el('div', 'menu-head', `<h1>NUKE<span>IT</span></h1><div class="steps"><b class="${this.page === 'jobs' ? 'on' : ''}">1 · Job</b><b class="${this.page === 'tools' ? 'on' : ''}">2 · Tools</b></div>`);
+    // Graphics: Auto, then each level in turn.
+    if (this.quality) {
+      const q = el('button', 'quality', `Graphics: ${this.quality.label}`);
+      q.onclick = () => {
+        const order = ['auto', '0', '1', '2', '3'];
+        this.quality.set(order[(order.indexOf(this.quality.mode) + 1) % order.length]);
+        this.onClick?.();
+        this.render();
+      };
+      head.append(q);
+    }
+    frame.append(head);
     frame.append(this.page === 'jobs' ? this._jobs() : this._tools());
     this.root.append(frame);
   }

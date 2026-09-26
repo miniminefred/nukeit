@@ -233,6 +233,24 @@ The first version lit everything within a sphere of a burning 5 m carpet bay, so
 fire had a whole floor alight in eight seconds. Tanks in a fire cook off. The extinguisher
 tests each burning piece's nearest point along the spray cone.
 
+## Keeping it smooth
+
+Measured on the tower, a frame went from 25–32 ms to 5–8 ms by fixing three
+things, in this order of size:
+
+- **BatchedMesh's per-instance culling and sorting** ran on the CPU over every
+  one of ten thousand instances on every render pass, shadows included: 9 ms of
+  a 10.8 ms frame. Both are off (`perObjectFrustumCulled`, `sortObjects`).
+- **Ambient occlusion** was 10–20 ms on its own. It is only on at Ultra.
+- **Lights are paid for on every lit pixel, lit or not.** The fire had six point
+  lights sitting at intensity 0 for the whole game; it has two.
+
+`render/quality.js` has four levels (resolution, bloom, AO, shadow size); the
+menu's Graphics button picks one or Auto, which drops a level when frames run
+over 22 ms and climbs back when they run under 13 ms. To measure, force the GPU
+to finish: `gl.finish()` around `dev.step(1/60, 20)`, since the test tab is
+hidden and has no real frame loop.
+
 ## Things already learned here
 
 - **`Color.set()` already converts sRGB to linear.** Converting again turned everything black.

@@ -35,6 +35,7 @@ kbd {
 .menu-head { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
 .menu-head h1 { margin: 0; font-size: 44px; letter-spacing: 0.18em; font-weight: 800; }
 .menu-head h1 span { color: var(--gold); }
+.menu-head .quality { background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; color: var(--dim); font-size: 13px; }
 .steps b { margin-left: 18px; color: var(--dim); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; font-size: 13px; }
 .steps b.on { color: var(--ink); border-bottom: 2px solid var(--gold); padding-bottom: 4px; }
 .menu-page h2 { font-size: 22px; font-weight: 600; margin: 28px 0 16px; }

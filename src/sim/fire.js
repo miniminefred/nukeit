@@ -17,7 +17,9 @@ import * as THREE from 'three';
 // down, and a spot with no heat left is out — the scorch stays.
 
 const MAX_SPOTS = 700;
-const LIGHTS = 6;
+// Every light in the scene is paid for on every lit pixel, burning or not, so
+// there are only two: over the two biggest fires.
+const LIGHTS = 2;
 const GROW = 0.07;             // m/s the circle widens at full heat
 const MIN_GAP = 0.3;           // m: a new spot this close to another is not a new spot
 const SPREAD_EVERY = 0.35;     // s

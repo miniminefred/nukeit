@@ -119,6 +119,12 @@ export class Pieces {
       const b = new THREE.BatchedMesh(n.inst, n.vert, n.idx, KIND[k].material);
       b.castShadow = KIND[k].name !== 'glass';
       b.receiveShadow = true;
+      // No per-piece culling or sorting. Both run on the CPU over every
+      // instance on every render pass, shadows included, and measured 9 ms of a
+      // 10.8 ms frame; the GPU draws the few hidden pieces for far less. Glass
+      // is left unsorted too — sorting two thousand panes a frame is what cost.
+      b.perObjectFrustumCulled = false;
+      b.sortObjects = false;
       b.name = `batch:${k}`;
       this.batches.set(k, b);
       this.root.add(b);

@@ -18,10 +18,11 @@ export const SUN_DIR = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathU
 
 export function createRenderer() {
   const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  // Pixel ratio is set by render/quality.js.
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // Plain PCF: the soft variant costs several times as many shadow samples.
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   // The sky shader works in physical radiance, which is far brighter than
   // anything else in the scene; half exposure is what puts the two together.
@@ -63,10 +64,9 @@ export function createLights(scene) {
   const sun = new THREE.DirectionalLight(0xfff0dd, 3.2);
   sun.position.copy(SUN_DIR).multiplyScalar(200);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(4096, 4096);
+  sun.shadow.mapSize.set(2048, 2048);      // quality.js changes this
   sun.shadow.bias = -0.0002;
   sun.shadow.normalBias = 0.03;
-  sun.shadow.radius = 3;
   const s = sun.shadow.camera;
   s.near = 20; s.far = 500;
   s.left = s.bottom = -40; s.right = s.top = 40;
