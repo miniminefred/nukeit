@@ -73,6 +73,10 @@ be run by hand.
 - Any asset URL built from a string at runtime has to add the base itself:
   `import.meta.env.BASE_URL + '…'`. Vite only rewrites URLs it can see in static imports,
   `href`s and `url()`s. Relative paths are easier.
+- The `github-pages` environment has a deployment-branch allowlist. It was created
+  allowing only `main`, and the first deploy from `master` was rejected until `master`
+  was added (Settings → Environments → github-pages). Rename the branch and it needs
+  doing again.
 - In **Git Bash**, MSYS rewrites `--base=/nukeit/` into a Windows path. Set
   `MSYS_NO_PATHCONV=1`, or build from PowerShell.
 
