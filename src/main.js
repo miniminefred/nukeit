@@ -1,37 +1,35 @@
 import { Timer } from 'three';
-import { createRenderer, createScene, createCamera, createLights, handleResize } from './scene.js';
+import { createRenderer, createScene, createCamera, createLights, createPost, handleResize, followShadow } from './scene.js';
+import { Physics } from './physics.js';
 import { createWorld } from './world.js';
 import { createInput } from './input.js';
-import { Player } from './player.js';
-import { buildTower, ENTRY } from './build/tower.js';
+import { buildTower } from './building/tower.js';
 
 const renderer = createRenderer();
-const scene = createScene();
+const scene = createScene(renderer);
 const camera = createCamera();
 const lights = createLights(scene);
-handleResize(renderer, camera);
+const post = createPost(renderer, scene, camera);
+handleResize(renderer, camera, post);
 
-const world = createWorld(scene);
-const input = createInput(renderer.domElement, document.getElementById('overlay'));
-const player = new Player(camera, input, world);
-
-const t0 = performance.now();
-await world.load(buildTower);
-const loadMs = performance.now() - t0;
-player.teleport(ENTRY.x, 0, ENTRY.z, ENTRY.yaw);
+const physics = await Physics.create();
+const world = createWorld(scene, physics);
+const input = createInput(renderer.domElement);
+world.load(buildTower);
+camera.position.set(0, 1.7, 20);
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, input, player, loadMs };
+  window.dev = { renderer, scene, camera, lights, world, physics, input, post };
 }
 
 const timer = new Timer();
-
 function frame(dt) {
-  player.update(dt);
-  world.update(camera.position);
-  renderer.render(scene, camera);
+  physics.step(dt);
+  world.pieces.sync();
+  followShadow(lights, camera);
+  post.composer.render(dt);
+  input.endFrame();
 }
-
 function animate() {
   requestAnimationFrame(animate);
   timer.update();
