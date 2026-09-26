@@ -27,6 +27,7 @@ const FRAG = /* glsl */ `
 
 // Presets: life (s), size (m), growth (m/s), drag, gravity (+ is down), colour.
 const KINDS = {
+  bigdust: { life: [7, 13], size: [2.5, 5], grow: 1.6, drag: 0.35, grav: -0.12, colour: 0xa49e94, alpha: 0.45, add: false },
   dust:  { life: [2.5, 5], size: [0.5, 1.2], grow: 0.8, drag: 1.6, grav: -0.1, colour: 0x9a948a, alpha: 0.55, add: false },
   chip:  { life: [0.4, 0.9], size: [0.12, 0.22], grow: 0, drag: 0.4, grav: 9.8, colour: 0x888888, alpha: 1, add: false },
   smoke: { life: [2.5, 4.5], size: [0.6, 1.0], grow: 0.9, drag: 1.0, grav: -1.4, colour: 0x2a2826, alpha: 0.5, add: false },

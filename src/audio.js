@@ -166,6 +166,14 @@ export class Audio {
   spray(on) { this.ctx && this.loops.spray.gain.setTargetAtTime(on ? 0.25 : 0, this.ctx.currentTime, 0.03); }
   foam(on) { this.ctx && this.loops.foam.gain.setTargetAtTime(on ? 0.45 : 0, this.ctx.currentTime, 0.05); }
 
+  // Gas escaping from a punctured tank.
+  hiss(x, y, z) {
+    if (!this.ctx) return;
+    const { gain, pan } = this._place(x, y, z, 15);
+    const out = this._out(gain * 0.8, pan);
+    this._noise(out, { type: 'highpass', f: 3500, q: 0.7, len: 1.6, gain: 0.9, attack: 0.02 });
+  }
+
   hurt() {
     if (!this.ctx) return;
     const out = this._out(0.5, 0);

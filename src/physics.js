@@ -18,6 +18,8 @@ const groups = (member, filter) => (member << 16) | filter;
 export const G_WORLD = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER);
 export const G_DEBRIS = groups(GROUP_DEBRIS, GROUP_WORLD | GROUP_DEBRIS);
 export const G_PLAYER = groups(GROUP_PLAYER, GROUP_WORLD);
+// What a tool's ray can hit: the building and debris, never the player.
+export const G_RAY = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS);
 
 const STEP = 1 / 60;
 
@@ -36,11 +38,15 @@ export class Physics {
     this.dynamic = new Set();       // pieces with a dynamic body
     this.onForce = null;            // (ownerA, ownerB, magnitude)
     this._acc = 0;
-    // The ground: a slab under the whole city.
-    this.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(1000, 0.5, 1000).setTranslation(0, -0.5, 0).setCollisionGroups(G_WORLD).setFriction(0.9),
-      this.fixed,
-    );
+    // The ground: a grid of 40 m tiles with their tops at y = 0. It was one
+    // 2 km box first, and a shape that big loses enough precision in contact
+    // tests that the player's capsule sank a few centimetres into it and stuck.
+    for (let x = -200; x < 200; x += 40)
+      for (let z = -200; z < 200; z += 40)
+        this.world.createCollider(
+          RAPIER.ColliderDesc.cuboid(20, 1, 20).setTranslation(x + 20, -1, z + 20).setCollisionGroups(G_WORLD).setFriction(0.9),
+          this.fixed,
+        );
   }
 
   // --------------------------------------------------------- colliders
@@ -111,7 +117,7 @@ export class Physics {
   // --------------------------------------------------------- queries
 
   // First thing along a ray. Returns { owner, collider, point, normal, distance }.
-  raycast(origin, dir, maxDist, { skip = null, groups = G_WORLD } = {}) {
+  raycast(origin, dir, maxDist, { skip = null, groups = G_RAY } = {}) {
     const ray = new RAPIER.Ray(origin, dir);
     const hit = this.world.castRayAndGetNormal(ray, maxDist, true, undefined, groups, undefined, undefined,
       skip ? (c) => skip(this.owner.get(c.handle)) === false : undefined);

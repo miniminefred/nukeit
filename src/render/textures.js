@@ -103,9 +103,9 @@ function set(out, r, g, b, h, rough) {
 const SURFACES = {
   concrete: (u, v, n, o) => {
     const big = fbm(n, u, v, 4, 4), fine = fbm(n, u, v, 32, 3);
-    const pit = fbm(n, u + 7.3, v, 48, 2) > 0.55 ? -0.6 : 0;
-    const t = 160 + big * 18 + fine * 14 + pit * 30;
-    set(o, t, t - 2, t - 7, big * 0.3 + fine * 0.4 + pit, 0.9 - fine * 0.05);
+    const pit = fbm(n, u + 7.3, v, 48, 2) > 0.62 ? -0.25 : 0;
+    const t = 165 + big * 14 + fine * 7 + pit * 20;
+    set(o, t, t - 2, t - 6, big * 0.2 + fine * 0.15 + pit, 0.9 - fine * 0.05);
   },
   broken: (u, v, n, o) => {        // the inside of concrete: aggregate
     const f = fbm(n, u, v, 16, 4), s = fbm(n, u + 3, v, 64, 2);
@@ -200,7 +200,7 @@ const SURFACES = {
 };
 
 // Normal-map strength per surface: how much its height field stands out.
-const RELIEF = { concrete: 3, broken: 5, wood: 1.5, rawwood: 6, carpet: 4, fabric: 3, soil: 4, leaves: 4, gypsum: 5, asphalt: 3, paving: 4, roofing: 3, leather: 3 };
+const RELIEF = { concrete: 1.2, broken: 5, wood: 1.5, rawwood: 6, carpet: 4, fabric: 3, soil: 4, leaves: 4, gypsum: 5, asphalt: 3, paving: 4, roofing: 3, leather: 3 };
 
 const cache = new Map();
 

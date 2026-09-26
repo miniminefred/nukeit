@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { box, boxes, worldUVs } from '../render/geometry.js';
+import { box, shapes, worldUVs } from '../render/geometry.js';
 
 // Builders for pieces, in metres and world coordinates.
 //
@@ -52,23 +52,26 @@ export function plate(pieces, kind, poly, y0, y1, role, opts = {}) {
 // Something made of several boxes and several materials — furniture.
 // `parts` is [{ kind, boxes: [[x0, y0, z0, x1, y1, z1], …], tint }] relative to
 // the piece's origin at (x, y, z), rotated `yaw` about the vertical.
+//
+// A part's `boxes` may hold any shape `render/geometry.js` knows — rounded
+// boxes, cylinders, cones, lumpy balls — and `round` rounds its box edges, which
+// is most of what stops furniture looking like it was cut from blocks.
 export function assembly(pieces, x, y, z, yaw, parts, role, opts = {}) {
   const c = new THREE.Vector3(x, y, z);
   const q = new THREE.Quaternion().setFromAxisAngle(UP, yaw);
-  // Recentre on the assembly's bounding box so it tumbles about its middle.
-  const all = parts.flatMap((p) => p.boxes);
-  const mid = new THREE.Vector3(
-    (Math.min(...all.map((b) => b[0])) + Math.max(...all.map((b) => b[3]))) / 2,
-    (Math.min(...all.map((b) => b[1])) + Math.max(...all.map((b) => b[4]))) / 2,
-    (Math.min(...all.map((b) => b[2])) + Math.max(...all.map((b) => b[5]))) / 2,
-  );
+  const geos = parts.map((p) => shapes(p.boxes, c, p.round ?? 0));
+  // Recentre on the real geometry so it tumbles about its middle.
+  const bb = new THREE.Box3();
+  for (const g of geos) { g.computeBoundingBox(); bb.union(g.boundingBox); }
+  const mid = bb.getCenter(new THREE.Vector3());
+  for (const g of geos) g.translate(-mid.x, -mid.y, -mid.z);
   const shift = (b) => [b[0] - mid.x, b[1] - mid.y, b[2] - mid.z, b[3] - mid.x, b[4] - mid.y, b[5] - mid.z];
   const pos = mid.clone().applyQuaternion(q).add(c);
   return pieces.add({
-    parts: parts.map((p) => ({ kind: p.kind, geometry: boxes(p.boxes.map(shift), pos), tint: p.tint })),
+    parts: parts.map((p, i) => ({ kind: p.kind, geometry: geos[i], tint: p.tint })),
     pos, quat: q, role,
-    colliders: opts.colliders ? opts.colliders.map(shift) : null,
     ...opts,
+    colliders: opts.colliders ? opts.colliders.map(shift) : null,
   });
 }
 

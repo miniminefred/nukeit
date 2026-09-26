@@ -83,7 +83,20 @@ const cutsBetween = (list, a, b) => [...new Set([a, ...list.filter((v) => v > a 
 
 function slabs(P, f) {
   const y0 = f * FLOOR_H, y1 = T(f);
-  const add = (x0, z0, x1, z1, kind) => block(P, kind, x0, y0, z0, x1, y1, z1, 'slab', { floor: f, lateral: true });
+  // Every slab bay gets a suspended ceiling under it (the ceiling of the floor
+  // below), and on the office floors carpet over it.
+  const offices = f >= PODIUM_FLOORS && f !== ROOF;
+  const add = (x0, z0, x1, z1, kind) => {
+    const s = block(P, kind, x0, y0, z0, x1, y1, z1, 'slab', { floor: f, lateral: true });
+    if (f >= 1) block(P, 'plaster', x0, y0 - 0.03, z0, x1, y0, z1, 'ceiling', { floor: f - 1, hang: true, tint: 0xf2efe8 });
+    if (offices) block(P, 'carpet', x0, y1, z0, x1, y1 + 0.02, z1, 'carpet', { floor: f });
+    return s;
+  };
+  const addPlate = (poly, kind) => {
+    plate(P, kind, poly, y0, y1, 'slab', { floor: f, lateral: true });
+    plate(P, 'plaster', poly, y0 - 0.03, y0, 'ceiling', { floor: f - 1, hang: true, tint: 0xf2efe8 });
+    if (offices) plate(P, 'carpet', poly, y1, y1 + 0.02, 'carpet', { floor: f });
+  };
 
   if (f < PODIUM_FLOORS || f === PODIUM_FLOORS) {
     // The podium plate. Above floor 0 it covers what the floor below covered,
@@ -119,8 +132,8 @@ function slabs(P, f) {
         add(xs[i], zs[k], xs[i + 1], zs[k + 1], kind);
       }
     // The teeth.
-    for (const b of [-9, -5, -1, 3]) plate(P, kind, [new THREE.Vector3(10, 0, b), new THREE.Vector3(12, 0, b + 2), new THREE.Vector3(10, 0, b + 4)], y0, y1, 'slab', { floor: f, lateral: true });
-    for (const a of [-14, -10, -6, -2, 2, 6]) plate(P, kind, [new THREE.Vector3(a, 0, 7), new THREE.Vector3(a + 4, 0, 7), new THREE.Vector3(a + 2, 0, 9)], y0, y1, 'slab', { floor: f, lateral: true });
+    for (const b of [-9, -5, -1, 3]) addPlate([new THREE.Vector3(10, 0, b), new THREE.Vector3(12, 0, b + 2), new THREE.Vector3(10, 0, b + 4)], kind);
+    for (const a of [-14, -10, -6, -2, 2, 6]) addPlate([new THREE.Vector3(a, 0, 7), new THREE.Vector3(a + 4, 0, 7), new THREE.Vector3(a + 2, 0, 9)], kind);
   }
   // Inside the core: the stair landing. The lift shaft stays open.
   if (f >= 1) block(P, f === ROOF ? 'roofing' : 'concrete', CORE.x0 + CORE.t, y0, 1.5, -0.2, y1, CORE.z1 - CORE.t, 'slab', { floor: f, lateral: true });
@@ -159,6 +172,7 @@ function columns(P, f) {
   for (const x of xs)
     for (const z of zs) {
       if (inCore(x, z, 0.5)) continue;
+      if (f === 0 && Math.abs(x) < 3.2 && z > 11) continue;      // the doorway
       if (!tower && x > ATRIUM.x0 && x < ATRIUM.x1 && z > ATRIUM.z0 && z < ATRIUM.z1) continue;
       block(P, f === 0 ? 'marble' : 'concrete', x - s, T(f), z - s, x + s, U(f), z + s, 'column', { floor: f, hp: 14 });
     }
@@ -226,7 +240,9 @@ function facade(P, f) {
       const t = i / n;
       const c = new THREE.Vector3(A.x + (B.x - A.x) * t, 0, A.z + (B.z - A.z) * t);
       const a = c.clone().addScaledVector(new THREE.Vector3(dx, 0, dz), -0.04), b = c.clone().addScaledVector(new THREE.Vector3(dx, 0, dz), 0.04);
-      panel(P, 'bronze', a, b, y0, yTop, 0.14, -out * 0.07, 'mullion', { floor: f });
+      // The entrance is an opening: no glass across it and no mullions in it.
+      const door = f === 0 && Math.abs(A.z - 12) < 0.01 && Math.abs(B.z - 12) < 0.01;
+      if (!(door && Math.abs(c.x) < 2.9)) panel(P, 'bronze', a, b, y0, yTop, 0.14, -out * 0.07, 'mullion', { floor: f });
       if (i === n) continue;
       const p0 = new THREE.Vector3(A.x + (B.x - A.x) * t, 0, A.z + (B.z - A.z) * t).addScaledVector(new THREE.Vector3(dx, 0, dz), 0.04);
       const p1 = new THREE.Vector3(A.x + (B.x - A.x) * ((i + 1) / n), 0, A.z + (B.z - A.z) * ((i + 1) / n)).addScaledVector(new THREE.Vector3(dx, 0, dz), -0.04);

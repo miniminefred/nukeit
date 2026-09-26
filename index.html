@@ -7,12 +7,67 @@
   <link rel="stylesheet" href="./src/style.css" />
 </head>
 <body>
-  <div id="overlay">
-    <h1>NUKEIT</h1>
-    <p>Click to play</p>
-    <p class="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &middot; <kbd>Shift</kbd> run &middot; <kbd>Space</kbd> jump &middot; <kbd>Esc</kbd> release</p>
+  <!-- The menu: jobs, then tools. Drawn by src/ui/menu.js. -->
+  <div id="menu"></div>
+
+  <div id="loading" class="screen">
+    <div class="panel">
+      <b id="load-text">Loading</b>
+      <div class="bar"><i id="load-fill"></i></div>
+    </div>
   </div>
-  <div id="crosshair"></div>
+
+  <div id="begin" class="screen click">
+    <div class="panel">
+      <small>On site</small>
+      <b id="begin-title"></b>
+      <p>Click to begin</p>
+      <div class="keys">
+        <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &middot; <kbd>Shift</kbd> run &middot; <kbd>Space</kbd> jump &middot;
+        <kbd>1</kbd>&ndash;<kbd>5</kbd> tools &middot; <kbd>Left click</kbd> use &middot; <kbd>Right click</kbd> tool option &middot; <kbd>Esc</kbd> pause
+      </div>
+    </div>
+  </div>
+
+  <div id="pause" class="screen">
+    <div class="panel">
+      <b>Paused</b>
+      <button id="p-resume" class="go">Resume</button>
+      <button id="p-restart">Restart job</button>
+      <button id="p-quit">Quit to jobs</button>
+    </div>
+  </div>
+
+  <div id="down" class="screen">
+    <div class="panel"><b id="down-text"></b><p>Back to the entrance&hellip;</p></div>
+  </div>
+
+  <div id="results" class="screen">
+    <div class="panel wide">
+      <small>Job complete</small>
+      <b id="r-title"></b>
+      <div id="r-rows"></div>
+      <div id="r-unlock"></div>
+      <button id="r-back" class="go">Back to jobs</button>
+    </div>
+  </div>
+
+  <div id="hud">
+    <div id="hurt"></div>
+    <div id="crosshair"></div>
+    <div id="objective">
+      <b id="obj-title"></b>
+      <div id="obj-height"></div>
+      <div class="bar"><i id="obj-fill"></i></div>
+      <small id="obj-note"></small>
+    </div>
+    <div id="fires"></div>
+    <div id="health"><span>Health</span><div class="bar"><i id="hp-fill"></i></div><b id="hp-text"></b></div>
+    <div id="slots"></div>
+    <div id="tip"></div>
+    <div id="flash"></div>
+  </div>
+
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>

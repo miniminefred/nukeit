@@ -21,6 +21,7 @@ let nextId = 1;
 const _m = new THREE.Matrix4();
 const _one = new THREE.Vector3(1, 1, 1);
 const _c = new THREE.Color();
+const _pf = new THREE.Vector3();
 
 export class Pieces {
   constructor(scene, physics) {
@@ -38,7 +39,7 @@ export class Pieces {
   add(spec) {
     const p = {
       id: nextId++,
-      parts: spec.parts.map((q) => ({ kind: KIND[q.kind], geometry: q.geometry, tint: q.tint ?? null, batch: null, instance: -1, mesh: null })),
+      parts: spec.parts.map((q) => ({ kind: KIND[q.kind], geometry: q.geometry, materials: q.materials ?? null, tint: q.tint ?? null, batch: null, instance: -1, mesh: null })),
       pos: spec.pos.clone(),
       quat: spec.quat ? spec.quat.clone() : new THREE.Quaternion(),
       role: spec.role,
@@ -75,6 +76,20 @@ export class Pieces {
     p.volume = s.x * s.y * s.z;
     this._updateBox(p);
     this.list.push(p);
+    return p;
+  }
+
+  // A piece made after the building was finalized — a shard, a fragment. It
+  // never goes into a batch; it has its own meshes from the start.
+  spawn(spec, { dynamic = false, vel, spin, debris = false } = {}) {
+    const p = this.add(spec);
+    this.promote(p);
+    if (dynamic) {
+      p.state = 'static';
+      this.makeDynamic(p, vel, spin, { debris, quiet: true });
+    } else {
+      this._addFixedCollider(p);
+    }
     return p;
   }
 
@@ -140,7 +155,7 @@ export class Pieces {
     g.quaternion.copy(p.quat);
     for (const q of p.parts) {
       if (q.batch) { q.batch.setVisibleAt(q.instance, false); }
-      q.mesh = new THREE.Mesh(q.geometry, this._material(q));
+      q.mesh = new THREE.Mesh(q.geometry, q.materials ?? this._material(q));
       q.mesh.castShadow = q.kind.name !== 'glass';
       q.mesh.receiveShadow = true;
       q.mesh.userData.piece = p;
@@ -180,12 +195,13 @@ export class Pieces {
 
   // Swap one part's geometry for a new one (after a cut). The collider becomes
   // the exact shape, so you can climb through the hole you made.
-  reshape(p, part, geometry) {
+  reshape(p, part, geometry, materials) {
     this.promote(p);
     const q = p.parts[part];
     if (q.geometry !== geometry) q.geometry.dispose();
     q.geometry = geometry;
     q.mesh.geometry = geometry;
+    if (materials) { q.materials = materials; q.mesh.material = materials; }
     if (p.state === 'static') {
       this._removeFixedColliders(p);
       // One trimesh per part, in world space.
@@ -198,7 +214,7 @@ export class Pieces {
   }
 
   // Knock a piece loose: it gets a body of its own and falls.
-  makeDynamic(p, vel, spin, { debris = false } = {}) {
+  makeDynamic(p, vel, spin, { debris = false, quiet = false } = {}) {
     if (p.state === 'dead' || p.state === 'dynamic') return;
     this.promote(p);
     this._removeFixedColliders(p);
@@ -220,7 +236,7 @@ export class Pieces {
     p.body = body;
     p.state = 'dynamic';
     this.physics.dynamic.add(p);
-    this.onChange?.();
+    if (!quiet) this.onChange?.();
   }
 
   // Gone: no mesh, no collider, nothing left to hold anything up.
@@ -236,6 +252,17 @@ export class Pieces {
     if (p.object) p.object.removeFromParent();
     p.state = 'dead';
     if (wasStanding) this.onChange?.();
+  }
+
+  // Move a piece that is coming down with a collapse. It stays in its batch —
+  // thousands of pieces fall at once, and promoting them all would cost
+  // thousands of draw calls — so its instance matrix is moved instead.
+  moveFalling(p, dy) {
+    const at = _pf.copy(p.pos);
+    at.y += dy;
+    if (p.object) { p.object.position.copy(at); return; }
+    _m.compose(at, p.quat, _one);
+    for (const q of p.parts) q.batch.setMatrixAt(q.instance, _m);
   }
 
   // Move promoted dynamic pieces to where their bodies are.
