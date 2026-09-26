@@ -79,7 +79,9 @@ export class Damage {
     if (p.state === 'static' && LOOSE.has(p.role)) this.pieces.makeDynamic(p);
     if (p.body) {
       const m = Math.max(5, p.body.mass());
-      p.body.applyImpulseAtPoint({ x: dir.x * energy * 120, y: dir.y * energy * 120 + 20, z: dir.z * energy * 120 }, point, true);
+      // A sledge head is about 5 kg arriving at 15 m/s.
+      const J = energy * 75;
+      p.body.applyImpulseAtPoint({ x: dir.x * J, y: dir.y * J + J * 0.15, z: dir.z * J }, point, true);
       if (m < 30) {
         // Light things just get knocked about — until they have had enough.
         p.hp = (p.hp ?? Math.max(1.5, m / 8)) - energy;
@@ -148,7 +150,7 @@ export class Damage {
   _dust(kind, point, normal, n) {
     const c = { wood: 0xc8b48c, plaster: 0xe8e4dc, concrete: 0xb8b2a8, marble: 0xd8c0b8 }[chipKind(kind)] ?? 0xaaa49a;
     for (let i = 0; i < n; i++) {
-      this.fx.particles.spawn('dust', point.x + normal.x * 0.05, point.y + normal.y * 0.05, point.z + normal.z * 0.05,
+      this.fx.particles.spawn('puff', point.x + normal.x * 0.05, point.y + normal.y * 0.05, point.z + normal.z * 0.05,
         normal.x * 0.8 + (Math.random() - 0.5) * 1.2, normal.y * 0.8 + Math.random() * 0.6, normal.z * 0.8 + (Math.random() - 0.5) * 1.2, c);
     }
   }

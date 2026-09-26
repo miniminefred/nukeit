@@ -96,7 +96,9 @@ export class Physics {
       let d = s.type === 'hull' ? RAPIER.ColliderDesc.convexHull(s.points) : null;
       if (d === null) d = RAPIER.ColliderDesc.cuboid(Math.max(0.01, s.hx), Math.max(0.01, s.hy), Math.max(0.01, s.hz));
       if (s.type === 'box') d.setTranslation(s.x ?? 0, s.y ?? 0, s.z ?? 0);
-      d.setDensity(density / 1000).setFriction(0.7).setRestitution(0.05)
+      // Real kilograms per cubic metre, so a mass is a mass and an impulse in
+      // newton-seconds does what it would do.
+      d.setDensity(density).setFriction(0.7).setRestitution(0.05)
         .setCollisionGroups(debris ? G_DEBRIS : G_WORLD);
       if (forces > 0) {
         d.setActiveEvents(RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS).setContactForceEventThreshold(forces);

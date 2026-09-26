@@ -13,14 +13,15 @@ const mat = (kind, tint) => {
 
 export function sledgeModel() {
   const g = new THREE.Group();
-  const handle = new THREE.Mesh(cylinder(0.022, 0.9, 12), mat('wood', 0xd8b890));
+  const handle = new THREE.Mesh(cylinder(0.02, 0.9, 12), mat('wood', 0xf0dcc0));
   handle.position.y = -0.45;
   const grip = new THREE.Mesh(cylinder(0.026, 0.22, 12), mat('leather', 0x303030));
   grip.position.y = -0.8;
-  const head = new THREE.Mesh(box(0.26, 0.1, 0.1), mat('metal', 0x5a5d62));
-  head.material.metalness = 0.85;
-  head.material.roughness = 0.5;
-  const faceL = new THREE.Mesh(box(0.02, 0.11, 0.11), mat('metal', 0x9a9da2));
+  const head = new THREE.Mesh(box(0.24, 0.09, 0.09), mat('metal', 0x3c3a38));
+  head.material.metalness = 0.6;
+  head.material.roughness = 0.65;
+  head.material.envMapIntensity = 0.4;
+  const faceL = new THREE.Mesh(box(0.02, 0.1, 0.1), mat('metal', 0x8a8c8e));
   faceL.position.x = -0.135;
   const faceR = faceL.clone();
   faceR.position.x = 0.135;

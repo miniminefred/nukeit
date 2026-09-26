@@ -40,7 +40,7 @@ export class Sledge {
     const down = ctx.input.mouse.left && ctx.input.mouse.locked;
     if (this.t < 0 && down) { this.t = 0; this.landed = false; ctx.audio?.swing(); }
     // Rest pose: over the right shoulder, head up.
-    let rx = -0.35, rz = 0.3, px = 0.34, py = -0.42, pz = -0.62;
+    let rx = -0.35, rz = 0.3, px = 0.42, py = -0.5, pz = -0.75;
     if (this.t >= 0) {
       this.t += dt;
       const t = this.t;

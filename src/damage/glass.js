@@ -173,13 +173,15 @@ export function shatter(pieces, piece, local, push, { coarse = false, chip = nul
     for (const p of clipped) { sx += p[0]; sy += p[1]; }
     sx /= clipped.length; sy /= clipped.length;
     const world = new THREE.Vector3(c.x + sx, c.y + sy, c.z).applyMatrix4(obj);
-    const edge = Math.abs(sx) > w / 2 - 0.25 || Math.abs(sy) > h / 2 - 0.25;
+    // Near the frame: measured from the shard's own vertices, so a long thin
+    // shard that runs into the frame counts even if its middle is well inside.
+    const edge = clipped.some(([x, y]) => Math.abs(x) > w / 2 - 0.02 || Math.abs(y) > h / 2 - 0.02);
     if (a < 0.004) { chip?.(world, push); continue; }
     const shape = new THREE.Shape(clipped.map(([x, y]) => new THREE.Vector2(x - sx, y - sy)));
     const g = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false });
     g.translate(0, 0, -t / 2);
     g.computeVertexNormals();
-    const stays = keepEdges && edge && ring >= 2 && Math.random() < 0.55;
+    const stays = keepEdges && edge && ring >= 1 && Math.random() < 0.6;
     const d = Math.hypot(sx - u0, sy - v0);
     let vel;
     if (push) vel = push.clone().multiplyScalar((stays ? 0 : 1) * (2.5 + Math.random() * 2) / (1 + d * 2)).add(new THREE.Vector3((Math.random() - 0.5), Math.random() * 0.5, (Math.random() - 0.5)));
