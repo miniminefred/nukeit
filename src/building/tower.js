@@ -4,14 +4,14 @@ import * as F from './furniture.js';
 import { fitOut as furnish } from './interiors.js';
 import { FLOOR_H, SLAB, PODIUM_FLOORS, TOP_FLOOR, ROOF, PENTHOUSE, T, U, CORE, ATRIUM, podiumFront, OUTLINE, inPoly, inCore, rectPoly } from './plan.js';
 
-// Trump Tower, at 100 m.
+// Trump Tower, at 70 m.
 //
 // The real one is 58 storeys on Fifth Avenue: a dark bronze glass shaft with a
 // sawtooth of notched corners up two faces, on a stepped podium whose terraces
 // are planted with trees, with the name in brass over the door and a pink
-// marble atrium inside. Here it is 25 storeys of 4 m — a six-storey podium of
-// shops round an atrium, nineteen storeys of offices over it, and a plant room
-// on the roof. The avenue is on the +z side.
+// marble atrium inside. Here it is 17 storeys of 4 m — a six-storey podium of
+// shops round an atrium, eight storeys of offices, a three-storey penthouse on
+// top, and a plant room on the roof. The avenue is on the +z side.
 //
 // **How it stands is the point.** Concrete columns and a concrete core carry
 // every slab. Glass, partitions and furniture carry nothing (building/support.js).
@@ -299,8 +299,6 @@ function roof(P) {
   block(P, 'concrete', 5.6, y, -4.1, 6, h, 4.1, 'core', { floor: ROOF });
   block(P, 'roofing', -6.2, h, -4.7, 6.2, h + 0.3, 4.7, 'slab', { floor: ROOF, lateral: true });
   F.transformer(P, 8, y, 3.5, Math.PI / 2);
-  // A mast.
-  block(P, 'steel', -0.15, h + 0.3, -0.15, 0.15, h + 6, 0.15, 'column', { floor: ROOF, tint: 0xcccccc });
 }
 
 // TRUMP TOWER in brass over the entrance, on a brass canopy.

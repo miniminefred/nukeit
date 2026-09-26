@@ -110,10 +110,13 @@ house on top. `building/plan.js` holds the plan and `PROGRAMME`;
 | 3 | food court: three counters with griddles, fridges and gas; seating |
 | 4 | the Grill: white tablecloths, a bar, a walled kitchen with gas, a piano |
 | 5 | café and bookshop |
-| 6–21 | offices |
-| 22 | penthouse living: fireplace, piano, sofas, dining for ten, kitchen |
-| 23 | three bedrooms, each with a bathroom |
-| 24 | master bedroom, dressing room, bathroom, study |
+| 6–13 | offices |
+| 14 | penthouse living: fireplace, piano, sofas, dining for ten, kitchen |
+| 15 | three bedrooms, each with a bathroom |
+| 16 | master bedroom, dressing room, bathroom, study |
+
+The tower is **70 m**: 17 storeys of 4 m, roof at 68 m, rooftop plant room to 72 m.
+`TOP_FLOOR` in `plan.js` is the one number; the penthouse is always its top three.
 
 Floors are finished to their use (marble, tile, oak, carpet), and furniture is
 placed through `freePodium` so nothing stands in a column, the core or the atrium.
@@ -121,7 +124,7 @@ New furniture lives in `furniture-home.js` and `furniture-food.js`.
 
 ### The lift
 
-`sim/lift.js`: a car in the core's lift shaft, lobby to floor 24. Inside, E goes
+`sim/lift.js`: a car in the core's lift shaft, lobby to the top floor. Inside, E goes
 up a floor and Q down, and holding either keeps it going. At the brass doors on
 any floor, E calls it. The landing doors are pieces tagged `liftdoor`, slid open
 with `Pieces.move`, and a brass sill bridges each doorway.

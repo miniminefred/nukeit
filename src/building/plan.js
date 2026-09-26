@@ -11,17 +11,18 @@ import * as THREE from 'three';
 //     z  12   +--------------[ door ]-----------------+
 //                         TRUMP TOWER
 //
-//     tower, floors 6-24: x -14..10, z -9..7, with a sawtooth of 45-degree
+//     tower, floors 6-16: x -14..10, z -9..7, with a sawtooth of 45-degree
 //     teeth out to x = 12 and z = 9.
 
 export const FLOOR_H = 4;
 export const SLAB = 0.3;
 export const PODIUM_FLOORS = 6;
-export const TOP_FLOOR = 24;
+export const TOP_FLOOR = 16;         // 17 storeys: the roof at 68 m, the plant room to 72
 export const ROOF = TOP_FLOOR + 1;
 
 // What each floor is. The podium is the public part of the building; the
 // penthouse is the top three storeys of the tower.
+export const PENTHOUSE = TOP_FLOOR - 2;   // the top three storeys
 export const PROGRAMME = {
   0: 'lobby',
   1: 'boutiques',
@@ -29,11 +30,10 @@ export const PROGRAMME = {
   3: 'food court',
   4: 'restaurant',
   5: 'café and books',
-  22: 'penthouse: living',
-  23: 'penthouse: bedrooms',
-  24: 'penthouse: master suite',
+  [PENTHOUSE]: 'penthouse: living',
+  [PENTHOUSE + 1]: 'penthouse: bedrooms',
+  [PENTHOUSE + 2]: 'penthouse: master suite',
 };
-export const PENTHOUSE = 22;
 export const floorUse = (f) => PROGRAMME[f] ?? (f >= PODIUM_FLOORS && f < PENTHOUSE ? 'offices' : '');
 
 export const T = (f) => f * FLOOR_H + SLAB;        // top of floor f's slab
