@@ -96,6 +96,43 @@ always come along. Then the job loads and you are put at the door.
 - **You can die**: falls, blasts, fire, being under a collapse. You come back at the door
   and the building stays as broken as you left it.
 
+## The building is a place
+
+Not a stack of offices — the owner asked for restaurants, shops and Trump's
+house on top. `building/plan.js` holds the plan and `PROGRAMME`;
+`building/interiors.js` furnishes each floor from it:
+
+| floor | what it is |
+|---|---|
+| 0 | lobby: reception, waterfall, escalator, café bar, plant room with transformers and gas |
+| 1 | fashion boutiques, changing rooms |
+| 2 | jewellers: glass cases of gold and stones |
+| 3 | food court: three counters with griddles, fridges and gas; seating |
+| 4 | the Grill: white tablecloths, a bar, a walled kitchen with gas, a piano |
+| 5 | café and bookshop |
+| 6–21 | offices |
+| 22 | penthouse living: fireplace, piano, sofas, dining for ten, kitchen |
+| 23 | three bedrooms, each with a bathroom |
+| 24 | master bedroom, dressing room, bathroom, study |
+
+Floors are finished to their use (marble, tile, oak, carpet), and furniture is
+placed through `freePodium` so nothing stands in a column, the core or the atrium.
+New furniture lives in `furniture-home.js` and `furniture-food.js`.
+
+### The lift
+
+`sim/lift.js`: a car in the core's lift shaft, lobby to floor 24. Inside, E goes
+up a floor and Q down, and holding either keeps it going. At the brass doors on
+any floor, E calls it. The landing doors are pieces tagged `liftdoor`, slid open
+with `Pieces.move`, and a brass sill bridges each doorway.
+
+**The car holds up its rider itself, and that was learned twice.** A kinematic
+car floor made the character controller report a zero-distance contact and
+refuse to walk off it; fixed colliders moved by hand were not always seen, and
+the rider fell down the shaft. So the lift puts you on its floor while it moves
+and will not let you sink below it while it stands; its colliders are only there
+for the walls.
+
 ## Architecture
 
 ```

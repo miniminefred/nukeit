@@ -48,12 +48,14 @@ function slabs(P, f) {
   const y0 = f * FLOOR_H, y1 = T(f);
   // Every slab bay gets a suspended ceiling under it (the ceiling of the floor
   // below), and on the office floors carpet over it.
-  // Carpet on the office floors, marble in the penthouse.
-  const finish = f >= PODIUM_FLOORS && f !== ROOF ? (f >= PENTHOUSE ? 'marble' : 'carpet') : null;
-  const add = (x0, z0, x1, z1, kind) => {
+  // What you walk on: marble in the shops and the penthouse, tiles in the food
+  // court, oak in the restaurant and the café, carpet in the offices.
+  const FINISH = { 1: 'marble', 2: 'marble', 3: 'ceramic', 4: 'wood', 5: 'wood' };
+  const finish = f === ROOF ? null : f >= PENTHOUSE ? 'marble' : f >= PODIUM_FLOORS ? 'carpet' : FINISH[f] ?? null;
+  const add = (x0, z0, x1, z1, kind, outdoors = false) => {
     const s = block(P, kind, x0, y0, z0, x1, y1, z1, 'slab', { floor: f, lateral: true });
     if (f >= 1) block(P, 'plaster', x0, y0 - 0.03, z0, x1, y0, z1, 'ceiling', { floor: f - 1, hang: true, tint: 0xf2efe8 });
-    if (finish) block(P, finish, x0, y1, z0, x1, y1 + 0.02, z1, 'carpet', { floor: f, structural: false });
+    if (finish && !outdoors) block(P, finish, x0, y1, z0, x1, y1 + 0.02, z1, 'carpet', { floor: f, structural: false, tint: finish === 'wood' ? 0xf2dcbc : finish === 'ceramic' ? 0xe8e2d8 : undefined });
     return s;
   };
   const addPlate = (poly, kind) => {
@@ -78,10 +80,10 @@ function slabs(P, f) {
         const roofHere = f === PODIUM_FLOORS || cz > here;
         if (f === PODIUM_FLOORS) {
           // Round the foot of the tower: only what lies outside its outline.
-          for (const [a0, b0, a1, b1] of subtract([x0, z0, x1, z1], [-14, -9, 12, 9])) add(a0, b0, a1, b1, 'roofing');
+          for (const [a0, b0, a1, b1] of subtract([x0, z0, x1, z1], [-14, -9, 12, 9])) add(a0, b0, a1, b1, 'roofing', true);
           continue;
         }
-        add(x0, z0, x1, z1, f === 0 ? 'marble' : roofHere ? 'roofing' : 'concrete');
+        add(x0, z0, x1, z1, f === 0 ? 'marble' : roofHere ? 'roofing' : 'concrete', roofHere);
       }
     if (f === PODIUM_FLOORS) notchRoofs(P, y0, y1);
   }

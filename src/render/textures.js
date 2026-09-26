@@ -113,12 +113,13 @@ const SURFACES = {
     const t = 150 + f * 30 + s * 25 - stone;
     set(o, t + stone * 0.4, t, t - 10, f * 1.6 + s, 0.95);
   },
-  marble: (u, v, n, o) => {        // Breccia Pernice: peach-pink with darker veins
-    const w = fbm(n, u, v, 3, 5);
-    const vein = Math.abs(Math.sin((u * 3 + v * 2 + w * 2.2) * Math.PI * 2));
-    const dark = Math.pow(1 - vein, 14);
-    const cloud = fbm(n, u, v, 8, 3);
-    set(o, 214 - dark * 90 + cloud * 12, 168 - dark * 80 + cloud * 10, 150 - dark * 70 + cloud * 8, -dark * 0.2, 0.18 + dark * 0.2);
+  marble: (u, v, n, o) => {        // Breccia Pernice: cloudy peach-pink, a few fine veins
+    const w = fbm(n, u, v, 2, 5);
+    const vein = Math.abs(Math.sin((u * 2 + v * 1.3 + w * 1.6) * Math.PI * 2));
+    const fine = Math.pow(1 - vein, 60);                      // thin, rare
+    const cloud = fbm(n, u, v, 5, 4), mottle = fbm(n, u + 3, v, 18, 2);
+    const t = cloud * 0.6 + mottle * 0.25;
+    set(o, 222 + t * 18 - fine * 55, 182 + t * 16 - fine * 55, 164 + t * 14 - fine * 50, -fine * 0.1, 0.16 + fine * 0.15);
   },
   wood: (u, v, n, o) => {          // veneer, grain along u
     const w = fbm(n, u, v, 2, 4);
@@ -152,9 +153,9 @@ const SURFACES = {
     const f = fbm(n, u, v, 16, 2);
     set(o, 60 + f * 10 + weave * 12, 62 + f * 10 + weave * 12, 78 + f * 12 + weave * 12, weave, 1);
   },
-  leather: (u, v, n, o) => {
+  leather: (u, v, n, o) => {       // mid-tone, so a tint can make it cream or oxblood
     const f = fbm(n, u, v, 24, 4);
-    set(o, 42 + f * 10, 30 + f * 8, 24 + f * 6, f * 1.2, 0.5);
+    set(o, 196 + f * 14, 188 + f * 13, 180 + f * 12, f * 1.2, 0.5);
   },
   metal: (u, v, n, o) => {         // brushed
     const b = fbm(n, u * 0.05, v * 6, 64, 2);
