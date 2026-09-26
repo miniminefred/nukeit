@@ -16,8 +16,19 @@ import { unsupported } from '../building/support.js';
 //    be thousands of rigid bodies stacking on each other, and this is also
 //    simply how a tower comes down.
 
+// Weight. A column carries every storey above it, so the lower it stands the
+// less of it has to go before it gives way. When one goes, its load moves onto
+// its neighbours, and a neighbour that was coping may not cope any more — which
+// is how taking out three or four columns low down can bring a whole floor
+// down on its own, and a floor coming down brings the rest with it.
+const SPREAD = 7.5;          // metres: how far a lost column's load moves
+const CHAIN_COLUMN = 3;      // lost neighbours that break an undamaged column...
+const CHAIN_CORE = 6;        // ...or an undamaged length of core wall
+const CHAIN_LOAD = 8;        // ...if it is carrying at least this many storeys
+
 const PANCAKE = 150;         // pieces: more than this falls together
 const G = 9.81 * 0.72;       // progressive collapse runs at about 0.7 g
+const _c = new THREE.Vector3();
 
 export class Structure {
   constructor(pieces, fx) {
@@ -27,20 +38,65 @@ export class Structure {
     this._wait = 0;
     this.falls = [];
     this.onCrushPlayer = null;
+    this.lost = [];          // where supports have given way: { floor, x, z }
+    this.checks = [];        // neighbours to re-examine: { p, t }
     pieces.onChange = () => { this.dirty = true; };
+  }
+
+  _lostNear(p) {
+    const c = p.box.getCenter(_c);
+    let n = 0;
+    for (const l of this.lost) if (l.floor === p.floor && Math.hypot(l.x - c.x, l.z - c.z) < SPREAD) n++;
+    return n;
+  }
+
+  // Has a damaged support taken more than it can carry?
+  mustFail(p) {
+    if (!p.load || p.hpMax === null) return false;
+    const share = p.load * (1 + this._lostNear(p) * 0.5);
+    return p.hp <= p.hpMax * share / (share + 14);
+  }
+
+  // A support has given way: the ones round it now carry its share.
+  failed(p) {
+    const c = p.box.getCenter(new THREE.Vector3());
+    this.lost.push({ floor: p.floor, x: c.x, z: c.z });
+    for (const q of this.pieces.list) {
+      if (q.state !== 'static' || q.floor !== p.floor || (q.role !== 'column' && q.role !== 'core')) continue;
+      const d = q.box.getCenter(_c).distanceTo(c);
+      if (d < SPREAD + 1.5) this.checks.push({ p: q, t: 0.4 + Math.random() * 1.4 + d * 0.08 });
+    }
+  }
+
+  _check(dt) {
+    if (!this.checks.length) return;
+    const due = [];
+    this.checks = this.checks.filter((e) => ((e.t -= dt) > 0 ? true : (due.push(e), false)));
+    for (const { p } of due) {
+      if (p.state !== 'static') continue;
+      const lost = this._lostNear(p);
+      const chain = p.load >= CHAIN_LOAD && lost >= (p.role === 'core' ? CHAIN_CORE : CHAIN_COLUMN);
+      if (!chain && !this.mustFail(p)) continue;
+      const c = p.box.getCenter(new THREE.Vector3());
+      // A crack, a shower of grit, and it goes.
+      this.fx.audio?.impact(c.x, c.y, c.z, 0.7);
+      for (let i = 0; i < 12; i++) this.fx.particles.spawn('dust', c.x + (Math.random() - 0.5), c.y + (Math.random() - 0.5) * 3, c.z + (Math.random() - 0.5), (Math.random() - 0.5) * 2, -0.5, (Math.random() - 0.5) * 2, 0xb8b2a8);
+      this.fx.damage.fail(p, c, new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize());
+    }
   }
 
   mark() { this.dirty = true; }
 
   update(dt) {
     this._wait -= dt;
+    this._check(dt);
     if (this.dirty && this._wait <= 0 && this.falls.length === 0) {
       this.dirty = false;
       this._wait = 0.1;
       const loose = unsupported(this.pieces.list);
       if (loose.length > PANCAKE) this._pancake(loose);
       else for (const p of loose) this.pieces.makeDynamic(p, undefined, undefined, { quiet: true });
-      if (loose.length) this.fx.chips.unsettle();
+      if (loose.length) { this.fx.chips.unsettle(); this._wakeRubble(loose); }
       if (loose.length && loose.length <= PANCAKE) this.dirty = true;   // what they carried may go next
     }
     for (const f of this.falls) this._fall(f, dt);
@@ -53,6 +109,16 @@ export class Structure {
   }
 
   get collapsing() { return this.falls.length > 0; }
+
+  // Frozen rubble lying on something that has just started to fall falls with it.
+  _wakeRubble(loose) {
+    const zone = new THREE.Box3();
+    for (const p of loose) zone.union(p.box);
+    zone.expandByScalar(0.3);
+    for (const r of this.pieces.list) {
+      if (r.state === 'rubble' && r.box.intersectsBox(zone)) this.pieces.makeDynamic(r, undefined, undefined, { quiet: true, debris: true });
+    }
+  }
 
   _pancake(list) {
     const P = this.pieces;
@@ -158,6 +224,8 @@ export class Structure {
 
   clear() {
     this.falls.length = 0;
+    this.lost.length = 0;
+    this.checks.length = 0;
     this.dirty = false;
   }
 }

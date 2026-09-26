@@ -16,10 +16,11 @@
 //    storeys of it, is not a building. Non-structural things may be at most
 //    three steps from real structure. Without this rule the curtain wall held
 //    itself up from the first floor after everything behind it had gone.
-//  * **Slabs span, a little.** A bay with nothing under it still stands if it
-//    is tied to a bay that is itself resting on something — up to two bays
-//    out. So knocking out one column leaves the floor sagging on its
-//    neighbours, and it is losing a whole line of them that brings it down.
+//  * **Slabs span, but only a little.** A bay keeps standing while anything is
+//    still under it, so one lost column leaves it resting on the others. Take
+//    away everything under it and it comes down — unless it is small (a
+//    sawtooth tooth, a landing) and tied to a neighbour that is still firmly
+//    held, by two or more supports of its own.
 //
 // This is connectivity, not stress: nothing here knows how heavy anything is.
 
@@ -27,6 +28,7 @@ const TOL = 0.06;
 const MIN_OVERLAP = 0.005;   // a 2 cm glass rail on a slab edge still counts
 const CELL = 2;
 const MAX_DEPTH = 3;
+const SMALL_BAY = 12;       // m^2: a bay this small can cantilever
 
 export function link(pieces) {
   const grid = new Map();
@@ -113,15 +115,18 @@ export function unsupported(pieces) {
     for (let i = n; i < m; i++) {
       const p = standing[i];
       if (p.hang) continue;
-      if (p.box.min.y < 0.05 || p.rests.some((q) => holds(p, q))) { p.sup = true; p.direct = true; p.depth = depthOf(p); }
+      let n = 0;
+      for (const q of p.rests) if (holds(p, q)) n++;
+      p.held = n;
+      if (p.box.min.y < 0.05 || n > 0) { p.sup = true; p.direct = true; p.depth = depthOf(p); }
     }
-    // Spans: two bays out from anything resting directly on support.
-    for (let hop = 0; hop < 2; hop++) {
-      for (let i = n; i < m; i++) {
-        const p = standing[i];
-        if (p.sup || !p.lateral) continue;
-        if (p.sides.some((q) => q.state === 'static' && q.sup && (hop === 0 ? q.direct : true))) { p.sup = true; p.depth = 0; }
-      }
+    // Small bays cantilever off a firmly held neighbour.
+    for (let i = n; i < m; i++) {
+      const p = standing[i];
+      if (p.sup || !p.lateral) continue;
+      const s = p.box;
+      if ((s.max.x - s.min.x) * (s.max.z - s.min.z) > SMALL_BAY) continue;
+      if (p.sides.some((q) => q.state === 'static' && q.direct && q.held >= 2)) { p.sup = true; p.depth = 0; }
     }
     n = m;
   }

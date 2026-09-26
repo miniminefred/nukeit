@@ -60,6 +60,8 @@ export class Pieces {
       damage: 0,          // volume taken out, m^3
       bites: 0,
       hp: spec.hp ?? null,
+      hpMax: spec.hp ?? null,
+      load: spec.load ?? 0,        // storeys this piece carries, for columns and core
       burning: 0,
       charred: 0,
       crack: null,
@@ -84,6 +86,8 @@ export class Pieces {
   spawn(spec, { dynamic = false, vel, spin, debris = false } = {}) {
     const p = this.add(spec);
     this.promote(p);
+    // An irregular shape — a broken lump — collides as its convex hull, not its box.
+    if (spec.hull) p.bites = Math.max(p.bites, 1);
     if (dynamic) {
       p.state = 'static';
       this.makeDynamic(p, vel, spin, { debris, quiet: true });
@@ -217,6 +221,7 @@ export class Pieces {
   makeDynamic(p, vel, spin, { debris = false, quiet = false } = {}) {
     if (p.state === 'dead' || p.state === 'dynamic') return;
     this.promote(p);
+    this._updateBox(p);
     this._removeFixedColliders(p);
     const s = p.localBox.getSize(new THREE.Vector3());
     const c = p.localBox.getCenter(new THREE.Vector3());
@@ -237,6 +242,18 @@ export class Pieces {
     p.state = 'dynamic';
     this.physics.dynamic.add(p);
     if (!quiet) this.onChange?.();
+  }
+
+  // A piece of debris that has stopped moving: out of the simulation, but
+  // still there, still solid, still something you can hit.
+  freeze(p) {
+    if (p.state !== 'dynamic' || !p.body) return;
+    this.physics.removeBody(p.body);
+    this.physics.dynamic.delete(p);
+    p.body = null;
+    p.state = 'rubble';
+    this._updateBox(p);
+    this._addFixedCollider(p);
   }
 
   // Gone: no mesh, no collider, nothing left to hold anything up.

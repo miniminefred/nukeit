@@ -136,7 +136,8 @@ function slabs(P, f) {
     for (const a of [-14, -10, -6, -2, 2, 6]) addPlate([new THREE.Vector3(a, 0, 7), new THREE.Vector3(a + 4, 0, 7), new THREE.Vector3(a + 2, 0, 9)], kind);
   }
   // Inside the core: the stair landing. The lift shaft stays open.
-  if (f >= 1) block(P, f === ROOF ? 'roofing' : 'concrete', CORE.x0 + CORE.t, y0, 1.5, -0.2, y1, CORE.z1 - CORE.t, 'slab', { floor: f, lateral: true });
+  // It runs over the tops of the core walls, which is what it rests on.
+  if (f >= 1) block(P, f === ROOF ? 'roofing' : 'concrete', CORE.x0, y0, 1.5, 0.2, y1, CORE.z1, 'slab', { floor: f, lateral: true });
 }
 
 // The triangles of podium roof left between the tower's teeth.
@@ -174,31 +175,37 @@ function columns(P, f) {
       if (inCore(x, z, 0.5)) continue;
       if (f === 0 && Math.abs(x) < 3.2 && z > 11) continue;      // the doorway
       if (!tower && x > ATRIUM.x0 && x < ATRIUM.x1 && z > ATRIUM.z0 && z < ATRIUM.z1) continue;
-      block(P, f === 0 ? 'marble' : 'concrete', x - s, T(f), z - s, x + s, U(f), z + s, 'column', { floor: f, hp: 14 });
+      block(P, f === 0 ? 'marble' : 'concrete', x - s, T(f), z - s, x + s, U(f), z + s, 'column', { floor: f, hp: 10, load: ROOF - f });
     }
 }
 
 function core(P, f) {
   const { x0, x1, z0, z1, t } = CORE;
-  const y0 = T(f), y1 = U(f);
+  // Full storey height, through the slab line: there is no slab inside the core
+  // for a wall to stand on, so each storey's walls stand on the ones below.
+  const y0 = f === 0 ? T(0) : f * FLOOR_H, y1 = U(f);
   const kind = f === 0 ? 'marble' : 'concrete';
-  const wall = (a0, b0, a1, b1, ya = y0, yb = y1) => block(P, kind, a0, ya, b0, a1, yb, b1, 'core', { floor: f, hp: 18 });
+  const wall = (a0, b0, a1, b1, ya = y0, yb = y1) => block(P, kind, a0, ya, b0, a1, yb, b1, 'core', { floor: f, hp: 14, load: ROOF - f });
   wall(x0, z0, x0 + t, z1);
   wall(x1 - t, z0, x1, z1);
   wall(x0 + t, z0, x1 - t, z0 + t);
-  // The street side, with the stair door and the lift door in it.
-  wall(x0 + t, z1 - t, -4.1, z1);
-  wall(-2.6, z1 - t, 0.9, z1);
-  wall(3.4, z1 - t, x1 - t, z1);
-  wall(-4.1, z1 - t, -2.6, z1, y0 + 2.4, y1);
-  wall(0.9, z1 - t, 3.4, z1, y0 + 2.4, y1);
+  // The street side, with the stair door and the lift door in it: three piers
+  // up to door height, and one band across the top that rests on them. (The
+  // band was two lintels once, and a lintel touching its neighbours only at the
+  // ends rests on nothing.)
+  const head = T(f) + 2.4;
+  wall(x0 + t, z1 - t, -4.1, z1, y0, head);
+  wall(-2.6, z1 - t, 0.9, z1, y0, head);
+  wall(3.4, z1 - t, x1 - t, z1, y0, head);
+  wall(x0 + t, z1 - t, x1 - t, z1, head, y1);
   // Between stair and lift.
-  block(P, 'concrete', -0.2, y0, z0 + t, 0.2, y1, z1 - t, 'core', { floor: f, hp: 18 });
+  block(P, 'concrete', -0.2, y0, z0 + t, 0.2, y1, z1 - t, 'core', { floor: f, hp: 14, load: ROOF - f });
   // Brass lift doors — the only thing between the lobby and the shaft.
   // They stand just outside the wall, on the corridor slab: there is no floor
   // inside the shaft for them to stand on.
-  block(P, 'brass', 0.9, y0, z1, 2.15, y0 + 2.4, z1 + 0.04, 'furniture', { floor: f });
-  block(P, 'brass', 2.15, y0, z1, 3.4, y0 + 2.4, z1 + 0.04, 'furniture', { floor: f });
+  const yd = T(f);
+  block(P, 'brass', 0.9, yd, z1, 2.15, yd + 2.4, z1 + 0.04, 'furniture', { floor: f });
+  block(P, 'brass', 2.15, yd, z1, 3.4, yd + 2.4, z1 + 0.04, 'furniture', { floor: f });
 }
 
 // A switchback of twenty 20 cm risers per storey. One piece per storey, with
@@ -438,9 +445,9 @@ function roof(P) {
   // The plant room over the core, the lift motor room, and a generator.
   const h = y + 3.6;
   block(P, 'concrete', -6, y, -4.5, 6, h, -4.1, 'core', { floor: ROOF });
-  block(P, 'concrete', -6, y, 4.1, -4.1, h, 4.5, 'core', { floor: ROOF });
-  block(P, 'concrete', -2.6, y, 4.1, 6, h, 4.5, 'core', { floor: ROOF });
-  block(P, 'concrete', -4.1, y + 2.4, 4.1, -2.6, h, 4.5, 'core', { floor: ROOF });
+  block(P, 'concrete', -6, y, 4.1, -4.1, y + 2.4, 4.5, 'core', { floor: ROOF });
+  block(P, 'concrete', -2.6, y, 4.1, 6, y + 2.4, 4.5, 'core', { floor: ROOF });
+  block(P, 'concrete', -6, y + 2.4, 4.1, 6, h, 4.5, 'core', { floor: ROOF });
   block(P, 'concrete', -6, y, -4.1, -5.6, h, 4.1, 'core', { floor: ROOF });
   block(P, 'concrete', 5.6, y, -4.1, 6, h, 4.1, 'core', { floor: ROOF });
   block(P, 'roofing', -6.2, h, -4.7, 6.2, h + 0.3, 4.7, 'slab', { floor: ROOF, lateral: true });

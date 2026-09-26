@@ -52,7 +52,9 @@ const FRAG = /* glsl */ `
 
 // Presets: life (s), size (m), growth (m/s), drag, gravity (+ is down), colour.
 const KINDS = {
-  bigdust: { life: [7, 13], size: [2.5, 5], grow: 1.6, drag: 0.35, grav: -0.12, colour: 0xa49e94, alpha: 0.45, add: false },
+  // Particles are not lit, so their colours are what they look like in
+  // ordinary light: a mid grey, not a white that glows in a dark room.
+  bigdust: { life: [9, 16], size: [2.2, 4.5], grow: 1.1, drag: 0.55, grav: -0.08, colour: 0x6d6963, alpha: 0.6, add: false },
   // The dust off a single blow: small and faint, because it is usually a metre
   // from your face and a full-size puff there fills the whole screen.
   puff:  { life: [1.2, 2.6], size: [0.1, 0.28], grow: 0.3, drag: 2.2, grav: -0.05, colour: 0x9a948a, alpha: 0.28, add: false },

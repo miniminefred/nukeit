@@ -18,7 +18,7 @@ export class Heap {
   constructor(scene, physics) {
     this.physics = physics;
     this.h = new Float32Array((N + 1) * (N + 1));
-    const geos = [0, 1, 2].map((s) => { const g = blob(s * 17.3, 0.45, 0); projectUVs(g, 1); return g; });
+    const geos = [0, 1, 2].map((s) => { const g = blob(s * 17.3, 0.5, 1); projectUVs(g, 1); return g; });
     this.meshes = geos.map((g) => {
       const m = new THREE.InstancedMesh(g, KIND.concrete.material, MAX_LUMPS / 3);
       m.count = 0;

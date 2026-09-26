@@ -69,6 +69,26 @@ export function subtract(geometry, materials, inside, centre, axis, radius, dept
   return { geometry: out.geometry, materials: Array.isArray(out.material) ? out.material : [out.material] };
 }
 
+// Break a lump off: returns both the piece that comes away (the part of
+// `geometry` inside a jagged blob at `centre`) and what is left behind.
+// { chunk: { geometry, materials }, rest: { geometry, materials } }
+export function chunkOff(geometry, materials, inside, centre, axis, radius, depth) {
+  const a = new Brush(geometry, materials);
+  a.updateMatrixWorld();
+  const cut = blob(Math.random() * 1000, 0.28, 2);
+  projectUVs(cut, 1);
+  const b = new Brush(cut, inside);
+  b.position.copy(centre);
+  b.quaternion.copy(_q.setFromUnitVectors(_z, axis));
+  b.scale.set(radius, radius * (0.8 + Math.random() * 0.5), depth);
+  b.updateMatrixWorld();
+  const piece = evaluator.evaluate(a, b, INTERSECTION);
+  const rest = evaluator.evaluate(a, b, SUBTRACTION);
+  cut.dispose();
+  const pack = (r) => ({ geometry: r.geometry, materials: Array.isArray(r.material) ? r.material : [r.material] });
+  return { chunk: pack(piece), rest: pack(rest) };
+}
+
 // Split `geometry` in two along a rough plane through `point` with normal
 // `normal`. Returns [{ geometry, materials }, { geometry, materials }], either
 // of which may be empty.
@@ -76,15 +96,16 @@ export function split(geometry, materials, inside, point, normal, size) {
   const a = new Brush(geometry, materials);
   a.updateMatrixWorld();
   // Half of space, as a big lumpy slab whose face runs through `point`.
-  const g = new THREE.BoxGeometry(1, 1, 1, 6, 6, 1);
+  const g = new THREE.BoxGeometry(1, 1, 1, 12, 12, 1);
   const p = g.attributes.position;
   const seed = Math.random() * 100;
   for (let i = 0; i < p.count; i++) {
     if (p.getZ(i) < 0) continue;       // only the cutting face is rough
     const x = p.getX(i), y = p.getY(i);
     // A function of position alone, so duplicated seam vertices move together.
-    const h = Math.sin(x * 13 + y * 7 + seed) * 0.5 + Math.sin(x * 31.7 - y * 23.3 + seed * 2) * 0.5;
-    p.setZ(i, 0.5 + h * 0.06);
+    // Three scales of roughness: a broken face undulates, then is jagged, then gritty.
+    const h = Math.sin(x * 9 + y * 5 + seed) * 0.55 + Math.sin(x * 31.7 - y * 23.3 + seed * 2) * 0.3 + Math.sin(x * 83 + y * 71 + seed * 3) * 0.15;
+    p.setZ(i, 0.5 + h * 0.1);
   }
   g.computeVertexNormals();
   projectUVs(g, size * 3);

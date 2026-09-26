@@ -14,6 +14,7 @@ import { Damage } from './damage/damage.js';
 import { Structure } from './sim/structure.js';
 import { Fire } from './sim/fire.js';
 import { Blast } from './sim/blast.js';
+import { Impacts } from './sim/impacts.js';
 import { TOOL_CLASSES } from './tools/tools.js';
 import { Menu } from './ui/menu.js';
 import { Hud, screens } from './ui/hud.js';
@@ -65,6 +66,24 @@ const blast = new Blast({ pieces, damage, physics, particles, chips, audio, shak
 const fire = new Fire(scene, pieces, physics, { particles, chips, audio, explode: (p) => blast.tank(p) });
 blast.ctx.fire = fire;
 damage.onStructure = () => structure.mark();
+
+// A cloud of dust rolling out from where something heavy came down. Thick
+// enough to lose sight of things in — and of you.
+function cloud(at, scale = 1) {
+  const n = Math.round(10 + 22 * scale);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, r = Math.random() * 1.2 * scale;
+    const s = (2 + Math.random() * 4) * scale;
+    particles.spawn('bigdust', at.x + Math.cos(a) * r, at.y + Math.random() * 0.8, at.z + Math.sin(a) * r,
+      Math.cos(a) * s, 0.4 + Math.random() * 1.2, Math.sin(a) * s);
+  }
+  for (let i = 0; i < n; i++) particles.spawn('dust', at.x, at.y + 0.3, at.z, (Math.random() - 0.5) * 6 * scale, Math.random() * 2, (Math.random() - 0.5) * 6 * scale, 0x7a756e);
+}
+damage.fx.cloud = cloud;
+const impacts = new Impacts(pieces, physics, { damage, cloud, audio, shake, player, structure });
+damage.fx.mustFail = (p) => structure.mustFail(p);
+damage.fx.onFailed = (p) => structure.failed(p);
+structure.fx.damage = damage;
 damage.fx.onPuncture = (p, point, normal) => {
   if (p.punctured) return;
   p.punctured = true;
@@ -142,6 +161,7 @@ function unloadJob() {
   for (const t of tools) { t.unequip?.(ctx); t.clear?.(); t.model.removeFromParent(); }
   tools = [];
   structure.clear();
+  impacts.clear();
   fire.clear();
   blast.clear();
   chips.clear();
@@ -226,6 +246,7 @@ function frame(dt) {
     physics.step(dt);
     pieces.sync();
     structure.update(dt);
+    impacts.update(dt);
     const dps = fire.update(dt, player.pos);
     if (dps > 0 && playing) player.damage(dps * dt, 'fire');
     blast.update(dt);
@@ -290,7 +311,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, heap, particles, audio, ctx, get tools() { return tools; }, start, measure,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, heap, particles, audio, ctx, get tools() { return tools; }, start, measure, impacts,
     get state() { return state; }, set state(s) { state = s; },
     // Run whole frames by hand, for a tab that is not on screen.
     step: (dt = 1 / 60, n = 1) => { for (let i = 0; i < n; i++) frame(dt); }, select };

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { subtract, split } from './cutter.js';
+import { subtract, split, chunkOff } from './cutter.js';
 import { addSplinters } from './splinters.js';
 import { crack, shatter } from './glass.js';
 import { insideMaterial } from '../render/materials.js';
@@ -76,7 +76,7 @@ export class Damage {
 
     // Loose things move when you hit them. Whether a thing is loose is what it
     // is, not how big its box is: a desk's bounding box says half a tonne.
-    if (p.state === 'static' && LOOSE.has(p.role)) this.pieces.makeDynamic(p);
+    if ((p.state === 'static' || p.state === 'rubble') && LOOSE.has(p.role)) this.pieces.makeDynamic(p);
     if (p.body) {
       const m = Math.max(5, p.body.mass());
       // A sledge head is about 5 kg arriving at 15 m/s.
@@ -97,18 +97,64 @@ export class Damage {
       particles.burst('spark', point.x, point.y, point.z, 14, 4);
       return kind;
     }
+    // Concrete and stone: a lump comes away and falls. Columns and core walls
+    // keep count, and the structure decides when one has had enough — sooner
+    // the more storeys it is carrying.
+    if (tough >= 8) {
+      // Fist- to brick-sized.
+      const r = THREE.MathUtils.clamp(0.07 + Math.random() * 0.06, 0.06, 0.2) * Math.sqrt(energy);
+      this._chunk(p, point, normal, dir, r, kind);
+      if (p.hp !== null && (p.role === 'column' || p.role === 'core')) {
+        p.hp -= energy;
+        if (p.hp <= 0 || this.fx.mustFail?.(p)) this.fail(p, point, dir);
+      } else if (p.bites > 40) this.fracture(p, point, dir, energy);
+      return kind;
+    }
     // How big a bite: soft things give a lot, hard things a little.
     const radius = THREE.MathUtils.clamp(0.24 * Math.sqrt(energy / tough), 0.035, 0.55);
     const depth = radius * (kind.splinters ? 2.4 : 1.7);
     this._bite(p, point, normal, dir, radius, depth, kind);
 
-    if (p.hp !== null && (p.role === 'column' || p.role === 'core')) {
-      p.hp -= energy;
-      if (p.hp <= 0) this.fail(p, point, dir);
-    } else if (p.damage > p.volume * 0.35 || p.bites > 36) {
+    if (p.damage > p.volume * 0.35 || p.bites > 36) {
       this.fracture(p, point, dir, energy);
     }
     return kind;
+  }
+
+  // Knock a lump off a piece: the lump is a real piece of it — its outside is
+  // the piece's own surface, its broken faces are the material's inside — and
+  // it falls. What is left has the matching hole in it.
+  _chunk(p, point, normal, dir, radius, kind) {
+    const { chips } = this.fx;
+    const local = this.toLocal(p, point);
+    const ln = this.dirToLocal(p, normal);
+    const part = this.partAt(p, local);
+    const q = p.parts[part];
+    // Centred just inside the surface, so the blob takes a lump that stands
+    // proud of the face and leaves a dished scar.
+    const centre = local.clone().addScaledVector(ln, -radius * 0.35);
+    let out;
+    try {
+      const mats = q.materials ?? (Array.isArray(q.mesh?.material) ? q.mesh.material : [this.pieces._material(q)]);
+      out = chunkOff(q.geometry, mats, insideMaterial(kind.name), centre, ln.clone().negate(), radius, radius * 1.2);
+    } catch (e) { console.warn('chunk failed', e); return; }
+    if (out.rest.geometry.attributes.position.count === 0) { this.pieces.destroy(p); return; }
+    this.pieces.reshape(p, part, out.rest.geometry, out.rest.materials);
+    p.bites++;
+    const g = out.chunk.geometry;
+    if (g.attributes.position.count > 0) {
+      g.computeBoundingBox();
+      const c = g.boundingBox.getCenter(new THREE.Vector3());
+      g.translate(-c.x, -c.y, -c.z);
+      // Start it a little proud of the face and moving away, or it sits in the
+      // exact hole it came out of and friction holds it there.
+      const pos = c.clone().applyQuaternion(p.quat).add(p.pos).addScaledVector(normal, 0.04);
+      const vel = normal.clone().multiplyScalar(2.2 + Math.random() * 1.5).add(new THREE.Vector3(0, 0.3, 0));
+      this.pieces.spawn({ parts: [{ kind: q.kind.name, geometry: g, materials: out.chunk.materials }], pos, quat: p.quat, role: 'fragment', floor: p.floor, structural: false, hull: true },
+        { dynamic: true, vel, spin: { x: Math.random() * 6 - 3, y: Math.random() * 6 - 3, z: Math.random() * 6 - 3 }, debris: true });
+    }
+    chips.burst(chipKind(kind), point, normal, 14, 2.5, 0.035);
+    this._dust(kind, point, normal, 10);
   }
 
   // Take a bite out of a piece where it was hit.
@@ -204,6 +250,8 @@ export class Damage {
     this.fracture(middle, point, dir, 2, 3);
     for (let i = 0; i < 40; i++) particles.spawn('dust', sc.x, top + Math.random() * size.y, sc.z, (Math.random() - 0.5) * 3, Math.random(), (Math.random() - 0.5) * 3, 0xb8b2a8);
     this.fx.chips.burst('concrete', new THREE.Vector3(sc.x, top + 0.5, sc.z), dir, 60, 3, 0.05);
+    this.fx.cloud?.(mc, 1.2);
+    this.fx.onFailed?.(p);
     this.onStructure?.();
   }
 
@@ -253,7 +301,7 @@ export class Damage {
         const c = g.boundingBox.getCenter(new THREE.Vector3());
         g.translate(-c.x, -c.y, -c.z);
         const pos = c.clone().applyQuaternion(p.quat).add(p.pos);
-        const f = P.spawn({ parts: [{ kind: q.kind.name, geometry: g, materials: bit.materials }], pos, quat: p.quat, role: 'fragment', floor: p.floor, structural: false },
+        const f = P.spawn({ parts: [{ kind: q.kind.name, geometry: g, materials: bit.materials }], pos, quat: p.quat, role: 'fragment', floor: p.floor, structural: false, hull: true },
           { dynamic: true, vel: vel.clone().add(new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.5, Math.random() - 0.5).multiplyScalar(2)), debris: g.boundingBox.getSize(_v).length() < 0.6 });
         out.push(f);
       }
