@@ -24,6 +24,7 @@ const DOWN = { x: 0, y: -1, z: 0 };
 const REFRESH = 0.15;            // s between looks at what is under a piece
 const SLIDE = 0.08;              // s of its horizontal speed it slides on landing
 const LANDINGS_PER_FRAME = 120;  // more than this wait for the next frame, still in the air
+const SWEEP = 0.5;               // s between checks that what rubble lies on is still there
 
 const _m = new THREE.Matrix4();
 const _one = new THREE.Vector3(1, 1, 1);
@@ -43,12 +44,18 @@ export class Rubble {
     this.flying = [];
     this._ray = new physics.R.Ray({ x: 0, y: 0, z: 0 }, DOWN);
     this._support = null;
+    this.resting = new Set();    // pieces lying on another piece
+    this._sweep = SWEEP;
     // Whatever leaves where it was — crushed, knocked loose, sent flying —
     // takes with it what was lying on it.
     pieces.onLeave = (p) => this.wake(p);
     // And when there are more loose pieces than rigid bodies can afford, the
     // rest come down this way.
     pieces.overflow = (p, vel, spin) => this.add(p, vel, spin);
+    // Wreckage left standing — a column's stub and bars, the edge of a pane
+    // still in its frame — is not in the building's load paths, so it too
+    // remembers what it sits on, and comes down when that does.
+    pieces.onAnchor = (p) => this.anchor(p);
   }
 
   get active() { return this.flying.length > 0; }
@@ -93,15 +100,47 @@ export class Rubble {
     const on = p.carried;
     if (!on) return;
     p.carried = null;
-    for (const r of on) if (r.state === 'rubble' && r.restOn === p) this.add(r, new THREE.Vector3(), new THREE.Vector3());
+    for (const r of on) if ((r.state === 'rubble' || r.state === 'static') && r.restOn === p) this.add(r, new THREE.Vector3(), new THREE.Vector3());
+  }
+
+  anchor(p) {
+    const c = p.box.getCenter(_v);
+    this._under(c.x, c.z, p.box.min.y + 0.05, p);
+    const on = this._support;
+    if (on && on.parts && on !== p) this._rest(p, on);
   }
 
   _unrest(p) {
     if (p.restOn) p.restOn.carried?.delete(p);
     p.restOn = null;
+    this.resting.delete(p);
+  }
+
+  _rest(p, on) {
+    p.restOn = on;
+    p.restAt = on.placed ?? 0;
+    (on.carried ??= new Set()).add(p);
+    this.resting.add(p);
+  }
+
+  // Now and then, everything lying on something is checked against it: if
+  // what it lies on has moved, or is moving, it falls. Most of the time the
+  // piece underneath going wakes what is on it at once; this catches the rest —
+  // a slab and the bar lying on it tipping over together, say, and only the
+  // slab being picked up where it landed.
+  _check() {
+    for (const r of this.resting) {
+      const on = r.restOn;
+      if (!on) { this.resting.delete(r); continue; }
+      if (r.state !== 'rubble' && r.state !== 'static') { this._unrest(r); continue; }
+      if ((on.state === 'static' || on.state === 'rubble') && (on.placed ?? 0) === r.restAt) continue;
+      this.add(r, new THREE.Vector3(), new THREE.Vector3());
+    }
   }
 
   update(dt) {
+    this._sweep -= dt;
+    if (this._sweep <= 0) { this._sweep = SWEEP; this._check(); }
     if (!this.flying.length) return;
     const P = this.pieces;
     let landings = LANDINGS_PER_FRAME;
@@ -135,10 +174,11 @@ export class Rubble {
 
   // The top of whatever is under (x, z), looking down from y; what it is goes
   // in _support. Moving bodies are not something to rest on.
-  _under(x, z, y) {
+  _under(x, z, y, self = null) {
     const r = this._ray;
     r.origin.x = x; r.origin.y = y; r.origin.z = z;
-    const hit = this.physics.world.castRay(r, y + 5, true, this.physics.R.QueryFilterFlags.EXCLUDE_DYNAMIC, G_LAND);
+    const own = self ? (c) => this.physics.owner.get(c.handle) !== self : undefined;
+    const hit = this.physics.world.castRay(r, y + 5, true, this.physics.R.QueryFilterFlags.EXCLUDE_DYNAMIC, G_LAND, undefined, undefined, own);
     this._support = hit ? this.physics.owner.get(hit.collider.handle) ?? null : null;
     return hit ? y - hit.timeOfImpact : -5;
   }
@@ -184,10 +224,8 @@ export class Rubble {
     P._addFixedCollider(p);
     // What it lies on: if that goes, so does this. The street and the city
     // are not pieces and never go.
-    if (on && on.parts) {
-      p.restOn = on;
-      (on.carried ??= new Set()).add(p);
-    }
+    p.placed = (p.placed ?? 0) + 1;
+    if (on && on.parts) this._rest(p, on);
     // Heavy things land with a thump and a cloud.
     const m = p.volume * p.kind.density;
     const v = Math.hypot(f.v.x, f.v.y, f.v.z);
@@ -206,5 +244,6 @@ export class Rubble {
 
   clear() {
     this.flying.length = 0;
+    this.resting.clear();
   }
 }

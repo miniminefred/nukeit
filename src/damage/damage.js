@@ -77,6 +77,9 @@ export class Damage {
       const [what, p, ...args] = this.pending.shift();
       p.queued = false;
       if (p.state === 'dead') continue;
+      // A support that has already been knocked loose does not give way
+      // where it stood: that left stubs and bars hanging in the air.
+      if (what === 'fail' && p.state !== 'static') continue;
       if (what === 'fail') this.fail(p, ...args, { soon: true });
       else this.fracture(p, args[0], args[1], args[2], args[3], 2);   // queued breaks: at most four pieces
     }

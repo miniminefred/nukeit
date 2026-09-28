@@ -21,6 +21,7 @@ import { TOOL_CLASSES } from './tools/tools.js';
 import { Menu } from './ui/menu.js';
 import { Hud, screens } from './ui/hud.js';
 import { Quality } from './render/quality.js';
+import { warmUp } from './render/warmup.js';
 import { job as jobById, tool as toolById } from './data/catalog.js';
 import { progress } from './data/progress.js';
 
@@ -153,6 +154,11 @@ async function start(jobId, toolIds) {
   hud.setJob(job);
   player.revive();
   player.teleport(job.entry.x, 0.05, job.entry.z, job.entry.yaw);
+  // Every shader the first blast needs, compiled now rather than in its frame.
+  const chipCounts = [chips.solid.count, chips.glass.count];
+  chips.solid.count = chips.glass.count = 1;
+  await warmUp(renderer, scene, camera, post);
+  [chips.solid.count, chips.glass.count] = chipCounts;
   height = measure();
   doneT = -1;
   started = performance.now();

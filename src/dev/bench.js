@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { chargeModel } from '../tools/viewmodels.js';
 import { unsupported } from '../building/support.js';
+import { G_LAND } from '../physics.js';
 
 // The collapse bench: an automated, repeatable test of the thing the game is
 // for. It loads Trump Tower, puts remote charges on a set of ground-floor
@@ -130,10 +131,11 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
   // rubble, apart from glass (which bursts) and small bits (which fade).
   const fate = {};
   for (const p of tower) { const k = p.state === 'dead' ? `dead ${p.role}` : p.state; fate[k] = (fate[k] ?? 0) + 1; }
+  const floating = floaters(dev);
   const minFps = Math.min(...windows.map((w) => w.fps));
   const height = dev.measure();
   return {
-    pass: minFps >= 30 && hanging === 0 && inAir === 0 && height < 10,
+    pass: minFps >= 30 && hanging === 0 && inAir === 0 && floating.length === 0 && height < 10,
     minFps,
     worstFrameMs: +(worst.dt * 1000).toFixed(1),
     worstAt: +worst.t.toFixed(2),
@@ -142,11 +144,36 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
     tippedAt: +tipAt.toFixed(2),
     brokeAt: +breakAt.toFixed(2),
     height: +height.toFixed(1),
-    hanging, inAir, standingAboveBefore: before, fate, standingAbove, rubble,
+    hanging, inAir, floating: floating.length, floatingList: floating.slice(0, 30), standingAboveBefore: before, fate, standingAbove, rubble,
     quality: dev.quality.label,
     canvas: `${dev.renderer.domElement.width}x${dev.renderer.domElement.height}`,
     slow: windows.filter((w) => w.fps < 30),
     frames,
     windows,
   };
+}
+
+// The physical test for hanging, for everything that has to lie on something:
+// rubble, and the wreckage a break leaves standing (stubs, bars, the edges of
+// panes). Is there something within a hand's breadth under it? The building's
+// own pieces span between supports, and unsupported() is their test.
+const WRECKAGE = new Set(['stub', 'rebar', 'shard', 'fragment']);
+
+export function floaters(dev) {
+  const floating = [];
+  const L = dev.pieces.list;
+  const { world, R, owner } = dev.physics;
+  const ray = new R.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
+  for (const p of L) {
+    if (!(p.state === 'rubble' || (p.state === 'static' && WRECKAGE.has(p.role))) || p.box.min.y < 0.3) continue;
+    const b = p.box;
+    let best = Infinity;
+    for (const [fx, fz] of [[0.5, 0.5], [0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8]]) {
+      ray.origin = { x: b.min.x + (b.max.x - b.min.x) * fx, y: b.min.y + 0.05, z: b.min.z + (b.max.z - b.min.z) * fz };
+      const hit = world.castRay(ray, 50, true, undefined, G_LAND, undefined, undefined, (c) => owner.get(c.handle) !== p);
+      if (hit) best = Math.min(best, hit.timeOfImpact - 0.05);
+    }
+    if (best > 0.15) floating.push(`${p.role} f${p.floor} ${p.state} y${b.min.y.toFixed(1)} gap ${best === Infinity ? 'inf' : best.toFixed(2)}`);
+  }
+  return floating;
 }

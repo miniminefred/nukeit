@@ -132,9 +132,11 @@ export class Topple {
         .setDensity(density).setFriction(0.6).setRestitution(0.02).setCollisionGroups(G_MASS), body);
     }
     // Everything riding on it keeps where it stood relative to the body.
+    // Everything riding is marked first, so that lifting one piece does not
+    // send flying another that rides on it.
+    for (const p of list) p.state = 'tipping';
     const riders = list.map((p) => {
-      P._removeFixedColliders(p);
-      p.state = 'tipping';
+      P.lift(p);
       return { p, m0: P.worldMatrix(p, new THREE.Matrix4()), m: new THREE.Matrix4() };
     });
     // A nudge over the edge: it is already off balance, this only saves it
@@ -244,6 +246,7 @@ export class Topple {
       const p = rd.p;
       if (p.state === 'dead') continue;
       rd.m.decompose(p.pos, p.quat, _s);
+      p.placed = (p.placed ?? 0) + 1;
       _s.set(1, 1, 1);
       if (p.object) {
         p.object.matrixAutoUpdate = true;

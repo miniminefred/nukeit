@@ -15,16 +15,19 @@ export const GROUP_WORLD = 0x0001;
 export const GROUP_DEBRIS = 0x0002;
 export const GROUP_PLAYER = 0x0004;
 export const GROUP_RUBBLE = 0x0008;
+export const GROUP_MASS = 0x0010;
 const groups = (member, filter) => (member << 16) | filter;
-export const G_WORLD = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER);
+export const G_WORLD = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER | GROUP_MASS);
 export const G_DEBRIS = groups(GROUP_DEBRIS, GROUP_WORLD | GROUP_DEBRIS | GROUP_RUBBLE);
 export const G_PLAYER = groups(GROUP_PLAYER, GROUP_WORLD | GROUP_RUBBLE);
 // A collapse's rubble: pieces lying where they came down. Solid to you and to
 // loose debris, but not to a tower that is still tipping over them — landing
 // on the rubble of its own broken storey it bounced back off it.
 export const G_RUBBLE = groups(GROUP_RUBBLE, GROUP_DEBRIS | GROUP_PLAYER);
-// A tipping mass meets the street, the city and what still stands, nothing else.
-export const G_MASS = groups(GROUP_WORLD, GROUP_WORLD);
+// A tipping mass meets the street, the city and what still stands, nothing
+// else — and it is its own group, so nothing comes to rest on it: it is about
+// to be gone.
+export const G_MASS = groups(GROUP_MASS, GROUP_WORLD);
 // What a tool's ray can hit: the building, its rubble and debris, never the player.
 export const G_RAY = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS | GROUP_RUBBLE);
 // What rubble comes to rest on.

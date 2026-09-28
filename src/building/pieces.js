@@ -38,6 +38,7 @@ export class Pieces {
     this.onChange = null;           // called when the set of standing pieces changes
     this.onLeave = null;            // (piece): a piece that was solid has left where it was
     this.overflow = null;           // (piece, vel, spin): loose, but no room for another body
+    this.onAnchor = null;           // (piece): wreckage made standing, to find what it sits on
     this.maxBodies = 50;            // rigid bodies the simulation can afford at once
     this.spares = new Map();        // material -> [BatchedMesh] for pieces made or cut after loading
     this._tintMats = new Map();
@@ -113,6 +114,7 @@ export class Pieces {
       this.makeDynamic(p, vel, spin, { debris, quiet: true });
     } else {
       this._addFixedCollider(p);
+      this.onAnchor?.(p);
     }
     return p;
   }
@@ -289,10 +291,19 @@ export class Pieces {
     if (!quiet) this.onChange?.();
   }
 
+  // Take a standing piece's colliders away as it starts to move with a
+  // collapse, and with them whatever was lying on it.
+  lift(p) {
+    const had = p.colliders.length > 0;
+    this._removeFixedColliders(p);
+    if (had) this.onLeave?.(p);
+  }
+
   // Slide a standing piece to a new position — a lift door opening. Its
   // colliders go with it.
   move(p, pos) {
     if (p.state !== 'static') return;
+    p.placed = (p.placed ?? 0) + 1;      // what lies on it is no longer where it was
     p.pos.copy(pos);
     this._updateBox(p);
     if (p.object) p.object.position.copy(pos);

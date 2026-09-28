@@ -175,9 +175,9 @@ export class Structure {
   _pancake(list) {
     const P = this.pieces;
     const foot = new THREE.Box3();
+    for (const p of list) p.state = 'falling';
     for (const p of list) {
-      p.state = 'falling';
-      P._removeFixedColliders(p);
+      P.lift(p);
       foot.union(p.box);
     }
     list.sort((a, b) => a.box.min.y - b.box.min.y);
