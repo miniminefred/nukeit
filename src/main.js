@@ -8,7 +8,6 @@ import { Player } from './player.js';
 import { Audio } from './audio.js';
 import { Particles } from './fx/particles.js';
 import { Chips } from './fx/chips.js';
-import { Heap } from './fx/heap.js';
 import { Shake } from './fx/shake.js';
 import { Damage } from './damage/damage.js';
 import { Structure } from './sim/structure.js';
@@ -17,6 +16,7 @@ import { Blast } from './sim/blast.js';
 import { Impacts } from './sim/impacts.js';
 import { Lift } from './sim/lift.js';
 import { Topple } from './sim/topple.js';
+import { Rubble } from './sim/rubble.js';
 import { TOOL_CLASSES } from './tools/tools.js';
 import { Menu } from './ui/menu.js';
 import { Hud, screens } from './ui/hud.js';
@@ -59,13 +59,13 @@ const input = createInput(renderer.domElement);
 const audio = new Audio();
 const particles = new Particles(scene);
 const chips = new Chips(scene, physics);
-const heap = new Heap(scene, physics);
 const shake = new Shake();
 const player = new Player(camera, input, physics);
 const hud = new Hud();
 
 const damage = new Damage(pieces, { chips, particles, audio, shake });
-const structure = new Structure(pieces, { particles, chips, heap, audio, shake, player });
+const rubble = new Rubble(pieces, physics, { chips, particles, audio });
+const structure = new Structure(pieces, { particles, chips, rubble, audio, shake, player });
 const blast = new Blast({ pieces, damage, physics, particles, chips, audio, shake, player, structure });
 const fire = new Fire(scene, pieces, physics, { particles, chips, audio, explode: (p) => blast.tank(p) });
 blast.ctx.fire = fire;
@@ -84,9 +84,10 @@ function cloud(at, scale = 1) {
   for (let i = 0; i < n; i++) particles.spawn('dust', at.x, at.y + 0.3, at.z, (Math.random() - 0.5) * 6 * scale, Math.random() * 2, (Math.random() - 0.5) * 6 * scale, 0x7a756e);
 }
 damage.fx.cloud = cloud;
+rubble.fx.cloud = cloud;
 const impacts = new Impacts(pieces, physics, { damage, cloud, audio, shake, player, structure });
 damage.fx.makeRoom = (n) => impacts.makeRoom(n);
-const topple = new Topple(pieces, physics, { heap, particles, chips, cloud, audio, shake, structure, player });
+const topple = new Topple(pieces, physics, { rubble, particles, chips, cloud, audio, shake, structure, player });
 structure.fx.topple = topple;
 damage.fx.mustFail = (p) => structure.mustFail(p);
 damage.fx.onFailed = (p) => structure.failed(p);
@@ -98,15 +99,6 @@ damage.fx.onPuncture = (p, point, normal) => {
   const jet = () => { if (p.state !== 'dead') particles.spawn('smoke', point.x, point.y, point.z, normal.x * 5, normal.y * 5 + 0.5, normal.z * 5, 0xdadada); };
   for (let i = 0; i < 40; i++) blast.later(jet, i * 0.03);
   blast.later(() => blast.tank(p), 1.3 + Math.random() * 0.6);
-};
-// A big fragment thrown clear of a collapse.
-structure.fx.throwChunk = (p, at, vel) => {
-  const q = p.parts[0];
-  const s = p.localBox.getSize(new THREE.Vector3());
-  if (s.x * s.y * s.z > 6) return;
-  const g = q.geometry.clone();
-  const f = pieces.spawn({ parts: [{ kind: q.kind.name, geometry: g }], pos: at, quat: p.quat, role: 'fragment', structural: false }, { dynamic: true, vel });
-  damage.fractureSoon(f, at, vel.clone().normalize(), 2);
 };
 structure.onCrushPlayer = () => player.damage(500, 'crushed');
 
@@ -179,7 +171,7 @@ function unloadJob() {
   blast.clear();
   damage.clear();
   chips.clear();
-  heap.clear();
+  rubble.clear();
   particles.clear();
   world.unload();
 }
@@ -264,6 +256,7 @@ function frame(dt) {
     physics.step(dt);
     pieces.sync();
     topple.update(dt);
+    rubble.update(dt);
     structure.update(dt);
     impacts.update(dt);
     damage.update();
@@ -274,7 +267,7 @@ function frame(dt) {
     if (heightT <= 0 && state === 'play') {
       heightT = 0.25;
       height = measure();
-      if (height < job.target && !structure.collapsing && !topple.active && doneT < 0) { doneT = 3.5; hud.flash('Target reached'); }
+      if (height < job.target && !structure.collapsing && !topple.active && !rubble.active && doneT < 0) { doneT = 3.5; hud.flash('Target reached'); }
     }
     if (doneT > 0 && state === 'play') { doneT -= dt; if (doneT <= 0) finish(); }
     if (downT > 0) {
@@ -331,10 +324,12 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, heap, particles, audio, ctx, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, particles, audio, ctx, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     // Run whole frames by hand, for a tab that is not on screen.
-    step: (dt = 1 / 60, n = 1) => { for (let i = 0; i < n; i++) frame(dt); }, select };
+    step: (dt = 1 / 60, n = 1) => { for (let i = 0; i < n; i++) frame(dt); }, select,
+    // The collapse bench (dev/bench.js): charges, a collapse, frame times.
+    bench: (o) => import('./dev/bench.js').then((m) => m.bench(window.dev, o)) };
 }
 
 const timer = new Timer();

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { KIND } from '../render/materials.js';
+import { G_WORLD, G_RUBBLE } from '../physics.js';
 
 // Every wall, slab, column, pane of glass and chair in the building is a piece.
 //
@@ -15,13 +16,15 @@ import { KIND } from '../render/materials.js';
 //   role         what it is in the building: slab, column, wall, core, glass,
 //                mullion, spandrel, carpet, stair, furniture, lamp, tank …
 //   structural   whether it carries load (from its first part's kind by default)
-//   state        'static' | 'dynamic' | 'falling' | 'dead'
+//   state        'static' | 'dynamic' | 'falling' | 'tipping' | 'flying' | 'rubble' | 'dead'
+//                (rubble: come to rest after a collapse, still and solid, not structure)
 
 let nextId = 1;
 const _m = new THREE.Matrix4();
 const _one = new THREE.Vector3(1, 1, 1);
 const _c = new THREE.Color();
 const _pf = new THREE.Vector3();
+const _dark = new THREE.Color(0x121010);
 
 export class Pieces {
   constructor(scene, physics) {
@@ -33,6 +36,10 @@ export class Pieces {
     this.root.name = 'building';
     scene.add(this.root);
     this.onChange = null;           // called when the set of standing pieces changes
+    this.onLeave = null;            // (piece): a piece that was solid has left where it was
+    this.overflow = null;           // (piece, vel, spin): loose, but no room for another body
+    this.maxBodies = 90;            // rigid bodies the simulation can afford at once
+    this.spares = new Map();        // kind name -> BatchedMesh for pieces made after loading
     this._tintMats = new Map();
   }
 
@@ -146,6 +153,7 @@ export class Pieces {
         const b = this.batches.get(q.kind.name);
         const g = b.addGeometry(q.geometry);
         q.batch = b;
+        q.batchGeometry = q.geometry;
         q.instance = b.addInstance(g);
         b.setMatrixAt(q.instance, _m);
         if (q.tint !== null) b.setColorAt(q.instance, _c.set(q.tint));
@@ -157,9 +165,10 @@ export class Pieces {
   _addFixedCollider(p) {
     const ph = this.physics;
     const boxes = p.colliderBoxes ?? [[p.localBox.min.x, p.localBox.min.y, p.localBox.min.z, p.localBox.max.x, p.localBox.max.y, p.localBox.max.z]];
+    const group = p.state === 'rubble' ? G_RUBBLE : G_WORLD;
     p.colliders = boxes.map(([x0, y0, z0, x1, y1, z1]) => {
       const c = new THREE.Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2).applyQuaternion(p.quat).add(p.pos);
-      return ph.addFixedBox(p, c, p.quat, Math.max(0.005, (x1 - x0) / 2), Math.max(0.005, (y1 - y0) / 2), Math.max(0.005, (z1 - z0) / 2));
+      return ph.addFixedBox(p, c, p.quat, Math.max(0.005, (x1 - x0) / 2), Math.max(0.005, (y1 - y0) / 2), Math.max(0.005, (z1 - z0) / 2), group);
     });
   }
 
@@ -223,23 +232,37 @@ export class Pieces {
     q.geometry = geometry;
     q.mesh.geometry = geometry;
     if (materials) { q.materials = materials; q.mesh.material = materials; }
-    if (p.state === 'static') {
+    if (p.state === 'static' || p.state === 'rubble') {
       this._removeFixedColliders(p);
       // One trimesh per part, in world space.
       for (const r of p.parts) {
         const w = r.geometry.clone().applyMatrix4(_m.compose(p.pos, p.quat, _one));
-        p.colliders.push(this.physics.addFixedMesh(p, w));
+        p.colliders.push(this.physics.addFixedMesh(p, w, p.state === 'rubble' ? G_RUBBLE : G_WORLD));
         w.dispose();
       }
     }
   }
 
   // Knock a piece loose: it gets a body of its own and falls.
+  //
+  // Rigid bodies are the expensive part of a collapse: six hundred of them at
+  // once took 150 ms a frame, and slow frames make the physics take more
+  // steps, which is slower again. So past `maxBodies`, a piece knocked loose
+  // falls the cheap way instead (sim/rubble.js) and lands as rubble.
   makeDynamic(p, vel, spin, { debris = false, quiet = false } = {}) {
-    if (p.state === 'dead' || p.state === 'dynamic') return;
+    if (p.state === 'dead' || p.state === 'dynamic' || p.state === 'flying') return;
+    if (this.overflow && this.physics.dynamic.size >= this.maxBodies) {
+      const was = p.state;
+      this.overflow(p, vel, spin);
+      if (was === 'static' && !quiet) this.onChange?.();
+      return;
+    }
     this.promote(p);
     this._updateBox(p);
+    const had = p.colliders.length > 0;
     this._removeFixedColliders(p);
+    if (had) this.onLeave?.(p);
+    if (p.restOn) { p.restOn.carried?.delete(p); p.restOn = null; }
     const s = p.localBox.getSize(new THREE.Vector3());
     const c = p.localBox.getCenter(new THREE.Vector3());
     let shapes;
@@ -292,7 +315,10 @@ export class Pieces {
   destroy(p) {
     if (p.state === 'dead') return;
     const wasStanding = p.state === 'static';
+    const had = p.colliders.length > 0;
     this._removeFixedColliders(p);
+    if (had) this.onLeave?.(p);
+    if (p.restOn) { p.restOn.carried?.delete(p); p.restOn = null; }
     if (p.body) { this.physics.removeBody(p.body); p.body = null; this.physics.dynamic.delete(p); }
     for (const q of p.parts) {
       if (q.batch && !q.mesh) q.batch.setVisibleAt(q.instance, false);
@@ -301,6 +327,60 @@ export class Pieces {
     if (p.object) p.object.removeFromParent();
     p.state = 'dead';
     if (wasStanding) this.onChange?.();
+  }
+
+  // A piece come to rest after a collapse goes back into a batch: a whole
+  // fallen tower is drawn in a few dozen calls again, not four thousand. One
+  // that still has the shape it was built with goes back to its own instance;
+  // one made or reshaped since goes into a batch for such pieces, if its
+  // geometry will fit one. Only pieces cut into several materials stay meshes.
+  // Hitting it again promotes it out, as it did the first time.
+  rejoin(p) {
+    _m.compose(p.pos, p.quat, _one);
+    if (!p.object) {
+      for (const q of p.parts) q.batch.setMatrixAt(q.instance, _m);
+      return true;
+    }
+    if (p.parts.some((q) => q.materials)) return false;
+    for (const q of p.parts) {
+      if (q.batch && q.geometry === q.batchGeometry) continue;
+      if (!this._spare(q)) return false;
+    }
+    for (const q of p.parts) {
+      q.batch.setMatrixAt(q.instance, _m);
+      q.batch.setVisibleAt(q.instance, true);
+      q.mesh = null;
+    }
+    p.object.removeFromParent();
+    p.object = null;
+    return true;
+  }
+
+  // Put a part into the spare batch for its material.
+  _spare(q) {
+    const k = q.kind.name;
+    let b = this.spares.get(k);
+    if (!b) {
+      b = new THREE.BatchedMesh(1024, 196608, 393216, q.kind.material);
+      b.castShadow = k !== 'glass';
+      b.receiveShadow = true;
+      b.perObjectFrustumCulled = false;
+      b.sortObjects = false;
+      b.name = `spare:${k}`;
+      this.spares.set(k, b);
+      this.root.add(b);
+    }
+    let g, i;
+    try {
+      g = b.addGeometry(q.geometry);
+      i = b.addInstance(g);
+    } catch { return false; }
+    if (q.batch && q.instance >= 0 && q.batch !== b) q.batch.setVisibleAt(q.instance, false);
+    q.batch = b;
+    q.instance = i;
+    q.batchGeometry = q.geometry;
+    b.setColorAt(i, _c.set(q.tint ?? 0xffffff).lerp(_dark, q.charred ?? 0));
+    return true;
   }
 
   // Move a piece that is coming down with a collapse. It stays in its batch —
@@ -345,8 +425,9 @@ export class Pieces {
       for (const q of p.parts) q.geometry.dispose();
     }
     this.physics.dynamic.clear();
-    for (const b of this.batches.values()) { b.removeFromParent(); b.dispose(); }
+    for (const b of [...this.batches.values(), ...this.spares.values()]) { b.removeFromParent(); b.dispose(); }
     this.batches.clear();
+    this.spares.clear();
     this.list.length = 0;
   }
 }

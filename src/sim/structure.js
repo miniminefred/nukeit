@@ -17,9 +17,10 @@ const SAG = [0.35, 0.9];     // s a slab with nothing under it hangs before it d
 //    floor that burnt through — become rigid bodies and fall for real.
 //  * **A building's worth** — everything above a storey whose columns and core
 //    are gone — comes down as a *pancake*. The whole mass drops together, and
-//    wherever its lowest floor meets the one below, both are ground up: turned
-//    into rubble on the heap, dust in the air and a few big fragments thrown
-//    clear. Then it drops onto the next floor. A hundred metres of tower cannot
+//    wherever its lowest floor meets the one below, both break up: their real
+//    slabs, columns and furniture spill out and down and land as rubble
+//    (sim/rubble.js), and dust rolls out of the crush line. Then it drops onto
+//    the next floor. A hundred metres of tower cannot
 //    be thousands of rigid bodies stacking on each other, and this is also
 //    simply how a tower comes down.
 
@@ -40,7 +41,7 @@ const _c = new THREE.Vector3();
 export class Structure {
   constructor(pieces, fx) {
     this.pieces = pieces;
-    this.fx = fx;            // { particles, chips, heap, audio, shake, player }
+    this.fx = fx;            // { particles, chips, rubble, audio, shake, player }
     this.dirty = false;
     this._wait = 0;
     this.falls = [];
@@ -156,10 +157,7 @@ export class Structure {
     for (const f of this.falls) this._fall(f, dt);
     const before = this.falls.length;
     this.falls = this.falls.filter((f) => f.alive);
-    if (before && this.falls.length === 0) {
-      this.fx.heap.settle();
-      this.dirty = true;
-    }
+    if (before && this.falls.length === 0) this.dirty = true;
   }
 
   get collapsing() { return this.falls.length > 0; }
@@ -198,8 +196,8 @@ export class Structure {
     f.v = Math.min(30, f.v + G * dt);
     f.offset -= f.v * dt;
     // Skip what has already been crushed.
-    while (f.low < f.list.length && f.list[f.low].state === 'dead') f.low++;
-    while (f.s < f.stump.length && f.stump[f.s].state === 'dead') f.s++;
+    while (f.low < f.list.length && f.list[f.low].state !== 'falling') f.low++;
+    while (f.s < f.stump.length && f.stump[f.s].state !== 'static') f.s++;
     if (f.low >= f.list.length) { f.alive = false; return; }
 
     let crushed = 0;
@@ -211,20 +209,20 @@ export class Structure {
       const reach = 0.45;
       for (let n = f.low; n < f.list.length; n++) {
         const p = f.list[n];
-        if (p.state === 'dead') continue;
+        if (p.state !== 'falling') continue;
         if (p.box.min.y + f.offset > top + reach) break;
         this._crush(p, f.offset, f);
         crushed++;
       }
       for (let n = f.s; n < f.stump.length; n++) {
         const p = f.stump[n];
-        if (p.state === 'dead') continue;
+        if (p.state !== 'static') continue;
         if (p.box.max.y < bottom - reach) break;
         this._crush(p, 0, f);
         crushed++;
       }
-      while (f.low < f.list.length && f.list[f.low].state === 'dead') f.low++;
-      while (f.s < f.stump.length && f.stump[f.s].state === 'dead') f.s++;
+      while (f.low < f.list.length && f.list[f.low].state !== 'falling') f.low++;
+      while (f.s < f.stump.length && f.stump[f.s].state !== 'static') f.s++;
       if (f.low >= f.list.length) break;
     }
     if (crushed) {
@@ -245,7 +243,7 @@ export class Structure {
     // Move what is still falling.
     for (let n = f.low; n < f.list.length; n++) {
       const p = f.list[n];
-      if (p.state === 'dead') continue;
+      if (p.state !== 'falling') continue;
       P.moveFalling(p, f.offset);
     }
     // Anyone underneath it.
@@ -260,22 +258,16 @@ export class Structure {
     }
   }
 
-  // A piece ground up in the collapse: most of it goes to the heap, some to
-  // dust, and now and then a big fragment is thrown clear.
+  // A piece broken up in the collapse: it spills out of the crush line, down
+  // and outwards, and lands as rubble.
   _crush(p, offset, f) {
-    const b = p.box.clone();
-    b.min.y += offset; b.max.y += offset;
-    const vol = p.volume * (p.kind.density > 1500 ? 0.35 : 0.08);
-    if (p.role === 'slab' || p.role === 'column' || p.role === 'core' || p.role === 'stair') this.fx.heap.add(b, vol);
-    if (p.kind.name === 'glass' && Math.random() < 0.08) this.fx.chips.burst('glass', b.getCenter(new THREE.Vector3()), new THREE.Vector3(0, 1, 0), 4, 4, 0.03);
-    // Big broken slabs thrown clear of the crush line: the part of a pancake
-    // you can actually see.
-    if ((p.role === 'slab' || p.role === 'column') && Math.random() < 0.22 && this.pieces.physics.dynamic.size < 260) {
-      const c = b.getCenter(new THREE.Vector3());
-      const out = c.clone().sub(f.foot.getCenter(new THREE.Vector3())).setY(0).normalize();
-      this.fx.throwChunk?.(p, c, out.multiplyScalar(4 + Math.random() * 6).setY(2 + Math.random() * 3));
-    }
-    this.pieces.destroy(p);
+    p.pos.y += offset;
+    this.pieces._updateBox(p);
+    const c = p.box.getCenter(_c);
+    const out = new THREE.Vector3(c.x - (f.foot.min.x + f.foot.max.x) / 2, 0, c.z - (f.foot.min.z + f.foot.max.z) / 2);
+    const l = out.length() || 1;
+    out.multiplyScalar((1 + Math.random() * 5) / l).setY(-f.v * (0.5 + Math.random() * 0.5));
+    this.fx.rubble.add(p, out);
   }
 
   clear() {

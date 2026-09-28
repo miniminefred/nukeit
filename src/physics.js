@@ -14,12 +14,21 @@ import * as THREE from 'three';
 export const GROUP_WORLD = 0x0001;
 export const GROUP_DEBRIS = 0x0002;
 export const GROUP_PLAYER = 0x0004;
+export const GROUP_RUBBLE = 0x0008;
 const groups = (member, filter) => (member << 16) | filter;
 export const G_WORLD = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER);
-export const G_DEBRIS = groups(GROUP_DEBRIS, GROUP_WORLD | GROUP_DEBRIS);
-export const G_PLAYER = groups(GROUP_PLAYER, GROUP_WORLD);
-// What a tool's ray can hit: the building and debris, never the player.
-export const G_RAY = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS);
+export const G_DEBRIS = groups(GROUP_DEBRIS, GROUP_WORLD | GROUP_DEBRIS | GROUP_RUBBLE);
+export const G_PLAYER = groups(GROUP_PLAYER, GROUP_WORLD | GROUP_RUBBLE);
+// A collapse's rubble: pieces lying where they came down. Solid to you and to
+// loose debris, but not to a tower that is still tipping over them — landing
+// on the rubble of its own broken storey it bounced back off it.
+export const G_RUBBLE = groups(GROUP_RUBBLE, GROUP_DEBRIS | GROUP_PLAYER);
+// A tipping mass meets the street, the city and what still stands, nothing else.
+export const G_MASS = groups(GROUP_WORLD, GROUP_WORLD);
+// What a tool's ray can hit: the building, its rubble and debris, never the player.
+export const G_RAY = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS | GROUP_RUBBLE);
+// What rubble comes to rest on.
+export const G_LAND = groups(GROUP_WORLD, GROUP_WORLD | GROUP_RUBBLE);
 
 const STEP = 1 / 60;
 
@@ -53,11 +62,11 @@ export class Physics {
   // --------------------------------------------------------- colliders
 
   // A fixed box, centred at `pos` with rotation `quat`.
-  addFixedBox(owner, pos, quat, hx, hy, hz) {
+  addFixedBox(owner, pos, quat, hx, hy, hz, group = G_WORLD) {
     const d = RAPIER.ColliderDesc.cuboid(hx, hy, hz)
       .setTranslation(pos.x, pos.y, pos.z)
       .setRotation(quat)
-      .setCollisionGroups(G_WORLD)
+      .setCollisionGroups(group)
       .setFriction(0.8);
     const c = this.world.createCollider(d, this.fixed);
     this.owner.set(c.handle, owner);
@@ -65,9 +74,9 @@ export class Physics {
   }
 
   // A fixed triangle mesh, from a geometry already in world space.
-  addFixedMesh(owner, geometry) {
+  addFixedMesh(owner, geometry, group = G_WORLD) {
     const { vertices, indices } = meshArrays(geometry);
-    const d = RAPIER.ColliderDesc.trimesh(vertices, indices).setCollisionGroups(G_WORLD).setFriction(0.8);
+    const d = RAPIER.ColliderDesc.trimesh(vertices, indices).setCollisionGroups(group).setFriction(0.8);
     const c = this.world.createCollider(d, this.fixed);
     this.owner.set(c.handle, owner);
     return c;
