@@ -17,8 +17,14 @@ import { unsupported } from '../building/support.js';
 //   await dev.bench()                          // the reference demolition
 //   await dev.bench({ charges: [...], secs })  // charges: [[x, z], ...] on the ground floor
 //
-// A hidden tab never runs requestAnimationFrame, and the bench says so rather
-// than measuring nothing.
+// A hidden tab never runs requestAnimationFrame. There the bench drives the
+// frames itself and times each one as the larger of its CPU time and its GPU
+// time (WebGL2 timer queries), and never less than a 60 Hz vsync: the time
+// the frame would have taken on screen, with the CPU and GPU working in
+// parallel as they do. `mode` says which way a run was measured. Chrome runs
+// a hidden tab's page at low priority — physics measured 20 ms there against
+// 5 on screen, drawing 41 against 4 — so a hidden run is only a sketch, and
+// never counts as a pass.
 
 // Where the charges go on the reference demolition: the west wall of the core
 // and the column line beside it. What they break, the chain reaction spreads.
@@ -48,7 +54,6 @@ function instrument(dev) {
 }
 
 export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, quality = null, profile = false } = {}) {
-  if (document.hidden) return { error: 'the tab is hidden: requestAnimationFrame does not run, so nothing can be measured' };
   if (quality !== null) dev.quality.set(quality);
   await dev.start('trump', ['bomb', 'sledge']);
   const { pieces, player, input } = dev;
@@ -70,11 +75,29 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
   let last = performance.now(), t = 0, fired = false, quietFor = 0, tipAt = -1, breakAt = -1;
   const busy = () => dev.topple.active || dev.structure.collapsing || dev.rubble.active || dev.physics.dynamic.size > 0 ||
     dev.structure.warnings.length || dev.structure.checks.length || dev.structure.sagging.length || bomb._chain.length;
+  const hidden = document.hidden;
+  const gpu = hidden ? gpuTimer(dev.renderer) : null;
+  if (hidden) dev.manual = true;
   await new Promise((done) => {
+    const ch = new MessageChannel();
+    const next = hidden ? () => ch.port2.postMessage(0) : () => requestAnimationFrame(tick);
+    let dtNext = 1 / 60;
     const tick = () => {
-      const now = performance.now();
-      const dt = (now - last) / 1000;
-      last = now;
+      let dt;
+      if (hidden) {
+        // One frame, by hand, timed.
+        const c0 = performance.now();
+        gpu?.begin();
+        dev.step(dtNext, 1);
+        gpu?.end();
+        const cpu = performance.now() - c0;
+        dt = Math.max(cpu, gpu?.last ?? 0, 1000 / 60) / 1000;
+        dtNext = Math.min(dt, 0.1);
+      } else {
+        const now = performance.now();
+        dt = (now - last) / 1000;
+        last = now;
+      }
       t += dt;
       if (fired) {
         const cpu = prof ? Object.fromEntries(Object.entries(prof.cost).map(([k, v]) => [k, +v.toFixed(2)])) : undefined;
@@ -91,10 +114,12 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
         bomb._t = 0.25;
       }
       if (fired && ((t > 6 && quietFor > 2) || t > secs)) return done();
-      requestAnimationFrame(tick);
+      next();
     };
-    requestAnimationFrame(tick);
+    ch.port1.onmessage = tick;
+    next();
   });
+  dev.manual = false;
 
   prof?.undo();
   dev.rig = null;
@@ -120,7 +145,7 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
   const minFps = Math.min(...windows.map((w) => w.fps));
   const height = dev.measure();
   return {
-    pass: minFps >= 30 && hanging === 0 && inAir === 0 && floating.length === 0 && height < 10,
+    pass: !hidden && minFps >= 30 && hanging === 0 && inAir === 0 && floating.length === 0 && height < 10,
     minFps,
     worstFrameMs: +(worst.dt * 1000).toFixed(1),
     worstAt: +worst.t.toFixed(2),
@@ -133,6 +158,7 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
     pile: heap,
     hanging, inAir, floating: floating.length, floatingList: floating.slice(0, 30), standingAboveBefore: before, fate, standingAbove, rubble,
     quality: dev.quality.label,
+    mode: hidden ? `hidden tab: max(CPU, GPU${gpu ? '' : ' unavailable'}) per frame` : 'on screen: requestAnimationFrame',
     canvas: `${dev.renderer.domElement.width}x${dev.renderer.domElement.height}`,
     slow: windows.filter((w) => w.fps < 30),
     frames,
@@ -227,4 +253,24 @@ export async function trial(dev, charges, secs = 30) {
     }
   } finally { dev.post.composer.render = render; }
   return { charges: charges.length, tip: dev.topple.lastTip, broke: dev.topple.lastBreak, downAt: +down.toFixed(1), height: +dev.measure().toFixed(1), pile: pile(dev) };
+}
+
+// GPU time per frame, from WebGL2 timer queries. Results come back a frame or
+// two late; `last` is the most recent one.
+function gpuTimer(renderer) {
+  const gl = renderer.getContext();
+  const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+  if (!ext) return null;
+  const pending = [];
+  const t = { last: 0 };
+  t.begin = () => { const q = gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); pending.push(q); };
+  t.end = () => {
+    gl.endQuery(ext.TIME_ELAPSED_EXT);
+    while (pending.length && gl.getQueryParameter(pending[0], gl.QUERY_RESULT_AVAILABLE)) {
+      const q = pending.shift();
+      if (!gl.getParameter(ext.GPU_DISJOINT_EXT)) t.last = gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6;
+      gl.deleteQuery(q);
+    }
+  };
+  return t;
 }

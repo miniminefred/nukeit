@@ -373,6 +373,7 @@ function fpsMeter(dt) {
 }
 function animate() {
   requestAnimationFrame(animate);
+  if (import.meta.env.DEV && window.dev?.manual) return;     // the bench is driving the frames
   timer.update();
   const dt = timer.getDelta();
   // Only a frame that was really drawn on screen says anything about speed.
