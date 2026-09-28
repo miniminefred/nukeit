@@ -78,6 +78,12 @@ export class Damage {
     }
   }
 
+  // A job being unloaded: what was queued belongs to pieces that are gone.
+  clear() {
+    for (const [, p] of this.pending) p.queued = false;
+    this.pending.length = 0;
+  }
+
   // Too much is loose already, or this is a fragment of a fragment: instead of
   // more bodies, chips and dust.
   crumble(p, point, dir) {

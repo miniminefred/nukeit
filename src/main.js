@@ -177,6 +177,7 @@ function unloadJob() {
   impacts.clear();
   fire.clear();
   blast.clear();
+  damage.clear();
   chips.clear();
   heap.clear();
   particles.clear();
