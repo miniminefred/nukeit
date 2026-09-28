@@ -4,13 +4,13 @@ import * as F from './furniture.js';
 import { fitOut as furnish } from './interiors.js';
 import { FLOOR_H, SLAB, PODIUM_FLOORS, TOP_FLOOR, ROOF, PENTHOUSE, T, U, CORE, ATRIUM, podiumFront, OUTLINE, inPoly, inCore, rectPoly } from './plan.js';
 
-// Trump Tower, at 70 m.
+// Trump Tower, at 50 m.
 //
 // The real one is 58 storeys on Fifth Avenue: a dark bronze glass shaft with a
 // sawtooth of notched corners up two faces, on a stepped podium whose terraces
 // are planted with trees, with the name in brass over the door and a pink
-// marble atrium inside. Here it is 17 storeys of 4 m — a six-storey podium of
-// shops round an atrium, eight storeys of offices, a three-storey penthouse on
+// marble atrium inside. Here it is 12 storeys of 4 m — a six-storey podium of
+// shops round an atrium, three storeys of offices, a three-storey penthouse on
 // top, and a plant room on the roof. The avenue is on the +z side.
 //
 // **How it stands is the point.** Concrete columns and a concrete core carry

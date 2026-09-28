@@ -16,8 +16,8 @@ import {
 //   3      the food court: three counters with their kitchens and gas, and seating
 //   4      the Grill: white tablecloths, a bar, a kitchen at the back
 //   5      a café and a bookshop
-//   6-13   offices
-//   14-16  the penthouse — living and dining; three bedrooms with bathrooms; the
+//   6-8    offices
+//   9-11   the penthouse — living and dining; three bedrooms with bathrooms; the
 //          master suite, its dressing room and a study
 //
 // Everything is placed against the plan in plan.js and kept clear of columns,

@@ -11,13 +11,13 @@ import * as THREE from 'three';
 //     z  12   +--------------[ door ]-----------------+
 //                         TRUMP TOWER
 //
-//     tower, floors 6-16: x -14..10, z -9..7, with a sawtooth of 45-degree
+//     tower, floors 6-11: x -14..10, z -9..7, with a sawtooth of 45-degree
 //     teeth out to x = 12 and z = 9.
 
 export const FLOOR_H = 4;
 export const SLAB = 0.3;
 export const PODIUM_FLOORS = 6;
-export const TOP_FLOOR = 16;         // 17 storeys: the roof at 68 m, the plant room to 72
+export const TOP_FLOOR = 11;         // 12 storeys: the roof at 48 m, the plant room to 52
 export const ROOF = TOP_FLOOR + 1;
 
 // What each floor is. The podium is the public part of the building; the

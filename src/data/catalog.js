@@ -7,11 +7,11 @@ export const JOBS = [
     id: 'trump',
     title: 'Trump Tower',
     where: 'Fifth Avenue, New York',
-    brief: 'Seventy metres of bronze glass on a six-storey podium: shops, restaurants, offices and a penthouse on top. The client wants it on the ground: bring the whole thing below 10 metres. '
+    brief: 'Fifty metres of bronze glass on a six-storey podium: shops, restaurants, offices and a penthouse on top. The client wants it on the ground: bring the whole thing below 10 metres. '
       + 'The gas is still connected in the plant room and the kitchens, so mind the tanks — and if something catches, put it out before it spreads.',
     target: 10,
-    storeys: 17,
-    height: 72,
+    storeys: 12,
+    height: 52,
     build: buildTower,
     entry: TOWER_ENTRY,
     site: TOWER_SITE,

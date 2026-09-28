@@ -110,12 +110,13 @@ house on top. `building/plan.js` holds the plan and `PROGRAMME`;
 | 3 | food court: three counters with griddles, fridges and gas; seating |
 | 4 | the Grill: white tablecloths, a bar, a walled kitchen with gas, a piano |
 | 5 | café and bookshop |
-| 6–13 | offices |
-| 14 | penthouse living: fireplace, piano, sofas, dining for ten, kitchen |
-| 15 | three bedrooms, each with a bathroom |
-| 16 | master bedroom, dressing room, bathroom, study |
+| 6–8 | offices |
+| 9 | penthouse living: fireplace, piano, sofas, dining for ten, kitchen |
+| 10 | three bedrooms, each with a bathroom |
+| 11 | master bedroom, dressing room, bathroom, study |
 
-The tower is **70 m**: 17 storeys of 4 m, roof at 68 m, rooftop plant room to 72 m.
+The tower is **50 m**: 12 storeys of 4 m, roof at 48 m, rooftop plant room to 52 m.
+It was 100 m, then 70 m; the owner asked for each cut.
 `TOP_FLOOR` in `plan.js` is the one number; the penthouse is always its top three.
 
 Floors are finished to their use (marble, tile, oak, carpet), and furniture is
