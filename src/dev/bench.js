@@ -28,7 +28,25 @@ export const REFERENCE = [[-5, 0], [-4.4, 3.3], [-5, 7], [-5, -7], [-5, 11.6], [
 // west side, where it falls.
 const VIEW = { at: [8, 1.2, 46], look: [-22, 16, 0] };
 
-export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, quality = null } = {}) {
+// Every system's share of a frame, in milliseconds of CPU, when `profile` is on.
+const SYSTEMS = [['physics', 'step'], ['pieces', 'sync'], ['topple', 'update'], ['rubble', 'update'], ['structure', 'update'],
+  ['impacts', 'update'], ['damage', 'update'], ['fire', 'update'], ['blast', 'update'], ['chips', 'update'], ['particles', 'update'],
+  ['player', 'update'], ['audio', 'update']];
+
+function instrument(dev) {
+  const cost = {};
+  const undo = [];
+  for (const [name, fn] of [...SYSTEMS, ['post.composer', 'render']]) {
+    const o = name.split('.').reduce((a, k) => a[k], dev);
+    const f = o[fn];
+    const key = name === 'post.composer' ? 'render' : name;
+    o[fn] = function (...a) { const t = performance.now(); const r = f.apply(this, a); cost[key] = (cost[key] ?? 0) + performance.now() - t; return r; };
+    undo.push(() => { o[fn] = f; });
+  }
+  return { cost, undo: () => undo.forEach((u) => u()) };
+}
+
+export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, quality = null, profile = false } = {}) {
   if (document.hidden) return { error: 'the tab is hidden: requestAnimationFrame does not run, so nothing can be measured' };
   if (quality !== null) dev.quality.set(quality);
   await dev.start('trump', ['bomb', 'sledge']);
@@ -64,6 +82,7 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
 
   // Let it settle for a second, then detonate as the right mouse button does.
   const frames = [];
+  const prof = profile ? instrument(dev) : null;
   let last = performance.now(), t = 0, fired = false, quietFor = 0, tipAt = -1, breakAt = -1;
   const busy = () => dev.topple.active || dev.structure.collapsing || dev.rubble.active || dev.physics.dynamic.size > 0 ||
     dev.structure.warnings.length || dev.structure.checks.length || dev.structure.sagging.length || bomb._chain.length;
@@ -74,11 +93,14 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
       last = now;
       t += dt;
       if (fired) {
-        frames.push({ t, dt, fps: 1 / dt, flying: dev.rubble.flying.length, bodies: dev.physics.dynamic.size, calls: dev.renderer.info.render.calls, tris: dev.renderer.info.render.triangles });
+        const cpu = prof ? Object.fromEntries(Object.entries(prof.cost).map(([k, v]) => [k, +v.toFixed(2)])) : undefined;
+        if (prof) for (const k in prof.cost) prof.cost[k] = 0;
+        frames.push({ t, dt, fps: 1 / dt, cpu, flying: dev.rubble.flying.length, bodies: dev.physics.dynamic.size, calls: dev.renderer.info.render.calls, tris: dev.renderer.info.render.triangles });
         if (dev.topple.active && tipAt < 0) tipAt = t;
         if (tipAt >= 0 && !dev.topple.active && breakAt < 0) breakAt = t;
         quietFor = busy() ? 0 : quietFor + dt;
       } else if (t > 1) {
+        if (prof) for (const k in prof.cost) prof.cost[k] = 0;
         fired = true;
         t = 0;
         bomb._chain = bomb.placed.splice(0);
@@ -90,6 +112,7 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
     requestAnimationFrame(tick);
   });
 
+  prof?.undo();
   // Half-second windows, as the counter reads.
   const windows = [];
   let acc = 0, n = 0, w0 = 0;

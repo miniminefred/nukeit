@@ -41,6 +41,9 @@ export class Physics {
   constructor() {
     this.R = RAPIER;
     this.world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+    // Two solver iterations, not four: debris tumbling and coming to rest does
+    // not need stiff stacks, and in a blast it halved the physics time.
+    this.world.numSolverIterations = 2;
     this.events = new RAPIER.EventQueue(true);
     this.fixed = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     this.owner = new Map();         // collider handle -> piece (or anything)
@@ -97,7 +100,9 @@ export class Physics {
       .setCanSleep(true)
       .setLinearDamping(0.05)
       .setAngularDamping(0.25)
-      .setCcdEnabled(debris);
+      // No continuous collision for debris either: it cost more than the
+      // odd chip passing through a thin wall is worth.
+      .setCcdEnabled(false);
     if (vel) bd.setLinvel(vel.x, vel.y, vel.z);
     if (spin) bd.setAngvel(spin);
     const body = this.world.createRigidBody(bd);

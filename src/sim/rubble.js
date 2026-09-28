@@ -201,8 +201,7 @@ export class Rubble {
       p.object.quaternion.copy(p.quat);
       return;
     }
-    _m.compose(p.pos, p.quat, _one);
-    for (const q of p.parts) q.batch.setMatrixAt(q.instance, _m);
+    this.pieces.drawAt(p, _m.compose(p.pos, p.quat, _one));
   }
 
   clear() {

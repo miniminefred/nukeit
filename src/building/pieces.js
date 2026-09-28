@@ -38,15 +38,17 @@ export class Pieces {
     this.onChange = null;           // called when the set of standing pieces changes
     this.onLeave = null;            // (piece): a piece that was solid has left where it was
     this.overflow = null;           // (piece, vel, spin): loose, but no room for another body
-    this.maxBodies = 90;            // rigid bodies the simulation can afford at once
-    this.spares = new Map();        // kind name -> BatchedMesh for pieces made after loading
+    this.maxBodies = 50;            // rigid bodies the simulation can afford at once
+    this.spares = new Map();        // material -> [BatchedMesh] for pieces made or cut after loading
     this._tintMats = new Map();
   }
 
   add(spec) {
     const p = {
       id: nextId++,
-      parts: spec.parts.map((q) => ({ kind: KIND[q.kind], geometry: q.geometry, materials: q.materials ?? null, tint: q.tint ?? null, batch: null, instance: -1, mesh: null })),
+      // draws: where the part is drawn in batches, [{ b, i, g, spare }], made
+      // from geometry `drawn`; mesh: its own mesh, once promoted.
+      parts: spec.parts.map((q) => ({ kind: KIND[q.kind], geometry: q.geometry, materials: q.materials ?? null, tint: q.tint ?? null, draws: [], drawn: null, mesh: null })),
       pos: spec.pos.clone(),
       quat: spec.quat ? spec.quat.clone() : new THREE.Quaternion(),
       role: spec.role,
@@ -152,11 +154,11 @@ export class Pieces {
       for (const q of p.parts) {
         const b = this.batches.get(q.kind.name);
         const g = b.addGeometry(q.geometry);
-        q.batch = b;
-        q.batchGeometry = q.geometry;
-        q.instance = b.addInstance(g);
-        b.setMatrixAt(q.instance, _m);
-        if (q.tint !== null) b.setColorAt(q.instance, _c.set(q.tint));
+        const i = b.addInstance(g);
+        q.draws = [{ b, i, g, spare: false }];
+        q.drawn = q.geometry;
+        b.setMatrixAt(i, _m);
+        if (q.tint !== null) b.setColorAt(i, _c.set(q.tint));
       }
       this._addFixedCollider(p);
     }
@@ -183,10 +185,13 @@ export class Pieces {
     const g = new THREE.Group();
     g.position.copy(p.pos);
     g.quaternion.copy(p.quat);
+    // Small things cast no shadow: a fist-sized lump's shadow is a few pixels,
+    // and drawing it again into the shadow map doubled the cost of debris.
+    const small = p.volume < 0.15;
     for (const q of p.parts) {
-      if (q.batch) { q.batch.setVisibleAt(q.instance, false); }
+      this._showDraws(q, false);
       q.mesh = new THREE.Mesh(q.geometry, q.materials ?? this._material(q));
-      q.mesh.castShadow = q.kind.name !== 'glass';
+      q.mesh.castShadow = q.kind.name !== 'glass' && !small;
       q.mesh.receiveShadow = true;
       q.mesh.userData.piece = p;
       g.add(q.mesh);
@@ -219,7 +224,7 @@ export class Pieces {
       q.charred = a;
       const base = _c.set(q.tint ?? 0xffffff).lerp(new THREE.Color(0x121010), a);
       if (q.mesh) q.mesh.material = this._material(q);
-      else if (q.batch) q.batch.setColorAt(q.instance, base);
+      for (const d of q.draws) d.b.setColorAt(d.i, base);
     }
   }
 
@@ -291,10 +296,7 @@ export class Pieces {
     p.pos.copy(pos);
     this._updateBox(p);
     if (p.object) p.object.position.copy(pos);
-    else {
-      _m.compose(p.pos, p.quat, _one);
-      for (const q of p.parts) q.batch.setMatrixAt(q.instance, _m);
-    }
+    else this.drawAt(p, _m.compose(p.pos, p.quat, _one));
     this._removeFixedColliders(p);
     this._addFixedCollider(p);
   }
@@ -321,7 +323,7 @@ export class Pieces {
     if (p.restOn) { p.restOn.carried?.delete(p); p.restOn = null; }
     if (p.body) { this.physics.removeBody(p.body); p.body = null; this.physics.dynamic.delete(p); }
     for (const q of p.parts) {
-      if (q.batch && !q.mesh) q.batch.setVisibleAt(q.instance, false);
+      this._dropDraws(q);
       if (q.mesh) q.mesh.geometry.dispose();
     }
     if (p.object) p.object.removeFromParent();
@@ -329,26 +331,42 @@ export class Pieces {
     if (wasStanding) this.onChange?.();
   }
 
-  // A piece come to rest after a collapse goes back into a batch: a whole
-  // fallen tower is drawn in a few dozen calls again, not four thousand. One
-  // that still has the shape it was built with goes back to its own instance;
-  // one made or reshaped since goes into a batch for such pieces, if its
-  // geometry will fit one. Only pieces cut into several materials stay meshes.
+  // Where a batched piece is drawn.
+  drawAt(p, m) {
+    for (const q of p.parts) for (const d of q.draws) d.b.setMatrixAt(d.i, m);
+  }
+
+  _showDraws(q, on) {
+    for (const d of q.draws) d.b.setVisibleAt(d.i, on);
+  }
+
+  // A part's batch draws are no good any more (it was cut, or it is gone):
+  // what it had in a spare batch is freed, its place in its original batch is
+  // hidden for good.
+  _dropDraws(q) {
+    for (const d of q.draws) {
+      if (d.spare) d.b.deleteGeometry(d.g);
+      else d.b.setVisibleAt(d.i, false);
+    }
+    q.draws = [];
+    q.drawn = null;
+  }
+
+  // A piece come to rest after a collapse goes back into batches: a whole
+  // fallen tower is drawn in a few dozen calls again, not six thousand. One
+  // with the shape it was built with goes back to its own instance. One made
+  // or cut since goes into the spare batches, a batch per material: a lump
+  // broken off a column is two, its weathered outside and its broken inside.
   // Hitting it again promotes it out, as it did the first time.
   rejoin(p) {
     _m.compose(p.pos, p.quat, _one);
-    if (!p.object) {
-      for (const q of p.parts) q.batch.setMatrixAt(q.instance, _m);
-      return true;
-    }
-    if (p.parts.some((q) => q.materials)) return false;
+    if (!p.object) { this.drawAt(p, _m); return true; }
     for (const q of p.parts) {
-      if (q.batch && q.geometry === q.batchGeometry) continue;
-      if (!this._spare(q)) return false;
+      if (q.draws.length && q.drawn === q.geometry) continue;
+      if (!this._batchPart(q)) return false;
     }
     for (const q of p.parts) {
-      q.batch.setMatrixAt(q.instance, _m);
-      q.batch.setVisibleAt(q.instance, true);
+      for (const d of q.draws) { d.b.setMatrixAt(d.i, _m); d.b.setVisibleAt(d.i, true); }
       q.mesh = null;
     }
     p.object.removeFromParent();
@@ -356,31 +374,45 @@ export class Pieces {
     return true;
   }
 
-  // Put a part into the spare batch for its material.
-  _spare(q) {
-    const k = q.kind.name;
-    let b = this.spares.get(k);
-    if (!b) {
-      b = new THREE.BatchedMesh(1024, 196608, 393216, q.kind.material);
-      b.castShadow = k !== 'glass';
-      b.receiveShadow = true;
-      b.perObjectFrustumCulled = false;
-      b.sortObjects = false;
-      b.name = `spare:${k}`;
-      this.spares.set(k, b);
-      this.root.add(b);
+  _batchPart(q) {
+    this._dropDraws(q);
+    const colour = new THREE.Color(q.tint ?? 0xffffff).lerp(_dark, q.charred ?? 0);
+    const bits = q.materials ? byMaterial(q.geometry, q.materials) : [[plain(q.geometry, 0, Infinity), q.kind.material]];
+    for (const [g, material] of bits) {
+      const d = this._spare(g, material);
+      g.dispose();
+      if (!d) { this._dropDraws(q); return false; }
+      d.b.setVisibleAt(d.i, false);
+      d.b.setColorAt(d.i, q.materials ? _c.set(0xffffff).lerp(_dark, q.charred ?? 0) : colour);
+      q.draws.push(d);
     }
-    let g, i;
-    try {
-      g = b.addGeometry(q.geometry);
-      i = b.addInstance(g);
-    } catch { return false; }
-    if (q.batch && q.instance >= 0 && q.batch !== b) q.batch.setVisibleAt(q.instance, false);
-    q.batch = b;
-    q.instance = i;
-    q.batchGeometry = q.geometry;
-    b.setColorAt(i, _c.set(q.tint ?? 0xffffff).lerp(_dark, q.charred ?? 0));
+    q.drawn = q.geometry;
     return true;
+  }
+
+  // Room for a geometry in a spare batch of this material, starting a new
+  // batch when the last one is full.
+  _spare(g, material) {
+    let list = this.spares.get(material);
+    if (!list) this.spares.set(material, (list = []));
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let b = list[list.length - 1];
+      if (!b || attempt === 1) {
+        b = new THREE.BatchedMesh(2048, Math.max(262144, g.attributes.position.count), 0, material);
+        b.castShadow = material !== KIND.glass?.material;
+        b.receiveShadow = true;
+        b.perObjectFrustumCulled = false;
+        b.sortObjects = false;
+        b.name = `spare:${material.name || material.uuid.slice(0, 6)}`;
+        list.push(b);
+        this.root.add(b);
+      }
+      try {
+        const id = b.addGeometry(g);
+        try { return { b, i: b.addInstance(id), g: id, spare: true }; } catch { b.deleteGeometry(id); }
+      } catch { /* full: next batch */ }
+    }
+    return null;
   }
 
   // Move a piece that is coming down with a collapse. It stays in its batch —
@@ -390,8 +422,7 @@ export class Pieces {
     const at = _pf.copy(p.pos);
     at.y += dy;
     if (p.object) { p.object.position.copy(at); return; }
-    _m.compose(at, p.quat, _one);
-    for (const q of p.parts) q.batch.setMatrixAt(q.instance, _m);
+    this.drawAt(p, _m.compose(at, p.quat, _one));
   }
 
   // Move promoted dynamic pieces to where their bodies are.
@@ -425,11 +456,59 @@ export class Pieces {
       for (const q of p.parts) q.geometry.dispose();
     }
     this.physics.dynamic.clear();
-    for (const b of [...this.batches.values(), ...this.spares.values()]) { b.removeFromParent(); b.dispose(); }
+    for (const b of [...this.batches.values(), ...[...this.spares.values()].flat()]) { b.removeFromParent(); b.dispose(); }
     this.batches.clear();
     this.spares.clear();
     this.list.length = 0;
   }
+}
+
+// A range of a geometry's triangles as a plain geometry of its own — no
+// index, and exactly position, normal and uv — which is what every geometry in
+// a spare batch has to be.
+function plain(g, start, count) {
+  const idx = g.index, pos = g.attributes.position, nor = g.attributes.normal, uv = g.attributes.uv;
+  const total = idx ? idx.count : pos.count;
+  const end = Math.min(total, start + count);
+  const n = Math.max(0, end - start);
+  const P = new Float32Array(n * 3), N = new Float32Array(n * 3), U = new Float32Array(n * 2);
+  for (let k = 0; k < n; k++) {
+    const v = idx ? idx.getX(start + k) : start + k;
+    P[k * 3] = pos.getX(v); P[k * 3 + 1] = pos.getY(v); P[k * 3 + 2] = pos.getZ(v);
+    if (nor) { N[k * 3] = nor.getX(v); N[k * 3 + 1] = nor.getY(v); N[k * 3 + 2] = nor.getZ(v); }
+    if (uv) { U[k * 2] = uv.getX(v); U[k * 2 + 1] = uv.getY(v); }
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(P, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+  out.setAttribute('uv', new THREE.BufferAttribute(U, 2));
+  if (!nor) out.computeVertexNormals();
+  return out;
+}
+
+// A cut geometry split by material: [[geometry, material]], one per material.
+function byMaterial(g, materials) {
+  if (!g.groups.length) return [[plain(g, 0, Infinity), materials[0]]];
+  const out = new Map();
+  for (const r of g.groups) {
+    const m = materials[r.materialIndex ?? 0];
+    if (!m) continue;
+    (out.get(m) ?? out.set(m, []).get(m)).push(plain(g, r.start, r.count));
+  }
+  return [...out].map(([m, gs]) => [gs.length === 1 ? gs[0] : merge(gs), m]);
+}
+
+function merge(gs) {
+  const n = gs.reduce((a, g) => a + g.attributes.position.count, 0);
+  const out = new THREE.BufferGeometry();
+  for (const [name, size] of [['position', 3], ['normal', 3], ['uv', 2]]) {
+    const arr = new Float32Array(n * size);
+    let o = 0;
+    for (const g of gs) { arr.set(g.attributes[name].array, o); o += g.attributes[name].array.length; }
+    out.setAttribute(name, new THREE.BufferAttribute(arr, size));
+  }
+  for (const g of gs) g.dispose();
+  return out;
 }
 
 // Vertices of every part, in the piece frame, for a convex-hull collider.

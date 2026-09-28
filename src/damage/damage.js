@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { subtract, split, chunkOff } from './cutter.js';
+import { subtract, chunkOff } from './cutter.js';
+import { fractureAsync, forgetJobs } from './csg.js';
 import { addSplinters } from './splinters.js';
 import { crack as crackGlass, shatter } from './glass.js';
 import { crack } from './cracks.js';
@@ -52,6 +53,7 @@ export class Damage {
     this.fx = fx;            // { chips, particles, audio, shake }
     this.onStructure = null; // called when something load-bearing changed
     this.pending = [];
+    this.broken = [];        // lumps back from the workers, waiting to take their piece's place
   }
 
   // Break it, but when there is time: from falls, collapses and blasts.
@@ -69,6 +71,8 @@ export class Damage {
 
   update() {
     const t0 = performance.now();
+    // Lumps that have come back from the workers go in first.
+    while (this.broken.length && performance.now() - t0 < BUDGET_MS) this._scatter(this.broken.shift());
     while (this.pending.length && performance.now() - t0 < BUDGET_MS) {
       const [what, p, ...args] = this.pending.shift();
       p.queued = false;
@@ -82,6 +86,8 @@ export class Damage {
   clear() {
     for (const [, p] of this.pending) p.queued = false;
     this.pending.length = 0;
+    this.broken.length = 0;
+    forgetJobs();
   }
 
   // Too much is loose already, or this is a fragment of a fragment: instead of
@@ -346,39 +352,20 @@ export class Damage {
           { dynamic: true, vel: vel.clone().add(new THREE.Vector3(Math.random() - 0.5, Math.random(), Math.random() - 0.5)), debris: true }));
       }
     } else {
+      // One lump of material: split along rough planes, in a worker. The
+      // piece stays as it is until its lumps come back.
+      if (p.breaking) return out;
+      p.breaking = true;
       const q = p.parts[0];
       const inside = insideMaterial(q.kind.name);
-      let bits = [{ geometry: q.geometry, materials: q.materials ?? [P._material(q)] }];
       const size = p.localBox.getSize(new THREE.Vector3());
       // At most as many pieces as there is room for.
       const passes = Math.min(maxPasses, Math.floor(Math.log2(room)), Math.max(minPasses, Math.round(Math.log2(Math.max(size.x, size.y, size.z) / 0.35))));
-      for (let pass = 0; pass < passes; pass++) {
-        const next = [];
-        for (const bit of bits) {
-          bit.geometry.computeBoundingBox();
-          const bb = bit.geometry.boundingBox, s = bb.getSize(new THREE.Vector3());
-          const axis = s.x >= s.y && s.x >= s.z ? new THREE.Vector3(1, 0, 0) : s.y >= s.z ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
-          axis.add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(0.5)).normalize();
-          const at = bb.getCenter(new THREE.Vector3()).add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiply(s).multiplyScalar(0.3));
-          try {
-            for (const half of split(bit.geometry, bit.materials, inside, at, axis, Math.max(s.x, s.y, s.z), gen > 1 ? 5 : 12)) {
-              if (half.geometry.attributes.position.count > 0) next.push(half);
-            }
-          } catch { next.push(bit); }
-        }
-        bits = next;
-      }
-      for (const bit of bits) {
-        const g = bit.geometry;
-        g.computeBoundingBox();
-        const c = g.boundingBox.getCenter(new THREE.Vector3());
-        g.translate(-c.x, -c.y, -c.z);
-        const pos = c.clone().applyQuaternion(p.quat).add(p.pos);
-        const f = P.spawn({ parts: [{ kind: q.kind.name, geometry: g, materials: bit.materials }], pos, quat: p.quat, role: 'fragment', floor: p.floor, structural: false, hull: true },
-          { dynamic: true, vel: vel.clone().add(new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.5, Math.random() - 0.5).multiplyScalar(2)), debris: g.boundingBox.getSize(_v).length() < 0.6 });
-        f.gen = gen;
-        out.push(f);
-      }
+      const job = { p, q, vel, gen, point: point.clone(), dir: dir.clone() };
+      fractureAsync(q.geometry, q.materials ?? [P._material(q)], inside, passes, gen > 1 ? 5 : 12)
+        .then((bits) => { job.bits = bits; this.broken.push(job); })
+        .catch(() => { p.breaking = false; if (p.state !== 'dead') this.crumble(p, job.point, job.dir); });
+      return out;
     }
     for (const f of out) f.gen = gen;
     this.fx.chips.burst(chipKind(p.kind), point, dir, 25, 3, 0.04);
@@ -386,6 +373,29 @@ export class Damage {
     P.destroy(p);
     if (p.structural || p.role === 'slab') this.onStructure?.();
     return out;
+  }
+
+  // The lumps of a piece broken in a worker take its place, wherever it has
+  // got to meanwhile, going the way it was going.
+  _scatter({ p, q, bits, vel, gen, point, dir }) {
+    const P = this.pieces;
+    p.breaking = false;
+    if (p.state === 'dead') return;
+    if (p.body) { const v = p.body.linvel(); vel = vel.clone().add(new THREE.Vector3(v.x, v.y, v.z)); }
+    for (const bit of bits) {
+      const g = bit.geometry;
+      g.computeBoundingBox();
+      const c = g.boundingBox.getCenter(new THREE.Vector3());
+      g.translate(-c.x, -c.y, -c.z);
+      const pos = c.clone().applyQuaternion(p.quat).add(p.pos);
+      const f = P.spawn({ parts: [{ kind: q.kind.name, geometry: g, materials: bit.materials }], pos, quat: p.quat, role: 'fragment', floor: p.floor, structural: false, hull: true },
+        { dynamic: true, vel: vel.clone().add(new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.5, Math.random() - 0.5).multiplyScalar(2)), debris: g.boundingBox.getSize(_v).length() < 0.6 });
+      f.gen = gen;
+    }
+    this.fx.chips.burst(chipKind(p.kind), point, dir, 25, 3, 0.04);
+    this._dust(p.kind, point, dir.clone().negate(), 20);
+    P.destroy(p);
+    if (p.structural || p.role === 'slab') this.onStructure?.();
   }
 }
 

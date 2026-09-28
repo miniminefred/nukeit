@@ -185,7 +185,7 @@ export class Topple {
         p.object.matrix.copy(mat);
         p.object.matrixWorldNeedsUpdate = true;
       } else {
-        for (const q of p.parts) q.batch.setMatrixAt(q.instance, mat);
+        this.pieces.drawAt(p, mat);
       }
     }
     // The columns it pivots on take the whole weight on one edge, and once the

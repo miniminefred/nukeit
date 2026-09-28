@@ -124,3 +124,29 @@ export function split(geometry, materials, inside, point, normal, size, detail =
   const pack = (r) => ({ geometry: r.geometry, materials: Array.isArray(r.material) ? r.material : [r.material] });
   return [pack(one), pack(two)];
 }
+
+// Break a geometry into up to 2^passes lumps: each pass splits every lump
+// across its longest side, along a rough plane placed a little off centre.
+// This is the expensive part of anything breaking — seven evaluations for a
+// column — so it runs in a worker (damage/csg.js); it is here so that the
+// worker and a fallback on the main thread share it.
+export function fractureGeometry(geometry, materials, inside, passes, detail) {
+  let bits = [{ geometry, materials }];
+  for (let pass = 0; pass < passes; pass++) {
+    const next = [];
+    for (const bit of bits) {
+      bit.geometry.computeBoundingBox();
+      const bb = bit.geometry.boundingBox, s = bb.getSize(new THREE.Vector3());
+      const axis = s.x >= s.y && s.x >= s.z ? new THREE.Vector3(1, 0, 0) : s.y >= s.z ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+      axis.add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(0.5)).normalize();
+      const at = bb.getCenter(new THREE.Vector3()).add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiply(s).multiplyScalar(0.3));
+      try {
+        for (const half of split(bit.geometry, bit.materials, inside, at, axis, Math.max(s.x, s.y, s.z), detail)) {
+          if (half.geometry.attributes.position.count > 0) next.push(half);
+        }
+      } catch { next.push(bit); }
+    }
+    bits = next;
+  }
+  return bits;
+}
