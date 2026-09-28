@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { chargeModel } from '../tools/viewmodels.js';
 import { unsupported } from '../building/support.js';
-import { G_LAND } from '../physics.js';
 
 // The collapse bench: an automated, repeatable test of the thing the game is
 // for. It loads Trump Tower, puts remote charges on a set of ground-floor
@@ -149,27 +148,14 @@ const WRECKAGE = new Set(['stub', 'rebar', 'shard', 'fragment']);
 
 export function floaters(dev) {
   const floating = [];
-  const L = dev.pieces.list;
-  const { world, R, owner } = dev.physics;
-  const ray = new R.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
-  for (const p of L) {
+  for (const p of dev.pieces.list) {
     if (!(p.state === 'rubble' || (p.state === 'static' && WRECKAGE.has(p.role))) || p.box.min.y < 0.3) continue;
-    const b = p.box;
-    let best = Infinity;
-    // The same five points rubble looks at when it lands (sim/rubble.js).
-    for (const [fx, fz] of [[0.5, 0.5], [0.12, 0.12], [0.88, 0.12], [0.12, 0.88], [0.88, 0.88]]) {
-      ray.origin = { x: b.min.x + (b.max.x - b.min.x) * fx, y: b.min.y + 0.05, z: b.min.z + (b.max.z - b.min.z) * fz };
-      // What counts as something to lie on is what rubble lands on: a piece,
-      // the street or the city (sim/rubble.js).
-      const hit = world.castRay(ray, 50, true, undefined, G_LAND, undefined, undefined, (c) => {
-        const o = owner.get(c.handle);
-        return o ? o !== p && (o.parts !== undefined || o.role === 'city') : dev.physics.ground.has(c.handle);
-      });
-      if (hit) best = Math.min(best, hit.timeOfImpact - 0.05);
-    }
-    if (best > 0.15) {
+    // How far its own underside is above what is under it, at the closest of
+    // nine columns across it: the same measure rubble lands by.
+    const gap = dev.rubble._gap(p);
+    if (gap > 0.15) {
       const a = p.anchored ? ` anchored on ${p.anchored.on}/${p.anchored.state} gap ${p.anchored.gap}` : '';
-      floating.push(`${p.role} f${p.floor} ${p.state} y${b.min.y.toFixed(1)} gap ${best === Infinity ? 'inf' : best.toFixed(2)} on ${p.restOn ? `${p.restOn.role}/${p.restOn.state}` : '-'}${a}`);
+      floating.push(`${p.role} f${p.floor} ${p.state} y${p.box.min.y.toFixed(1)} gap ${gap === Infinity ? 'inf' : gap.toFixed(2)} on ${p.restOn ? `${p.restOn.role}/${p.restOn.state}` : '-'}${a}`);
     }
   }
   return floating;

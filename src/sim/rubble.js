@@ -46,7 +46,7 @@ const _v = new THREE.Vector3();
 const _s = new THREE.Vector3();
 const _o = { x: 0, y: 0, z: 0 };
 const UP = new THREE.Vector3(0, 1, 0);
-const FOOT = [[0, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+const GRID = [0.08, 0.5, 0.92];
 const AXES = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)];
 
 export class Rubble {
@@ -147,12 +147,36 @@ export class Rubble {
 
   // How far the lowest of five points under a piece's footprint is above
   // whatever is under it.
-  _gap(p) {
-    const b = p.box, ix = (b.max.x - b.min.x) * 0.38, iz = (b.max.z - b.min.z) * 0.38;
-    const cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
-    let h = -Infinity;
-    for (const [dx, dz] of FOOT) h = Math.max(h, this._under(cx + dx * ix, cz + dz * iz, b.min.y + 0.1, p));
-    return b.min.y - h;
+  _gap(p) { return this._clearance(p, false).gap; }
+
+  // How far a piece's underside is above what is under it, at the closest of
+  // nine columns across its footprint, and what that is. `landing`: looking
+  // from above it, for a piece coming down (and at this frame's landings,
+  // which Rapier cannot see yet); otherwise from just inside its underside,
+  // for one that is lying somewhere.
+  _clearance(p, landing) {
+    const b = p.box, top = b.max.y + 0.5;
+    let gap = Infinity, on = null;
+    for (const fx of GRID) for (const fz of GRID) {
+      const x = b.min.x + (b.max.x - b.min.x) * fx, z = b.min.z + (b.max.z - b.min.z) * fz;
+      const t = rayThrough(p, x, top, z);
+      if (!t) continue;
+      const bottom = top - t[1];
+      let y = this._under(x, z, landing ? top : bottom + 0.1, p), sup = this._support;
+      if (landing) for (const r of this.recent) {
+        const rb = r.box;
+        if (rb.max.y <= y || x < rb.min.x || x > rb.max.x || z < rb.min.z || z > rb.max.z || r.state !== 'rubble') continue;
+        const u = rayThrough(r, x, top, z);
+        if (u && top - u[0] > y) { y = top - u[0]; sup = r; }
+      }
+      if (bottom - y < gap) { gap = bottom - y; on = sup; }
+    }
+    if (gap === Infinity) {
+      // Too thin to hit from nine columns: its bounding box, then.
+      const y = this._under((b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2, landing ? top : b.min.y + 0.1, p);
+      return { gap: b.min.y - y, on: this._support };
+    }
+    return { gap, on };
   }
 
   _rest(p, on) {
@@ -255,26 +279,18 @@ export class Rubble {
     P._updateBox(p);
     p.pos.add(c.sub(p.box.getCenter(_v)));
     P._updateBox(p);
-    // What it lies on: the highest of five points under its footprint.
-    const b = p.box, top = b.max.y + 0.5;
-    const ix = (b.max.x - b.min.x) * 0.38, iz = (b.max.z - b.min.z) * 0.38;
+    // Down until it touches: at nine columns across its footprint, how far
+    // its own underside is above whatever is under it. The least of those is
+    // how far it drops. (Putting the bottom of its bounding box on the
+    // highest thing under it held a tilted slab up by its high side, its low
+    // corner in the air.)
+    const { gap, on } = this._clearance(p, true);
+    const b = p.box;
+    const h = b.min.y - gap;
     const cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
-    let h = -Infinity, on = null;
-    for (const [dx, dz] of FOOT) {
-      const x = cx + dx * ix, z = cz + dz * iz;
-      let y = this._under(x, z, top), sup = this._support;
-      for (const r of this.recent) {
-        const rb = r.box;
-        if (rb.max.y <= y || x < rb.min.x || x > rb.max.x || z < rb.min.z || z > rb.max.z || r.state !== 'rubble') continue;
-        const t = rayDown(r, x, top, z);
-        if (t >= 0 && top - t > y) { y = top - t; sup = r; }
-      }
-      if (y > h) { h = y; on = sup; }
-    }
     // Resting pieces bed into each other a little.
-    const thick = b.max.y - b.min.y;
-    const bed = h > 0.05 ? Math.min(0.05, thick * 0.12) : 0;
-    p.pos.y += h - bed - b.min.y;
+    const bed = h > 0.05 ? 0.03 : 0;
+    p.pos.y -= gap + bed;
     P._updateBox(p);
     p.state = 'rubble';
     P.rejoin(p);
@@ -350,16 +366,16 @@ export class Rubble {
   }
 }
 
-// Where a ray straight down from (x, y, z) first meets a piece's collider —
-// its box, or its boxes, in its own frame — as a distance, or -1. The same
-// shape Rapier would find, for a piece Rapier cannot see yet.
+// Where a ray straight down from (x, y, z) goes through a piece's collider —
+// its box, or its boxes, in its own frame — as [in, out] distances, or null.
+// The same shape Rapier would find, for a piece Rapier cannot see yet.
 const _ro = new THREE.Vector3(), _rd = new THREE.Vector3(), _qi = new THREE.Quaternion();
-function rayDown(p, x, y, z) {
+export function rayThrough(p, x, y, z) {
   _qi.copy(p.quat).invert();
   _ro.set(x - p.pos.x, y - p.pos.y, z - p.pos.z).applyQuaternion(_qi);
   _rd.set(0, -1, 0).applyQuaternion(_qi);
   const boxes = p.colliderBoxes ?? [[p.localBox.min.x, p.localBox.min.y, p.localBox.min.z, p.localBox.max.x, p.localBox.max.y, p.localBox.max.z]];
-  let best = -1;
+  let best = null;
   for (const b of boxes) {
     let t0 = -Infinity, t1 = Infinity;
     for (let a = 0; a < 3; a++) {
@@ -371,7 +387,7 @@ function rayDown(p, x, y, z) {
       if (ta > t0) t0 = ta;
       if (tb < t1) t1 = tb;
     }
-    if (t0 <= t1 && t1 >= 0) { const t = Math.max(0, t0); if (best < 0 || t < best) best = t; }
+    if (t0 <= t1 && t1 >= 0 && (!best || t0 < best[0])) best = [Math.max(0, t0), t1];
   }
   return best;
 }
