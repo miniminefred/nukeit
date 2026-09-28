@@ -173,7 +173,10 @@ export function floaters(dev) {
       const hit = world.castRay(ray, 50, true, undefined, G_LAND, undefined, undefined, (c) => owner.get(c.handle) !== p);
       if (hit) best = Math.min(best, hit.timeOfImpact - 0.05);
     }
-    if (best > 0.15) floating.push(`${p.role} f${p.floor} ${p.state} y${b.min.y.toFixed(1)} gap ${best === Infinity ? 'inf' : best.toFixed(2)}`);
+    if (best > 0.15) {
+      const a = p.anchored ? ` anchored on ${p.anchored.on}/${p.anchored.state} gap ${p.anchored.gap}` : '';
+      floating.push(`${p.role} f${p.floor} ${p.state} y${b.min.y.toFixed(1)} gap ${best === Infinity ? 'inf' : best.toFixed(2)} on ${p.restOn ? `${p.restOn.role}/${p.restOn.state}` : '-'}${a}`);
+    }
   }
   return floating;
 }

@@ -105,15 +105,27 @@ export class Rubble {
 
   anchor(p) {
     const c = p.box.getCenter(_v);
-    this._under(c.x, c.z, p.box.min.y + 0.05, p);
+    const y = this._under(c.x, c.z, p.box.min.y + 0.05, p);
     const on = this._support;
+    if (import.meta.env.DEV) p.anchored = { on: on?.role ?? (on ? 'city' : 'ground'), state: on?.state, gap: +(p.box.min.y - y).toFixed(2) };
     if (on && on.parts && on !== p) this._rest(p, on);
+    else if (p.box.min.y > 0.3) this.resting.add(p);
   }
 
   _unrest(p) {
     if (p.restOn) p.restOn.carried?.delete(p);
     p.restOn = null;
     this.resting.delete(p);
+  }
+
+  // How far the lowest of five points under a piece's footprint is above
+  // whatever is under it.
+  _gap(p) {
+    const b = p.box, ix = (b.max.x - b.min.x) * 0.38, iz = (b.max.z - b.min.z) * 0.38;
+    const cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
+    let h = -Infinity;
+    for (const [dx, dz] of FOOT) h = Math.max(h, this._under(cx + dx * ix, cz + dz * iz, b.min.y + 0.1, p));
+    return b.min.y - h;
   }
 
   _rest(p, on) {
@@ -130,9 +142,11 @@ export class Rubble {
   // slab being picked up where it landed.
   _check() {
     for (const r of this.resting) {
-      const on = r.restOn;
-      if (!on) { this.resting.delete(r); continue; }
       if (r.state !== 'rubble' && r.state !== 'static') { this._unrest(r); continue; }
+      const on = r.restOn;
+      // Lying on something that is not a piece — the lift car, the roof of a
+      // neighbour: look again, and fall if it has gone.
+      if (!on) { if (this._gap(r) > 0.15) this.add(r, new THREE.Vector3(), new THREE.Vector3()); continue; }
       if ((on.state === 'static' || on.state === 'rubble') && (on.placed ?? 0) === r.restAt) continue;
       this.add(r, new THREE.Vector3(), new THREE.Vector3());
     }
@@ -226,6 +240,7 @@ export class Rubble {
     // are not pieces and never go.
     p.placed = (p.placed ?? 0) + 1;
     if (on && on.parts) this._rest(p, on);
+    else if (h > 0.3) this.resting.add(p);        // on something that is not a piece, off the street
     // Heavy things land with a thump and a cloud.
     const m = p.volume * p.kind.density;
     const v = Math.hypot(f.v.x, f.v.y, f.v.z);

@@ -11,7 +11,8 @@ import { G_MASS } from '../physics.js';
 // which act as the hinge. It stays in one piece in the air. When it hits the
 // ground, or anything, hard enough, it breaks: every slab, wall, column and
 // desk in it flies on from where the swing was carrying it and comes down as
-// rubble (sim/rubble.js) — the tower lying in pieces along the street. A gentle lean that comes to rest against a neighbour just stays there.
+// rubble (sim/rubble.js) — the tower lying in pieces along the street. Even
+// a gentle lean that comes to rest against a neighbour comes apart.
 // If every support on a storey goes at once, evenly, it does not tip — it drops
 // straight down (the pancake in sim/structure.js).
 //
@@ -234,9 +235,12 @@ export class Topple {
     if (n) { this.fx.structure?.mark(); this.fx.audio?.rumble(0.5); }
     if (ground) this._release();
     if (M.t > 0.4 && ((ground && speed > BREAK_SPEED) || (building && speed > CRUSH_SPEED))) return this._break(speed);
-    // Came to rest without breaking: it stays where it ended up, leaning.
+    // Came to rest without breaking — leaning on a neighbour, say — it still
+    // comes apart. A dozen storeys of rubble that has lost its footing is not
+    // a building that can lean; left standing there it was four thousand
+    // pieces supported by links to where they used to be.
     if (b.isSleeping() || speed < 0.2) M.still += dt; else M.still = 0;
-    if (M.still > 1.2 || M.t > 25) this._settle();
+    if (M.still > 1.2 || M.t > 25) return this._break(speed);
   }
 
   // Put every rider where the body has carried it.
@@ -255,20 +259,6 @@ export class Topple {
       }
       P._updateBox(p);
     }
-  }
-
-  _settle() {
-    const P = this.pieces;
-    this._release();
-    this._place();
-    for (const { p } of this.mass.riders) {
-      if (p.state === 'dead') continue;
-      p.state = 'static';
-      P._addFixedCollider(p);
-    }
-    this.physics.world.removeRigidBody(this.mass.body);
-    this.mass = null;
-    this.fx.structure?.mark();
   }
 
   // It hit hard: it comes apart where it lies.

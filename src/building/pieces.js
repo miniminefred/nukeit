@@ -322,6 +322,7 @@ export class Pieces {
     p.state = 'rubble';
     this._updateBox(p);
     this._addFixedCollider(p);
+    this.onAnchor?.(p);
   }
 
   // Gone: no mesh, no collider, nothing left to hold anything up.
