@@ -1,4 +1,6 @@
-import RAPIER from '@dimforge/rapier3d-compat';
+// The SIMD build: the same engine, compiled to use the CPU's vector units —
+// every browser that runs WebGL2 has WebAssembly SIMD.
+import RAPIER from '@dimforge/rapier3d-simd-compat';
 import * as THREE from 'three';
 
 // Rigid-body physics, through Rapier.

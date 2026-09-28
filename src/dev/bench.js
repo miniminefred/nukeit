@@ -170,7 +170,12 @@ export function floaters(dev) {
     let best = Infinity;
     for (const [fx, fz] of [[0.5, 0.5], [0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8]]) {
       ray.origin = { x: b.min.x + (b.max.x - b.min.x) * fx, y: b.min.y + 0.05, z: b.min.z + (b.max.z - b.min.z) * fz };
-      const hit = world.castRay(ray, 50, true, undefined, G_LAND, undefined, undefined, (c) => owner.get(c.handle) !== p);
+      // What counts as something to lie on is what rubble lands on: a piece,
+      // the street or the city (sim/rubble.js).
+      const hit = world.castRay(ray, 50, true, undefined, G_LAND, undefined, undefined, (c) => {
+        const o = owner.get(c.handle);
+        return o ? o !== p && (o.parts !== undefined || o.role === 'city') : dev.physics.ground.has(c.handle);
+      });
       if (hit) best = Math.min(best, hit.timeOfImpact - 0.05);
     }
     if (best > 0.15) {

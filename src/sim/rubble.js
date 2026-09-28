@@ -44,6 +44,12 @@ export class Rubble {
     this.flying = [];
     this._ray = new physics.R.Ray({ x: 0, y: 0, z: 0 }, DOWN);
     this._support = null;
+    this._self = null;
+    this._restable = (c) => {
+      const o = physics.owner.get(c.handle);
+      if (o) return o !== this._self && (o.parts !== undefined || o.role === 'city');
+      return physics.ground.has(c.handle);
+    };
     this.resting = new Set();    // pieces lying on another piece
     this._sweep = SWEEP;
     // Whatever leaves where it was — crushed, knocked loose, sent flying —
@@ -187,12 +193,16 @@ export class Rubble {
   }
 
   // The top of whatever is under (x, z), looking down from y; what it is goes
-  // in _support. Moving bodies are not something to rest on.
+  // in _support. Only three things are something to rest on: a piece, the
+  // street and the city. Not a moving body, not the lift car (whose colliders
+  // are moved by hand — a raft of rubble came to rest on its roof and hung
+  // there when it went), and not a collider already removed this frame, which
+  // queries still find until the physics next steps.
   _under(x, z, y, self = null) {
     const r = this._ray;
     r.origin.x = x; r.origin.y = y; r.origin.z = z;
-    const own = self ? (c) => this.physics.owner.get(c.handle) !== self : undefined;
-    const hit = this.physics.world.castRay(r, y + 5, true, this.physics.R.QueryFilterFlags.EXCLUDE_DYNAMIC, G_LAND, undefined, undefined, own);
+    this._self = self;
+    const hit = this.physics.world.castRay(r, y + 5, true, this.physics.R.QueryFilterFlags.EXCLUDE_DYNAMIC, G_LAND, undefined, undefined, this._restable);
     this._support = hit ? this.physics.owner.get(hit.collider.handle) ?? null : null;
     return hit ? y - hit.timeOfImpact : -5;
   }
