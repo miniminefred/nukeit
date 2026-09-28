@@ -28,7 +28,10 @@ export const G_PLAYER = groups(GROUP_PLAYER, GROUP_WORLD | GROUP_RUBBLE);
 // A collapse's rubble: pieces lying where they came down. Solid to you and to
 // loose debris, but not to a tower that is still tipping over them — landing
 // on the rubble of its own broken storey it bounced back off it.
-export const G_RUBBLE = groups(GROUP_RUBBLE, GROUP_DEBRIS | GROUP_PLAYER);
+// Its filter has to take the world group too: a query only finds a collider
+// whose filter accepts the query's own group, and without it the rays rubble
+// lands by, and the sledge's, went straight through every piece of rubble.
+export const G_RUBBLE = groups(GROUP_RUBBLE, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER);
 // A tipping mass meets the street and the city, nothing else. Its hinge is a
 // joint, not the stumps it stands on; anything left in its own footprint —
 // the lift car, a stair, the core fallen down its shaft — it passes through.
