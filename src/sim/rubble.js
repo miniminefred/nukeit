@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { G_LAND } from '../physics.js';
+import { fractureAsync } from '../damage/csg.js';
+import { insideMaterial } from '../render/materials.js';
 
 // What a collapse leaves behind is the building itself.
 //
@@ -15,6 +17,13 @@ import { G_LAND } from '../physics.js';
 // other, and they do not need to be: nothing collides in the air. What matters
 // is where they end up. So a piece in the air is a point with a velocity and a
 // spin, and what it lands on is found by casting rays down at its footprint.
+// What comes down hard and big — a slab bay, a length of core wall, a column
+// — breaks where it lands, into a few chunks with real broken faces (cut in
+// the CSG workers), which tumble off and land again on their own. That is
+// what makes a pile and not a floor: chunks lie at angles, propped on each
+// other, with space between them. Laid flat and whole, twelve storeys of
+// slabs made a crust four metres thick.
+//
 // Each landed piece remembers what it came to rest on. When that goes — is
 // crushed, knocked loose, falls again — what lay on it is picked up and falls
 // too, so nothing is ever left hanging.
@@ -25,6 +34,10 @@ const REFRESH = 0.15;            // s between looks at what is under a piece
 const SLIDE = 0.08;              // s of its horizontal speed it slides on landing
 const LANDINGS_PER_FRAME = 120;  // more than this wait for the next frame, still in the air
 const SWEEP = 0.5;               // s between checks that what rubble lies on is still there
+const CHUNK = 1.2;               // m^3 of box: a piece this big breaks up where it lands...
+const CHUNK_SPEED = 3;           // ...if it lands at least this fast
+const CHUNK_MS = 3;              // ms a frame for putting the chunks in its place
+const BREAKS = new Set(['slab', 'core', 'column', 'wall', 'stair', 'spandrel']);
 
 const _m = new THREE.Matrix4();
 const _one = new THREE.Vector3(1, 1, 1);
@@ -45,12 +58,20 @@ export class Rubble {
     this._ray = new physics.R.Ray({ x: 0, y: 0, z: 0 }, DOWN);
     this._support = null;
     this._self = null;
+    this._out = 0;               // pieces out at the workers
+    // Pieces landed since the physics last stepped. A new collider is not in
+    // Rapier's query tree until the next step, so rays cannot see these yet:
+    // every piece landing in one frame came to rest at the same height, and
+    // twelve storeys made a pile six metres high.
+    this.recent = [];
+    this._steps = -1;
     this._restable = (c) => {
       const o = physics.owner.get(c.handle);
       if (o) return o !== this._self && (o.parts !== undefined || o.role === 'city');
       return physics.ground.has(c.handle);
     };
     this.resting = new Set();    // pieces lying on another piece
+    this.broken = [];            // chunks back from the workers, waiting to take their piece's place
     this._sweep = SWEEP;
     // Whatever leaves where it was — crushed, knocked loose, sent flying —
     // takes with it what was lying on it.
@@ -64,7 +85,7 @@ export class Rubble {
     pieces.onAnchor = (p) => this.anchor(p);
   }
 
-  get active() { return this.flying.length > 0; }
+  get active() { return this.flying.length > 0 || this.broken.length > 0 || this._out > 0; }
 
   // Send a piece flying: whatever it is, however it stood or moved. `vel` in
   // m/s, `spin` in rad/s.
@@ -159,8 +180,11 @@ export class Rubble {
   }
 
   update(dt) {
+    if (this.physics.steps !== this._steps) { this._steps = this.physics.steps; this.recent.length = 0; }
     this._sweep -= dt;
     if (this._sweep <= 0) { this._sweep = SWEEP; this._check(); }
+    const t0 = performance.now();
+    while (this.broken.length && performance.now() - t0 < CHUNK_MS) this._chunks(this.broken.shift());
     if (!this.flying.length) return;
     const P = this.pieces;
     let landings = LANDINGS_PER_FRAME;
@@ -223,7 +247,9 @@ export class Rubble {
     // Rotate about its centre, not about its frame's origin.
     const c = p.box.getCenter(new THREE.Vector3());
     p.quat.premultiply(_q);
-    const tilt = 0.04 + Math.random() * 0.14;
+    // On the street a piece lies nearly flat; on the pile it lands however it
+    // lands; a broken chunk comes to rest propped at any angle up to steep.
+    const tilt = f.chunk ? 0.2 + Math.random() * 0.8 : f.floor > 0.3 ? 0.1 + Math.random() * 0.45 : 0.04 + Math.random() * 0.14;
     const axis = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
     p.quat.premultiply(_q.setFromAxisAngle(axis, tilt));
     P._updateBox(p);
@@ -235,17 +261,23 @@ export class Rubble {
     const cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
     let h = -Infinity, on = null;
     for (const [dx, dz] of FOOT) {
-      const y = this._under(cx + dx * ix, cz + dz * iz, top);
-      if (y > h) { h = y; on = this._support; }
+      const x = cx + dx * ix, z = cz + dz * iz;
+      let y = this._under(x, z, top), sup = this._support;
+      for (const r of this.recent) {
+        const rb = r.box;
+        if (rb.max.y > y && rb.max.y < top && x > rb.min.x && x < rb.max.x && z > rb.min.z && z < rb.max.z && r.state === 'rubble') { y = rb.max.y; sup = r; }
+      }
+      if (y > h) { h = y; on = sup; }
     }
-    // Resting pieces bed into each other a little: rubble is not a stack of plates.
+    // Resting pieces bed into each other a little.
     const thick = b.max.y - b.min.y;
-    const bed = h > 0.05 ? Math.min(0.12, thick * 0.2) : 0;
+    const bed = h > 0.05 ? Math.min(0.05, thick * 0.12) : 0;
     p.pos.y += h - bed - b.min.y;
     P._updateBox(p);
     p.state = 'rubble';
     P.rejoin(p);
     P._addFixedCollider(p);
+    this.recent.push(p);
     // What it lies on: if that goes, so does this. The street and the city
     // are not pieces and never go.
     p.placed = (p.placed ?? 0) + 1;
@@ -255,7 +287,49 @@ export class Rubble {
     const m = p.volume * p.kind.density;
     const v = Math.hypot(f.v.x, f.v.y, f.v.z);
     if (m > 3000 && v > 4 && Math.random() < 0.08) this.fx.cloud?.(new THREE.Vector3(cx, b.min.y + 0.3, cz), Math.min(2.5, Math.sqrt(m) / 60));
+    if (!f.chunk && !p.gen && v > CHUNK_SPEED && p.volume > CHUNK && p.parts.length === 1 && BREAKS.has(p.role)) this._breakUp(p, f.v);
     return true;
+  }
+
+  // Split a piece that has landed hard, in a worker. It lies where it landed
+  // until its chunks are ready.
+  _breakUp(p, v) {
+    const q = p.parts[0];
+    p.gen = 1;
+    const at = p.placed;
+    this._out++;
+    const passes = p.volume > 6 ? 3 : 2;
+    fractureAsync(q.geometry, q.materials ?? [this.pieces._material(q)], insideMaterial(q.kind.name), passes, 8)
+      .then((bits) => this.broken.push({ p, q, bits, at, v: v.clone() }))
+      .catch(() => {})
+      .finally(() => { this._out--; });
+  }
+
+  // The chunks take their piece's place, and tumble off it.
+  _chunks({ p, q, bits, at, v }) {
+    if (p.state !== 'rubble') return;          // gone, or in the air again: it stays whole
+    const P = this.pieces;
+    const c0 = p.box.getCenter(new THREE.Vector3());
+    const out = [];
+    for (const bit of bits) {
+      const g = bit.geometry;
+      g.computeBoundingBox();
+      const c = g.boundingBox.getCenter(new THREE.Vector3());
+      g.translate(-c.x, -c.y, -c.z);
+      const pos = c.applyQuaternion(p.quat).add(p.pos);
+      out.push(P.spawn({ parts: [{ kind: q.kind.name, geometry: g, materials: bit.materials, tint: q.tint }], pos, quat: p.quat, role: 'fragment', floor: p.floor, structural: false, hull: true }, { free: true }));
+    }
+    p.brokeUp = true;
+    P.destroy(p);
+    for (const f of out) {
+      f.gen = 1;
+      const away = f.box.getCenter(new THREE.Vector3()).sub(c0).setY(0);
+      const l = away.length() || 1;
+      const vel = away.multiplyScalar((0.6 + Math.random() * 1.6) / l).add(new THREE.Vector3(v.x * 0.15, 0.8 + Math.random() * 1.8, v.z * 0.15));
+      this.add(f, vel, new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(3));
+      const fl = this.flying[this.flying.length - 1];
+      if (fl?.p === f) fl.chunk = true;
+    }
   }
 
   _draw(p) {
@@ -270,5 +344,6 @@ export class Rubble {
   clear() {
     this.flying.length = 0;
     this.resting.clear();
+    this.broken.length = 0;
   }
 }

@@ -25,9 +25,10 @@ import { G_LAND } from '../physics.js';
 // and the column line beside it. What they break, the chain reaction spreads.
 export const REFERENCE = [[-5, 0], [-4.4, 3.3], [-5, 7], [-5, -7], [-5, 11.6], [-5, -11.6], [-9.5, 3.5], [-9.5, -3.5]];
 
-// On the far pavement of the avenue, looking up at the tower's front and its
-// west side, where it falls.
-const VIEW = { at: [8, 1.2, 46], look: [-22, 16, 0] };
+// Held over the far pavement of the avenue, 40 m up — the avenue is the one
+// clear line of sight in the city — framing the whole tower, top to street,
+// and the ground to the west of it, where it falls.
+const VIEW = { at: [-4, 40, 49], look: [-12, 27, 0] };
 
 // Every system's share of a frame, in milliseconds of CPU, when `profile` is on.
 const SYSTEMS = [['physics', 'step'], ['pieces', 'sync'], ['topple', 'update'], ['rubble', 'update'], ['structure', 'update'],
@@ -54,30 +55,13 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
   const { pieces, player, input } = dev;
   dev.state = 'play';
   input.mouse.locked = true;
-  // Stand across the avenue, looking at the tower.
-  const [x, y, z] = view.at, [lx, ly, lz] = view.look;
-  player.teleport(x, y, z);
-  player.yaw = Math.atan2(-(lx - x), -(lz - z));
-  player.pitch = Math.atan2(ly - (y + 1.62), Math.hypot(lx - x, lz - z));
+  // You stand safely across the avenue; the camera is held where it sees it all.
+  player.teleport(10, 0.05, 44);
+  dev.rig = { at: new THREE.Vector3(...view.at), look: new THREE.Vector3(...view.look) };
   dev.select(0);
   document.getElementById('begin')?.classList.remove('open');
 
-  // Place the charges on the supports nearest each point, on the face toward it.
-  const bomb = dev.tools.find((t) => t.id === 'bomb');
-  const supports = pieces.list.filter((p) => p.floor === 0 && (p.role === 'column' || p.role === 'core') && p.state === 'static');
-  const V = new THREE.Vector3();
-  for (const [cx, cz] of charges) {
-    const want = new THREE.Vector3(cx, 1.2, cz);
-    const p = supports.reduce((a, b) => (b.box.distanceToPoint(want) < a.box.distanceToPoint(want) ? b : a));
-    const at = p.box.clampPoint(want, new THREE.Vector3());
-    at.y = 1.2;
-    const normal = want.clone().sub(p.box.getCenter(V)).setY(0).normalize();
-    const mesh = chargeModel();
-    mesh.position.copy(at).addScaledVector(normal, 0.025);
-    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
-    dev.scene.add(mesh);
-    bomb.placed.push({ mesh, at });
-  }
+  const bomb = place(dev, charges);
   const tower = pieces.list.filter((p) => p.state === 'static' && p.box.min.y > 4.2);
   const before = tower.length;
 
@@ -114,6 +98,7 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
   });
 
   prof?.undo();
+  dev.rig = null;
   // Half-second windows, as the counter reads.
   const windows = [];
   let acc = 0, n = 0, w0 = 0;
@@ -130,7 +115,7 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
   // What became of the tower: every piece of it should be lying somewhere as
   // rubble, apart from glass (which bursts) and small bits (which fade).
   const fate = {};
-  for (const p of tower) { const k = p.state === 'dead' ? `dead ${p.role}` : p.state; fate[k] = (fate[k] ?? 0) + 1; }
+  for (const p of tower) { const k = p.state === 'dead' ? (p.brokeUp ? 'broken into chunks' : `dead ${p.role}`) : p.state; fate[k] = (fate[k] ?? 0) + 1; }
   const floating = floaters(dev);
   const heap = pile(dev);
   const minFps = Math.min(...windows.map((w) => w.fps));
@@ -144,6 +129,7 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
     seconds: +t.toFixed(1),
     tippedAt: +tipAt.toFixed(2),
     brokeAt: +breakAt.toFixed(2),
+    broke: dev.topple.lastBreak ?? null,
     height: +height.toFixed(1),
     pile: heap,
     hanging, inAir, floating: floating.length, floatingList: floating.slice(0, 30), standingAboveBefore: before, fate, standingAbove, rubble,
@@ -208,4 +194,50 @@ export function pile(dev) {
   const h = [...cells.values()].sort((a, b) => a - b);
   const at = (q) => +(h[Math.floor(q * (h.length - 1))] ?? 0).toFixed(1);
   return { pieces: n, volume: Math.round(volume), tonnes: Math.round(tons), area: h.length, mean: +(h.reduce((a, b) => a + b, 0) / Math.max(1, h.length)).toFixed(2), p50: at(0.5), p90: at(0.9), max: at(1) };
+}
+
+// Put charges on the ground-floor supports nearest each [x, z], on the face
+// toward it, as you would with the detonator in your hand.
+function place(dev, charges) {
+  const bomb = dev.tools.find((t) => t.id === 'bomb');
+  const supports = dev.pieces.list.filter((p) => p.floor === 0 && (p.role === 'column' || p.role === 'core') && p.state === 'static');
+  const V = new THREE.Vector3();
+  for (const [cx, cz] of charges) {
+    const want = new THREE.Vector3(cx, 1.2, cz);
+    const p = supports.reduce((a, b) => (b.box.distanceToPoint(want) < a.box.distanceToPoint(want) ? b : a));
+    const at = p.box.clampPoint(want, new THREE.Vector3());
+    at.y = 1.2;
+    const normal = want.clone().sub(p.box.getCenter(V)).setY(0).normalize();
+    const mesh = chargeModel();
+    mesh.position.copy(at).addScaledVector(normal, 0.025);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+    dev.scene.add(mesh);
+    bomb.placed.push({ mesh, at });
+  }
+  return bomb;
+}
+
+// Which way does a set of charges bring it down, if at all? Simulation only,
+// nothing drawn, 30 frames a simulated second: for choosing a demolition.
+export async function trial(dev, charges, secs = 30) {
+  await dev.start('trump', ['bomb', 'sledge']);
+  dev.state = 'play';
+  dev.input.mouse.locked = true;
+  dev.player.teleport(10, 0.05, 44);
+  dev.topple.lastTip = null;
+  dev.topple.lastBreak = null;
+  const bomb = place(dev, charges);
+  bomb._chain = bomb.placed.splice(0);
+  bomb._t = 0.1;
+  const render = dev.post.composer.render;
+  dev.post.composer.render = () => {};
+  let t = 0, down = -1;
+  try {
+    for (; t < secs; t += 1 / 30) {
+      dev.step(1 / 30, 1);
+      if (down < 0 && dev.measure() < 10) down = t;
+      if (down >= 0 && t > down + 4 && !dev.rubble.active && !dev.topple.active && !dev.structure.collapsing) break;
+    }
+  } finally { dev.post.composer.render = render; }
+  return { charges: charges.length, tip: dev.topple.lastTip, broke: dev.topple.lastBreak, downAt: +down.toFixed(1), height: +dev.measure().toFixed(1), pile: pile(dev) };
 }

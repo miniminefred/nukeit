@@ -105,6 +105,7 @@ structure.onCrushPlayer = () => player.damage(500, 'crushed');
 
 const lift = new Lift(scene, physics);
 let liftTip = null;
+let rig = null;           // dev: { at, look } to hold the camera there
 
 const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene };
 
@@ -252,6 +253,8 @@ function frame(dt) {
       liftTip = player.dead ? null : lift.control(input, player);
       lift.update(dt, player, { collapsing: structure.collapsing || topple.active });
       player.update(dt);
+      // A camera held somewhere else — the collapse bench's, over the avenue.
+      if (rig) { camera.position.copy(rig.at); camera.lookAt(rig.look); }
     } else lift.update(dt, null, { collapsing: structure.collapsing || topple.active });
     const t = tools[current];
     for (const tool of tools) {
@@ -292,7 +295,7 @@ function frame(dt) {
   followShadow(lights, camera);
   shake.apply(camera, dt);
   post.composer.render(dt);
-  if (state === 'play') {
+  if (state === 'play' && !rig) {
     renderer.autoClear = false;
     renderer.clearDepth();
     renderer.render(vmScene, vmCamera);
@@ -332,6 +335,7 @@ const frames = (n) => new Promise((r) => {
 if (import.meta.env.DEV) {
   window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, particles, audio, ctx, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
+    get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.
     step: (dt = 1 / 60, n = 1) => { for (let i = 0; i < n; i++) frame(dt); }, select,
     // The collapse bench (dev/bench.js): charges, a collapse, frame times.

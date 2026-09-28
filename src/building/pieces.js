@@ -104,7 +104,8 @@ export class Pieces {
 
   // A piece made after the building was finalized — a shard, a fragment. It
   // never goes into a batch; it has its own meshes from the start.
-  spawn(spec, { dynamic = false, vel, spin, debris = false } = {}) {
+  // `free`: neither standing nor a body yet — it is about to be sent flying.
+  spawn(spec, { dynamic = false, vel, spin, debris = false, free = false } = {}) {
     const p = this.add(spec);
     this.promote(p);
     // An irregular shape — a broken lump — collides as its convex hull, not its box.
@@ -112,7 +113,7 @@ export class Pieces {
     if (dynamic) {
       p.state = 'static';
       this.makeDynamic(p, vel, spin, { debris, quiet: true });
-    } else {
+    } else if (!free) {
       this._addFixedCollider(p);
       this.onAnchor?.(p);
     }

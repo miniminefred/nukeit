@@ -89,6 +89,7 @@ export class Topple {
     for (const [p, d] of along) { acc += p.hp; edge = d; if (acc >= left * HINGE_SHARE) break; }
     const hinge = along.filter(([, d]) => d <= edge + 0.01).map(([p]) => p);
     const anchor = centre.clone().addScaledVector(dir, edge - centre.dot(dir) + 0.4);
+    this.lastTip = { floor: f, dir: [+dir.x.toFixed(2), +dir.z.toFixed(2)], left: +(left / all).toFixed(2) };
     this._crush(f, hinge, base);
     this._start(above, dir, m, f, hinge, anchor);
     return true;
@@ -104,7 +105,11 @@ export class Topple {
     const lo = f * FLOOR_H - 0.05;
     for (const p of [...P.list]) {
       if (p.state !== 'static' || keep.has(p)) continue;
-      if (p.box.max.y > base + 0.05 || p.box.min.y < lo) continue;
+      // Everything that starts in the storey, including what reaches up into
+      // the one above — a stair, a wall, a spandrel. Left, those stood inside
+      // the tipping mass's first box and the solver threw four thousand tonnes
+      // off them at forty metres a second.
+      if (p.box.min.y >= base - 0.05 || p.box.min.y < lo) continue;
       fx.rubble.add(p, new THREE.Vector3((Math.random() - 0.5) * 2, -1, (Math.random() - 0.5) * 2));
     }
     const c = new THREE.Vector3();
@@ -113,9 +118,22 @@ export class Topple {
 
   _start(list, dir, mass, f, hinge, anchor) {
     const P = this.pieces, R = this.physics.R, world = this.physics.world;
+    // Anything already loose inside it — the core, fallen down its own shaft —
+    // rides with it. As rigid bodies inside the mass's boxes, they were what
+    // it was pushed off.
+    const zone = new THREE.Box3();
+    for (const p of list) if (p.role === 'slab') zone.union(p.box);
+    const standing = list.slice();
+    for (const p of [...this.physics.dynamic]) {
+      if (!p.body || !zone.containsPoint(p.box.getCenter(_v))) continue;
+      this.physics.removeBody(p.body);
+      this.physics.dynamic.delete(p);
+      p.body = null;
+      list.push(p);
+    }
     // One box per floor slab and one per storey of core, in world coordinates.
     const byFloor = new Map();
-    for (const p of list) {
+    for (const p of standing) {
       if (p.role !== 'slab' && p.role !== 'core' && p.role !== 'column') continue;
       const k = `${p.floor}|${p.role === 'slab' ? 's' : 'c'}`;
       const b = byFloor.get(k) ?? new THREE.Box3();
@@ -240,7 +258,7 @@ export class Topple {
     // a building that can lean; left standing there it was four thousand
     // pieces supported by links to where they used to be.
     if (b.isSleeping() || speed < 0.2) M.still += dt; else M.still = 0;
-    if (M.still > 1.2 || M.t > 25) return this._break(speed);
+    if (M.still > 1.2 || M.t > 25) return this._break(speed, 'rest');
   }
 
   // Put every rider where the body has carried it.
@@ -261,8 +279,13 @@ export class Topple {
     }
   }
 
-  // It hit hard: it comes apart where it lies.
-  _break(speed) {
+  // It hit hard (or came to rest with nothing that could hold it): it comes
+  // apart where it is. Nothing is added — no scatter, no burst. Each piece
+  // carries on exactly as the mass was carrying it at that point, turning as
+  // it turned, so the end that hit stops on the street and the rest comes
+  // down along it as it swings. Pushed apart at random, with an explosion's
+  // sound, the tower looked as if it had blown up in mid-air.
+  _break(speed, why = 'impact') {
     const P = this.pieces, fx = this.fx;
     const M = this.mass;
     this._place();
@@ -271,25 +294,21 @@ export class Topple {
     const lv = b.linvel(), av = b.angvel(), com = b.translation();
     const vAt = (p) => {
       const r = _v.set(p.pos.x - com.x, p.pos.y - com.y, p.pos.z - com.z);
-      return new THREE.Vector3(lv.x + av.y * r.z - av.z * r.y, lv.y + av.z * r.x - av.x * r.z, lv.z + av.x * r.y - av.y * r.x).multiplyScalar(0.8);
+      return new THREE.Vector3(lv.x + av.y * r.z - av.z * r.y, lv.y + av.z * r.x - av.x * r.z, lv.z + av.x * r.y - av.y * r.x);
     };
     this.physics.world.removeRigidBody(b);
     this.mass = null;
     const riders = M.riders.map((r) => r.p).filter((p) => p.state !== 'dead');
-    // Every piece of it flies on from where the swing was carrying it, and
-    // comes down as rubble.
-    const spin = new THREE.Vector3(av.x, av.y, av.z).multiplyScalar(0.8);
-    for (const p of riders) {
-      const w = spin.clone().add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(1.5));
-      fx.rubble.add(p, vAt(p).add(new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5).multiplyScalar(2.5)), w);
-    }
+    this.lastBreak = { why, speed: +speed.toFixed(1), t: +M.t.toFixed(2) };
+    const spin = new THREE.Vector3(av.x, av.y, av.z);
+    for (const p of riders) fx.rubble.add(p, vAt(p), spin.clone());
     // Dust along where it came down.
     const low = riders.filter((p) => p.box.min.y < 3).slice(0, 400);
     for (let i = 0; i < 14 && low.length; i++) {
       const p = low[(Math.random() * low.length) | 0];
       fx.cloud?.(p.box.getCenter(new THREE.Vector3()).setY(0.5), 2.5);
     }
-    fx.audio?.explosion(com.x, 1, com.z, 6);
+    fx.audio?.impact(com.x, 1, com.z, 1);
     fx.audio?.rumble(1);
     fx.shake?.add(1);
     fx.structure?.mark();

@@ -18,18 +18,24 @@ export const GROUP_DEBRIS = 0x0002;
 export const GROUP_PLAYER = 0x0004;
 export const GROUP_RUBBLE = 0x0008;
 export const GROUP_MASS = 0x0010;
+export const GROUP_GROUND = 0x0020;
 const groups = (member, filter) => (member << 16) | filter;
-export const G_WORLD = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER | GROUP_MASS);
+export const G_WORLD = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER);
+// The street and the city: the world, and also what a tipping mass lands on.
+export const G_GROUND = groups(GROUP_WORLD | GROUP_GROUND, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER | GROUP_MASS);
 export const G_DEBRIS = groups(GROUP_DEBRIS, GROUP_WORLD | GROUP_DEBRIS | GROUP_RUBBLE);
 export const G_PLAYER = groups(GROUP_PLAYER, GROUP_WORLD | GROUP_RUBBLE);
 // A collapse's rubble: pieces lying where they came down. Solid to you and to
 // loose debris, but not to a tower that is still tipping over them — landing
 // on the rubble of its own broken storey it bounced back off it.
 export const G_RUBBLE = groups(GROUP_RUBBLE, GROUP_DEBRIS | GROUP_PLAYER);
-// A tipping mass meets the street, the city and what still stands, nothing
-// else — and it is its own group, so nothing comes to rest on it: it is about
-// to be gone.
-export const G_MASS = groups(GROUP_MASS, GROUP_WORLD);
+// A tipping mass meets the street and the city, nothing else. Its hinge is a
+// joint, not the stumps it stands on; anything left in its own footprint —
+// the lift car, a stair, the core fallen down its shaft — it passes through.
+// Colliding with those, the solver threw four thousand tonnes off them at
+// forty metres a second, and the tower seemed to burst in mid-air. And it is
+// its own group, so nothing comes to rest on it: it is about to be gone.
+export const G_MASS = groups(GROUP_MASS, GROUP_GROUND);
 // What a tool's ray can hit: the building, its rubble and debris, never the player.
 export const G_RAY = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS | GROUP_RUBBLE);
 // What rubble comes to rest on.
@@ -55,6 +61,7 @@ export class Physics {
     this.dynamic = new Set();       // pieces with a dynamic body
     this.onForce = null;            // (ownerA, ownerB, magnitude)
     this._acc = 0;
+    this.steps = 0;                 // simulation steps taken, ever
     this.ground = new Set();        // collider handles of the ground tiles
     // The ground: a grid of 40 m tiles with their tops at y = 0. It was one
     // 2 km box first, and a shape that big loses enough precision in contact
@@ -62,7 +69,7 @@ export class Physics {
     for (let x = -200; x < 200; x += 40)
       for (let z = -200; z < 200; z += 40)
         this.ground.add(this.world.createCollider(
-          RAPIER.ColliderDesc.cuboid(20, 1, 20).setTranslation(x + 20, -1, z + 20).setCollisionGroups(G_WORLD).setFriction(0.9),
+          RAPIER.ColliderDesc.cuboid(20, 1, 20).setTranslation(x + 20, -1, z + 20).setCollisionGroups(G_GROUND).setFriction(0.9),
           this.fixed,
         ).handle);
   }
@@ -175,6 +182,7 @@ export class Physics {
       this.world.step(this.events);
       this._acc -= STEP;
       steps++;
+      this.steps++;
       if (this.onForce) {
         this.events.drainContactForceEvents((e) => {
           const a = this.owner.get(e.collider1()), b = this.owner.get(e.collider2());
