@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { subtract, chunkOff } from './cutter.js';
-import { fractureAsync, forgetJobs } from './csg.js';
+import { fractureAsync, subtractAsync, forgetJobs } from './csg.js';
 import { addSplinters } from './splinters.js';
 import { crack as crackGlass, shatter } from './glass.js';
 import { crack } from './cracks.js';
@@ -229,7 +229,10 @@ export class Damage {
   }
 
   // Take a bite out of a piece where it was hit.
-  _bite(p, point, normal, dir, radius, depth, kind, { chips: throwChips = true } = {}) {
+  // `soon`: cut in a worker and put the hole in when it is ready, a frame or
+  // two later — for blasts, which make several holes at once; a blow you
+  // strike yourself cuts at once.
+  _bite(p, point, normal, dir, radius, depth, kind, { chips: throwChips = true, soon = false } = {}) {
     const { chips, particles } = this.fx;
     const local = this.toLocal(p, point);
     const ldir = this.dirToLocal(p, dir);
@@ -238,6 +241,22 @@ export class Damage {
     const size = q.geometry.boundingBox.getSize(_v);
     const thin = Math.min(size.x, size.y, size.z);
     const centre = local.clone().addScaledVector(ldir, depth * 0.35);
+    if (soon) {
+      const from = q.geometry;
+      const mats = q.materials ?? (Array.isArray(q.mesh?.material) ? q.mesh.material : [this.pieces._material(q)]);
+      subtractAsync(from, mats, insideMaterial(kind.name), centre, ldir, radius, depth).then((out) => {
+        // Still there, still the shape it was cut from, still where it stood?
+        if (p.state !== 'static' || q.geometry !== from) return;
+        if (out.geometry.attributes.position.count === 0) { this.pieces.destroy(p); return; }
+        this.pieces.reshape(p, part, out.geometry, out.materials);
+        p.bites++;
+        if (p.role === 'slab' || p.structural) this.onStructure?.();
+      }).catch(() => {});
+      p.damage += (4 / 3) * Math.PI * radius * radius * depth * 0.5;
+      if (throwChips) chips.burst(chipKind(kind), point, normal.clone(), Math.round(6 + radius * 40), 2.5, Math.min(0.06, radius * 0.25));
+      this._dust(kind, point, normal, Math.round(4 + radius * 30));
+      return;
+    }
     try {
       const mats = q.materials ?? (Array.isArray(q.mesh?.material) ? q.mesh.material : [this.pieces._material(q)]);
       const out = subtract(q.geometry, mats, insideMaterial(kind.name), centre, ldir, radius, depth);

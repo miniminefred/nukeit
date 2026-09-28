@@ -32,7 +32,7 @@ export class Blast {
   later(fn, delay) { this.queue.push({ fn, t: delay }); }
 
   explode(at, r) {
-    const { pieces, damage, physics, particles, chips, fire, audio, shake, player, structure } = this.ctx;
+    const { pieces, damage, physics, particles, chips, fire, audio, shake, player, structure, rubble } = this.ctx;
     this.count++;
     // Fireball, sparks, smoke.
     particles.spawn('flash', at.x, at.y, at.z);
@@ -77,7 +77,7 @@ export class Blast {
         // A hole in the floor.
         if (near > 0.3) {
           const hit = p.box.clampPoint(at, new THREE.Vector3());
-          damage._bite(p, hit, out.clone().negate(), out.clone(), r * 0.45 * near, r * 0.5, p.kind);
+          damage._bite(p, hit, out.clone().negate(), out.clone(), r * 0.45 * near, r * 0.5, p.kind, { soon: true });
           // Only something the size of a transformer breaks a whole floor bay.
           if (near > 0.85 && r >= 5) damage.fractureSoon(p, hit, out.clone(), 3);
         }
@@ -85,9 +85,15 @@ export class Blast {
       }
       if (p.role === 'stair' || p.role === 'ceiling' || p.role === 'carpet' || p.role === 'mullion' || p.role === 'spandrel' || p.role === 'wall' || p.role === 'furniture' || p.role === 'lamp' || p.role === 'fragment' || p.role === 'tank') {
         if (near > 0.35 && p.role !== 'stair' && p.volume < 6) damage.fractureSoon(p, p.box.clampPoint(at, new THREE.Vector3()), out.clone(), 4 * near);
-        else {
-          if (p.state === 'static' && p.role !== 'stair' && p.role !== 'carpet') pieces.makeDynamic(p);
-          if (p.body) p.body.applyImpulse({ x: out.x * near * 600, y: out.y * near * 600 + 150 * near, z: out.z * near * 600 }, true);
+        else if ((p.state === 'static' || p.state === 'rubble' || p.state === 'dynamic') && p.role !== 'stair' && p.role !== 'carpet') {
+          // Thrown: through the air the way a blast throws things, which is
+          // ballistic, and down as rubble where it lands. As rigid bodies, the
+          // contents of a lobby thrown at once took 15 ms a physics step.
+          const J = near * 600, m = Math.max(5, p.volume * p.kind.density * 0.5);
+          const v = out.clone().multiplyScalar(J / m).add(new THREE.Vector3(0, (150 * near) / m, 0));
+          if (p.body) { const b = p.body.linvel(); v.add(new THREE.Vector3(b.x, b.y, b.z)); }
+          v.clampLength(0, 25);
+          rubble.add(p, v, new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(6 * near));
         }
       }
     }

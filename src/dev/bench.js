@@ -132,6 +132,7 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
   const fate = {};
   for (const p of tower) { const k = p.state === 'dead' ? `dead ${p.role}` : p.state; fate[k] = (fate[k] ?? 0) + 1; }
   const floating = floaters(dev);
+  const heap = pile(dev);
   const minFps = Math.min(...windows.map((w) => w.fps));
   const height = dev.measure();
   return {
@@ -144,6 +145,7 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
     tippedAt: +tipAt.toFixed(2),
     brokeAt: +breakAt.toFixed(2),
     height: +height.toFixed(1),
+    pile: heap,
     hanging, inAir, floating: floating.length, floatingList: floating.slice(0, 30), standingAboveBefore: before, fate, standingAbove, rubble,
     quality: dev.quality.label,
     canvas: `${dev.renderer.domElement.width}x${dev.renderer.domElement.height}`,
@@ -184,4 +186,26 @@ export function floaters(dev) {
     }
   }
   return floating;
+}
+
+// The pile the tower left: how much of it there is, how far it spreads, how
+// high it stands. Heights are the top of the rubble in each square metre.
+export function pile(dev) {
+  const cells = new Map();
+  let n = 0, volume = 0, tons = 0;
+  for (const p of dev.pieces.list) {
+    if (p.state !== 'rubble') continue;
+    n++;
+    volume += p.volume;
+    tons += p.volume * p.kind.density / 1000;
+    const b = p.box;
+    for (let x = Math.floor(b.min.x); x <= Math.floor(b.max.x); x++)
+      for (let z = Math.floor(b.min.z); z <= Math.floor(b.max.z); z++) {
+        const k = x * 10007 + z;
+        cells.set(k, Math.max(cells.get(k) ?? 0, b.max.y));
+      }
+  }
+  const h = [...cells.values()].sort((a, b) => a - b);
+  const at = (q) => +(h[Math.floor(q * (h.length - 1))] ?? 0).toFixed(1);
+  return { pieces: n, volume: Math.round(volume), tonnes: Math.round(tons), area: h.length, mean: +(h.reduce((a, b) => a + b, 0) / Math.max(1, h.length)).toFixed(2), p50: at(0.5), p90: at(0.9), max: at(1) };
 }

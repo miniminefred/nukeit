@@ -1,5 +1,5 @@
 import { encode, decode } from './csg-wire.js';
-import { fractureGeometry } from './cutter.js';
+import { fractureGeometry, subtract } from './cutter.js';
 
 // Breaking things in the background.
 //
@@ -42,8 +42,18 @@ function pool() {
 
 // Split `geometry` into up to 2^passes lumps. Resolves to [{ geometry, materials }].
 export function fractureAsync(geometry, materials, inside, passes, detail) {
+  if (!pool().length) return Promise.resolve(fractureGeometry(geometry, materials, inside, passes, detail));
+  return run({ op: 'fracture', passes, detail }, geometry, materials, inside);
+}
+
+// A jagged hole, as damage/cutter.js `subtract`. Resolves to { geometry, materials }.
+export function subtractAsync(geometry, materials, inside, centre, axis, radius, depth) {
+  if (!pool().length) return Promise.resolve(subtract(geometry, materials, inside, centre, axis, radius, depth));
+  return run({ op: 'subtract', centre: centre.toArray(), axis: axis.toArray(), radius, depth }, geometry, materials, inside).then((b) => b[0]);
+}
+
+function run(job, geometry, materials, inside) {
   const ws = pool();
-  if (!ws.length) return Promise.resolve(fractureGeometry(geometry, materials, inside, passes, detail));
   const all = [...materials];
   if (!all.includes(inside)) all.push(inside);
   const w = ws.reduce((a, b) => (b.busy < a.busy ? b : a));
@@ -52,7 +62,7 @@ export function fractureAsync(geometry, materials, inside, passes, detail) {
     waiting.set(id, { resolve, reject, all });
     w.busy++;
     const g = encode(geometry);
-    w.postMessage({ id, geometry: g, count: all.length, inside: all.indexOf(inside), passes, detail },
+    w.postMessage({ ...job, id, geometry: g, count: all.length, inside: all.indexOf(inside) },
       Object.values(g.attributes).map((a) => a.buffer));
   });
 }

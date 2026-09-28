@@ -67,7 +67,7 @@ const hud = new Hud();
 const damage = new Damage(pieces, { chips, particles, audio, shake });
 const rubble = new Rubble(pieces, physics, { chips, particles, audio });
 const structure = new Structure(pieces, { particles, chips, rubble, audio, shake, player });
-const blast = new Blast({ pieces, damage, physics, particles, chips, audio, shake, player, structure });
+const blast = new Blast({ pieces, damage, physics, particles, chips, audio, shake, player, structure, rubble });
 const fire = new Fire(scene, pieces, physics, { particles, chips, audio, explode: (p) => blast.tank(p) });
 blast.ctx.fire = fire;
 damage.onStructure = () => structure.mark();
