@@ -150,12 +150,12 @@ src/
   render/              textures (procedural PBR), materials (the material table), geometry
   building/            pieces (the store), support (what holds what), kit, furniture, tower
   damage/              damage (what a blow does), cutter (CSG), splinters, glass, paint
-  sim/                 structure (support + weight + pancake), impacts, fire, blast
+  sim/                 structure (support + weight + pancake), topple, impacts, fire, blast, lift
   fx/                  particles, chips, heap (rubble heightfield), shake
   tools/               tools (sledge, spray, extinguisher, charges), viewmodels
   ui/                  menu, hud (and every overlay screen)
   data/                catalog, progress
-  scenery/city.js      Street, pavements and blocks — not breakable
+  scenery/city.js      Street, pavements and blocks — solid (fixed colliders), not breakable
 ```
 
 ### Pieces, and why most of the building is never a mesh
@@ -249,6 +249,48 @@ What loses support falls:
 Every heavy landing throws a **dust cloud** (`cloud()` in `main.js`), big and dark enough
 to hide in.
 
+### Toppling: a tower cut on one side goes over, not down
+
+`sim/topple.js`. When a column or core wall fails, `structure.failed()` asks
+`topple.check(floor)` first. If the weight above that storey is no longer over what is
+left standing (its centre of mass is outside the rectangle round the surviving supports,
+or those supports hold under 30% of the storey's strength and are well off-centre),
+**everything above tips as one rigid body** toward the broken side. Cut every support on a
+storey evenly and nothing is off-centre, so it drops straight down as the pancake. Only
+the part above the cut goes; what is below stays standing.
+
+- **One Rapier body, a cuboid per slab and per storey of core.** The ~4,000 pieces ride on
+  it: each keeps its matrix at the start, and every frame it is drawn at body × start. They
+  lose their own colliders while tipping and get them back if it comes to rest.
+- **The hinge is a revolute joint, not the surviving columns.** It is pinned along the
+  fall-side edge of what is left, at the underside of the mass. The columns were tried
+  first, and the structure pass fails them next: the block rocked back from 13° and sank
+  flat into its own footprint. The joint lets go at 26°, or on touching the street.
+- **It crushes what it leans on, but only on the fall side.** Everything left in the broken
+  storey is ground up the moment it tips (the stairs and spandrels held it at 2.5°
+  otherwise). After that, up to 16 pieces a frame of whatever the mass touches past the
+  pivot, standing or loose, are destroyed. **Loose ones too**: the columns knocked out
+  first are rigid bodies lying in the gap, a rigid body cannot be crushed, and the tower
+  rested on them. **Crushing both sides** let it sink evenly instead of swinging.
+- **Its rubble is piled only once it has landed.** Piled at once, the heap rose under the
+  fall side and the tower bounced back off its own debris.
+- **Only the street and the neighbours break it** (`physics.ground` holds the ground tile
+  handles; city blocks are owned by `CITY`). At 5 m/s at the contact it comes apart: the 90
+  biggest structural pieces go on as bodies carrying 80% of the swing, 2% of the rest fly,
+  and everything else becomes heap and dust. Its own lower floors and the heap only break
+  it at 14 m/s. Counting them as ground broke it at 4° in mid-air, which reads as a drop.
+  If it comes to rest gently, against a neighbour say, it stays there leaning, as static
+  pieces again.
+- **Wreckage is not structure.** Stubs, rebar, shards and fragments made after the building
+  was linked have no support links, so `unsupported()` saw 138 of them as floating and set
+  off a pancake alongside the topple. They are skipped by role (`WRECKAGE` in
+  `building/support.js`).
+
+Measured on the reference cut (every core wall on storey 1 and the columns with x < 4):
+it tips west, reaches about 20° and hits the street 7–8 s later, and breaks in one 80 ms
+frame. Frames during the tip are 25–45 ms with `gl.finish`, most of it rendering the dust.
+That cost is the spectacle and is not to be cut; see *Keeping it smooth* for what is.
+
 ### Fire
 
 `sim/fire.js`: burning pieces have fuel and heat, char towards black (instance colour on
@@ -296,6 +338,12 @@ to finish: `gl.finish()` around `dev.step(1/60, 20)`, since the test tab is
 hidden and has no real frame loop.
 
 ## Things already learned here
+
+- **A CSG split was 30–60 ms on a 40-triangle lump**: two evaluations, each against a
+  rough face 12 × 12 subdivisions fine. It is one evaluation now (`[INTERSECTION,
+  SUBTRACTION]` in one pass), and pieces past their first generation get a 5 × 5 face.
+  Nobody can count facets on a piece that size, and this was what made a falling tower
+  stutter.
 
 - **Clear a geometry's groups before it becomes a piece.** Box, cylinder and
   extrude geometries carry one group per face, each naming a material slot.

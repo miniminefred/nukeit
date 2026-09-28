@@ -7,7 +7,11 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 // None of it can be broken. The job site is the only part of the world made of
 // pieces; this is stage scenery, and nothing you do reaches it.
 
-export function buildCity(scene) {
+// Neighbours are solid but not breakable: a tower toppling into one slides off
+// it. The collider owner is a marker, not a piece, so tools ignore it.
+export const CITY = { role: 'city' };
+
+export function buildCity(scene, physics) {
   const group = new THREE.Group();
   group.name = 'city';
 
@@ -53,6 +57,12 @@ export function buildCity(scene) {
     m.castShadow = true;
     m.receiveShadow = true;
     group.add(m);
+    if (physics) {
+      const c = physics.world.createCollider(
+        physics.R.ColliderDesc.cuboid(w / 2, h / 2, d / 2).setTranslation(x, h / 2, z).setFriction(0.35),
+        physics.fixed);
+      physics.owner.set(c.handle, CITY);
+    }
   };
 
   const tints = [0xb9b2a6, 0x9ea3a8, 0xc7b89c, 0x8f9499, 0xa89586];

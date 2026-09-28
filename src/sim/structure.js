@@ -70,6 +70,8 @@ export class Structure {
   failed(p) {
     const c = p.box.getCenter(new THREE.Vector3());
     this.lost.push({ floor: p.floor, x: c.x, z: c.z });
+    // Is the weight above still over what is left? If not, it tips.
+    if (this.fx.topple?.check(p.floor)) return;
     for (const q of this.pieces.list) {
       if (q.state !== 'static' || q.floor !== p.floor || (q.role !== 'column' && q.role !== 'core')) continue;
       const d = q.box.getCenter(_c).distanceTo(c);

@@ -16,6 +16,7 @@ import { Fire } from './sim/fire.js';
 import { Blast } from './sim/blast.js';
 import { Impacts } from './sim/impacts.js';
 import { Lift } from './sim/lift.js';
+import { Topple } from './sim/topple.js';
 import { TOOL_CLASSES } from './tools/tools.js';
 import { Menu } from './ui/menu.js';
 import { Hud, screens } from './ui/hud.js';
@@ -85,6 +86,8 @@ function cloud(at, scale = 1) {
 damage.fx.cloud = cloud;
 const impacts = new Impacts(pieces, physics, { damage, cloud, audio, shake, player, structure });
 damage.fx.makeRoom = (n) => impacts.makeRoom(n);
+const topple = new Topple(pieces, physics, { heap, particles, chips, cloud, audio, shake, structure, player });
+structure.fx.topple = topple;
 damage.fx.mustFail = (p) => structure.mustFail(p);
 damage.fx.onFailed = (p) => structure.failed(p);
 structure.fx.damage = damage;
@@ -170,6 +173,7 @@ function unloadJob() {
   for (const t of tools) { t.unequip?.(ctx); t.clear?.(); t.model.removeFromParent(); }
   tools = [];
   structure.clear();
+  topple.clear();
   impacts.clear();
   fire.clear();
   blast.clear();
@@ -247,9 +251,9 @@ function frame(dt) {
   if (state === 'play' || state === 'paused' || state === 'done') {
     if (playing) {
       liftTip = player.dead ? null : lift.control(input, player);
-      lift.update(dt, player, structure);
+      lift.update(dt, player, { collapsing: structure.collapsing || topple.active });
       player.update(dt);
-    } else lift.update(dt, null, structure);
+    } else lift.update(dt, null, { collapsing: structure.collapsing || topple.active });
     const t = tools[current];
     for (const tool of tools) {
       tool.model.visible = tool === t && playing && !player.dead;
@@ -258,6 +262,7 @@ function frame(dt) {
     }
     physics.step(dt);
     pieces.sync();
+    topple.update(dt);
     structure.update(dt);
     impacts.update(dt);
     damage.update();
@@ -268,7 +273,7 @@ function frame(dt) {
     if (heightT <= 0 && state === 'play') {
       heightT = 0.25;
       height = measure();
-      if (height < job.target && !structure.collapsing && doneT < 0) { doneT = 3.5; hud.flash('Target reached'); }
+      if (height < job.target && !structure.collapsing && !topple.active && doneT < 0) { doneT = 3.5; hud.flash('Target reached'); }
     }
     if (doneT > 0 && state === 'play') { doneT -= dt; if (doneT <= 0) finish(); }
     if (downT > 0) {
@@ -325,7 +330,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, heap, particles, audio, ctx, get tools() { return tools; }, start, measure, impacts, lift, quality,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, heap, particles, audio, ctx, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     // Run whole frames by hand, for a tab that is not on screen.
     step: (dt = 1 / 60, n = 1) => { for (let i = 0; i < n; i++) frame(dt); }, select };

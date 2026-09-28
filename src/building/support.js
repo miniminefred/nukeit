@@ -30,6 +30,7 @@ const TOL = 0.06;
 const MIN_OVERLAP = 0.005;   // a 2 cm glass rail on a slab edge still counts
 const CELL = 2;
 const MAX_DEPTH = 3;
+const WRECKAGE = new Set(['stub', 'rebar', 'shard', 'fragment']);
 const SMALL_BAY = 12;
 const WEAK = 0.25;          // below this fraction of its durability a support carries nothing       // m^2: a bay this small can cantilever
 
@@ -96,7 +97,11 @@ function relate(A, B) {
 // Which standing pieces have lost their support. `pieces` must be the full
 // list; dead and moving ones are ignored.
 export function unsupported(pieces) {
-  const standing = pieces.filter((p) => p.state === 'static');
+  // Wreckage made after the building was linked — stubs, rebar, shards left in
+  // a frame, rubble — lies where it is and is not part of the load path. Left
+  // in, the stubs of a row of broken columns counted as a hundred floating
+  // pieces and set off a collapse of their own.
+  const standing = pieces.filter((p) => p.state === 'static' && !WRECKAGE.has(p.role));
   standing.sort((a, b) => a.box.min.y - b.box.min.y);
   for (const p of standing) { p.sup = false; p.direct = false; p.depth = 99; }
 

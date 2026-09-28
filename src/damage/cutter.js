@@ -92,11 +92,14 @@ export function chunkOff(geometry, materials, inside, centre, axis, radius, dept
 // Split `geometry` in two along a rough plane through `point` with normal
 // `normal`. Returns [{ geometry, materials }, { geometry, materials }], either
 // of which may be empty.
-export function split(geometry, materials, inside, point, normal, size) {
+// `detail` is the rough face's grid. A fragment of a fragment gets a coarser
+// one: at 12 it cost 30-60 ms to break a 40-triangle lump, which is what made a
+// falling tower stutter, and on a piece that size nobody can count the facets.
+export function split(geometry, materials, inside, point, normal, size, detail = 12) {
   const a = new Brush(geometry, materials);
   a.updateMatrixWorld();
   // Half of space, as a big lumpy slab whose face runs through `point`.
-  const g = new THREE.BoxGeometry(1, 1, 1, 12, 12, 1);
+  const g = new THREE.BoxGeometry(1, 1, 1, detail, detail, 1);
   const p = g.attributes.position;
   const seed = Math.random() * 100;
   for (let i = 0; i < p.count; i++) {
@@ -115,8 +118,8 @@ export function split(geometry, materials, inside, point, normal, size) {
   b.quaternion.copy(_q.setFromUnitVectors(_z, normal));
   b.position.copy(point).addScaledVector(normal, -s / 2);
   b.updateMatrixWorld();
-  const one = evaluator.evaluate(a, b, INTERSECTION);
-  const two = evaluator.evaluate(a, b, SUBTRACTION);
+  // Both halves in one pass: the brushes are prepared and intersected once.
+  const [one, two] = evaluator.evaluate(a, b, [INTERSECTION, SUBTRACTION], [new Brush(), new Brush()]);
   g.dispose();
   const pack = (r) => ({ geometry: r.geometry, materials: Array.isArray(r.material) ? r.material : [r.material] });
   return [pack(one), pack(two)];

@@ -38,15 +38,16 @@ export class Physics {
     this.dynamic = new Set();       // pieces with a dynamic body
     this.onForce = null;            // (ownerA, ownerB, magnitude)
     this._acc = 0;
+    this.ground = new Set();        // collider handles of the ground tiles
     // The ground: a grid of 40 m tiles with their tops at y = 0. It was one
     // 2 km box first, and a shape that big loses enough precision in contact
     // tests that the player's capsule sank a few centimetres into it and stuck.
     for (let x = -200; x < 200; x += 40)
       for (let z = -200; z < 200; z += 40)
-        this.world.createCollider(
+        this.ground.add(this.world.createCollider(
           RAPIER.ColliderDesc.cuboid(20, 1, 20).setTranslation(x + 20, -1, z + 20).setCollisionGroups(G_WORLD).setFriction(0.9),
           this.fixed,
-        );
+        ).handle);
   }
 
   // --------------------------------------------------------- colliders

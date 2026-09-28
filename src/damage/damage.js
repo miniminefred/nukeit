@@ -355,7 +355,7 @@ export class Damage {
           axis.add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(0.5)).normalize();
           const at = bb.getCenter(new THREE.Vector3()).add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiply(s).multiplyScalar(0.3));
           try {
-            for (const half of split(bit.geometry, bit.materials, inside, at, axis, Math.max(s.x, s.y, s.z))) {
+            for (const half of split(bit.geometry, bit.materials, inside, at, axis, Math.max(s.x, s.y, s.z), gen > 1 ? 5 : 12)) {
               if (half.geometry.attributes.position.count > 0) next.push(half);
             }
           } catch { next.push(bit); }

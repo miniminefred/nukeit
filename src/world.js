@@ -9,7 +9,7 @@ import { link } from './building/support.js';
 // away when you leave, so taking the job again gives it back to you standing.
 
 export function createWorld(scene, physics) {
-  buildCity(scene);
+  buildCity(scene, physics);
   const pieces = new Pieces(scene, physics);
 
   return {
