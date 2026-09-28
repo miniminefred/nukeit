@@ -105,8 +105,11 @@ export class Pieces {
   // A piece made after the building was finalized — a shard, a fragment. It
   // never goes into a batch; it has its own meshes from the start.
   // `free`: neither standing nor a body yet — it is about to be sent flying.
+  // It goes straight into the spare batches, so that it flies drawn in a
+  // batch with the others rather than as meshes of its own.
   spawn(spec, { dynamic = false, vel, spin, debris = false, free = false } = {}) {
     const p = this.add(spec);
+    if (free && this._batchNew(p)) return p;
     this.promote(p);
     // An irregular shape — a broken lump — collides as its convex hull, not its box.
     if (spec.hull) p.bites = Math.max(p.bites, 1);
@@ -384,6 +387,15 @@ export class Pieces {
     }
     p.object.removeFromParent();
     p.object = null;
+    return true;
+  }
+
+  // A new piece drawn in the spare batches from the start. False if it will
+  // not go, and then it is left for promote().
+  _batchNew(p) {
+    for (const q of p.parts) if (!this._batchPart(q)) { for (const r of p.parts) this._dropDraws(r); return false; }
+    _m.compose(p.pos, p.quat, _one);
+    for (const q of p.parts) for (const d of q.draws) { d.b.setMatrixAt(d.i, _m); d.b.setVisibleAt(d.i, true); }
     return true;
   }
 

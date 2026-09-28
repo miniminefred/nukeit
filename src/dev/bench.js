@@ -156,7 +156,8 @@ export function floaters(dev) {
     if (!(p.state === 'rubble' || (p.state === 'static' && WRECKAGE.has(p.role))) || p.box.min.y < 0.3) continue;
     const b = p.box;
     let best = Infinity;
-    for (const [fx, fz] of [[0.5, 0.5], [0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8]]) {
+    // The same five points rubble looks at when it lands (sim/rubble.js).
+    for (const [fx, fz] of [[0.5, 0.5], [0.12, 0.12], [0.88, 0.12], [0.12, 0.88], [0.88, 0.88]]) {
       ray.origin = { x: b.min.x + (b.max.x - b.min.x) * fx, y: b.min.y + 0.05, z: b.min.z + (b.max.z - b.min.z) * fz };
       // What counts as something to lie on is what rubble lands on: a piece,
       // the street or the city (sim/rubble.js).

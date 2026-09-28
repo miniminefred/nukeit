@@ -265,7 +265,9 @@ export class Rubble {
       let y = this._under(x, z, top), sup = this._support;
       for (const r of this.recent) {
         const rb = r.box;
-        if (rb.max.y > y && rb.max.y < top && x > rb.min.x && x < rb.max.x && z > rb.min.z && z < rb.max.z && r.state === 'rubble') { y = rb.max.y; sup = r; }
+        if (rb.max.y <= y || x < rb.min.x || x > rb.max.x || z < rb.min.z || z > rb.max.z || r.state !== 'rubble') continue;
+        const t = rayDown(r, x, top, z);
+        if (t >= 0 && top - t > y) { y = top - t; sup = r; }
       }
       if (y > h) { h = y; on = sup; }
     }
@@ -346,4 +348,30 @@ export class Rubble {
     this.resting.clear();
     this.broken.length = 0;
   }
+}
+
+// Where a ray straight down from (x, y, z) first meets a piece's collider —
+// its box, or its boxes, in its own frame — as a distance, or -1. The same
+// shape Rapier would find, for a piece Rapier cannot see yet.
+const _ro = new THREE.Vector3(), _rd = new THREE.Vector3(), _qi = new THREE.Quaternion();
+function rayDown(p, x, y, z) {
+  _qi.copy(p.quat).invert();
+  _ro.set(x - p.pos.x, y - p.pos.y, z - p.pos.z).applyQuaternion(_qi);
+  _rd.set(0, -1, 0).applyQuaternion(_qi);
+  const boxes = p.colliderBoxes ?? [[p.localBox.min.x, p.localBox.min.y, p.localBox.min.z, p.localBox.max.x, p.localBox.max.y, p.localBox.max.z]];
+  let best = -1;
+  for (const b of boxes) {
+    let t0 = -Infinity, t1 = Infinity;
+    for (let a = 0; a < 3; a++) {
+      const o = a === 0 ? _ro.x : a === 1 ? _ro.y : _ro.z, d = a === 0 ? _rd.x : a === 1 ? _rd.y : _rd.z;
+      const lo = b[a], hi = b[a + 3];
+      if (Math.abs(d) < 1e-9) { if (o < lo || o > hi) { t0 = Infinity; break; } continue; }
+      let ta = (lo - o) / d, tb = (hi - o) / d;
+      if (ta > tb) [ta, tb] = [tb, ta];
+      if (ta > t0) t0 = ta;
+      if (tb < t1) t1 = tb;
+    }
+    if (t0 <= t1 && t1 >= 0) { const t = Math.max(0, t0); if (best < 0 || t < best) best = t; }
+  }
+  return best;
 }
