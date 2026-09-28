@@ -10,7 +10,7 @@ import { blob } from '../damage/cutter.js';
 // rest on whatever they land on. A few seconds later they shrink away: small
 // broken bits do not pile up, only the big chunks (which are pieces) stay.
 
-const MAX = 5000;
+const MAX = 1800;
 const COLOURS = {
   wood: 0xc79a62, concrete: 0x9b958c, marble: 0xcf9f92, plaster: 0xeeeae2, carpet: 0x55505a,
   fabric: 0x3a4250, plastic: 0x2a2a2c, metal: 0x8a8d90, bronze: 0x5a4a38, roofing: 0x555555,

@@ -84,6 +84,7 @@ function cloud(at, scale = 1) {
 }
 damage.fx.cloud = cloud;
 const impacts = new Impacts(pieces, physics, { damage, cloud, audio, shake, player, structure });
+damage.fx.makeRoom = (n) => impacts.makeRoom(n);
 damage.fx.mustFail = (p) => structure.mustFail(p);
 damage.fx.onFailed = (p) => structure.failed(p);
 structure.fx.damage = damage;
@@ -102,7 +103,7 @@ structure.fx.throwChunk = (p, at, vel) => {
   if (s.x * s.y * s.z > 6) return;
   const g = q.geometry.clone();
   const f = pieces.spawn({ parts: [{ kind: q.kind.name, geometry: g }], pos: at, quat: p.quat, role: 'fragment', structural: false }, { dynamic: true, vel });
-  damage.fracture(f, at, vel.clone().normalize(), 2);
+  damage.fractureSoon(f, at, vel.clone().normalize(), 2);
 };
 structure.onCrushPlayer = () => player.damage(500, 'crushed');
 
@@ -259,6 +260,7 @@ function frame(dt) {
     pieces.sync();
     structure.update(dt);
     impacts.update(dt);
+    damage.update();
     const dps = fire.update(dt, player.pos);
     if (dps > 0 && playing) player.damage(dps * dt, 'fire');
     blast.update(dt);
@@ -330,13 +332,27 @@ if (import.meta.env.DEV) {
 }
 
 const timer = new Timer();
+
+// Frames per second, top right, so a slow machine can be told apart from a
+// slow game.
+const fpsEl = document.getElementById('fps');
+let fpsAcc = 0, fpsN = 0;
+function fpsMeter(dt) {
+  fpsAcc += dt; fpsN++;
+  if (fpsAcc < 0.5) return;
+  if (fpsEl) fpsEl.textContent = `${Math.round(fpsN / fpsAcc)} fps · ${quality.label}`;
+  fpsAcc = 0; fpsN = 0;
+}
 function animate() {
   requestAnimationFrame(animate);
   timer.update();
   const dt = timer.getDelta();
   // Only a frame that was really drawn on screen says anything about speed.
   if (state === 'play') quality.sample(dt);
-  frame(Math.min(dt, 0.05));
+  fpsMeter(dt);
+  // Up to a tenth of a second per frame. It was a twentieth, so below 20 fps the
+  // whole game ran in slow motion — falling, walking, collapsing all floated.
+  frame(Math.min(dt, 0.1));
 }
 openMenu();
 animate();

@@ -257,7 +257,27 @@ The first version lit everything within a sphere of a burning 5 m carpet bay, so
 fire had a whole floor alight in eight seconds. Tanks in a fire cook off. The extinguisher
 tests each burning piece's nearest point along the spray cone.
 
-## Keeping it smooth
+## Keeping it smooth — without losing the collapse
+
+**The game is for the satisfaction of watching a structure fall and a chain
+reaction travel.** Performance work must cut the small stuff and never the big
+collapse. A cap once turned breaking slabs into dust when the simulation was
+busy, and the owner stopped it at once. So now: big pieces always break into a
+few big chunks; the smallest loose bits are faded early to make room; breakage
+from falls and chain reactions is queued at 4 ms a frame; small fragments of
+fragments crumble. And the chain has a rhythm (`WARN`/`SAG` in
+`sim/structure.js`): a failing column cracks, groans and sheds grit before it
+goes, a slab with nothing under it hangs and sifts dust before it drops.
+
+Measured: a bay whose four columns were broken sagged, dropped, and broke on
+the floor below with the worst frame at 19 ms. Before the queue and the caps,
+the same kind of event put three thousand bodies into the simulation and took
+45 s to compute four seconds of.
+
+Two things that made it feel "like the moon": frame time was clamped to 50 ms
+and physics to three steps, so below 20 fps everything ran in slow motion. The
+clamp is 100 ms and six steps now. The sky is baked into a cube map once; its
+scattering shader used to run on every sky pixel every frame.
 
 Measured on the tower, a frame went from 25–32 ms to 5–8 ms by fixing three
 things, in this order of size:

@@ -27,6 +27,22 @@ import { box } from '../render/geometry.js';
 //   glass                   cracks, then shatters
 //   loose furniture         it moves as well — knocked across the room if light
 
+// Keeping a collapse from swamping the frame — without taking the collapse
+// away, which is the whole point of the game. Left alone it ran away: a
+// falling slab smashed into eight pieces, each of those landed and smashed
+// into eight more, and one floor coming down put three thousand bodies into
+// the simulation. So the *small* stuff is what gives:
+//  * big pieces always break into a few big chunks, and keep falling;
+//  * when too much is loose, the smallest bits are faded out to make room
+//    (sim/impacts.js), never the big ones;
+//  * small fragments of fragments crumble to chips and dust;
+//  * breakage from falls and chain reactions waits its turn in a queue with a
+//    few milliseconds a frame, so it lands over a second, not in one frame.
+const MAX_LOOSE = 180;
+const MAX_GEN = 2;
+const BIG = 150;             // kg: a piece this heavy always breaks into real chunks
+const BUDGET_MS = 4;
+
 const _inv = new THREE.Quaternion();
 const _v = new THREE.Vector3();
 
@@ -35,6 +51,42 @@ export class Damage {
     this.pieces = pieces;
     this.fx = fx;            // { chips, particles, audio, shake }
     this.onStructure = null; // called when something load-bearing changed
+    this.pending = [];
+  }
+
+  // Break it, but when there is time: from falls, collapses and blasts.
+  fractureSoon(p, point, dir, energy = 1, minPasses = 1) {
+    if (p.state === 'dead' || p.queued) return;
+    p.queued = true;
+    this.pending.push(['fracture', p, point.clone(), dir.clone(), energy, minPasses]);
+  }
+
+  failSoon(p, point, dir) {
+    if (p.state === 'dead' || p.queued) return;
+    p.queued = true;
+    this.pending.push(['fail', p, point.clone(), dir.clone()]);
+  }
+
+  update() {
+    const t0 = performance.now();
+    while (this.pending.length && performance.now() - t0 < BUDGET_MS) {
+      const [what, p, ...args] = this.pending.shift();
+      p.queued = false;
+      if (p.state === 'dead') continue;
+      if (what === 'fail') this.fail(p, ...args, { soon: true });
+      else this.fracture(p, args[0], args[1], args[2], args[3], 2);   // queued breaks: at most four pieces
+    }
+  }
+
+  // Too much is loose already, or this is a fragment of a fragment: instead of
+  // more bodies, chips and dust.
+  crumble(p, point, dir) {
+    this.fx.chips.burst(chipKind(p.kind), point, dir, 8, 2.5, 0.05);
+    this._dust(p.kind, point, dir.clone().negate(), 10);
+    if (p.volume > 1) this.fx.cloud?.(point, 0.8);
+    this.pieces.destroy(p);
+    if (p.structural || p.role === 'slab') this.onStructure?.();
+    return [];
   }
 
   // World point -> piece frame.
@@ -223,7 +275,7 @@ export class Damage {
   // A column or a length of core wall gives way. The middle goes to rubble, a
   // short stub stays standing with its bars sticking out of it, and the slab
   // above has lost one of the things holding it up.
-  fail(p, point, dir) {
+  fail(p, point, dir, { soon = false } = {}) {
     const { particles, audio } = this.fx;
     const b = p.box.clone();
     const size = b.getSize(new THREE.Vector3());
@@ -251,7 +303,8 @@ export class Damage {
     const mc = new THREE.Vector3(sc.x, (top + b.max.y) / 2, sc.z);
     P.destroy(p);
     const middle = P.spawn({ parts: [{ kind: kindName, geometry: box(size.x * 0.97, b.max.y - top - 0.02, size.z * 0.97, mc) }], pos: mc, role: 'fragment', floor: p.floor, structural: false });
-    this.fracture(middle, point, dir, 2, 3);
+    if (soon) this.fractureSoon(middle, point, dir, 2, 3);
+    else this.fracture(middle, point, dir, 2, 3);
     for (let i = 0; i < 40; i++) particles.spawn('dust', sc.x, top + Math.random() * size.y, sc.z, (Math.random() - 0.5) * 3, Math.random(), (Math.random() - 0.5) * 3, 0xb8b2a8);
     this.fx.chips.burst('concrete', new THREE.Vector3(sc.x, top + 0.5, sc.z), dir, 60, 3, 0.05);
     this.fx.cloud?.(mc, 1.2);
@@ -262,13 +315,22 @@ export class Damage {
   // Break a piece into fragments that fall. Furniture comes apart into the
   // things it was made of; a single slab of material is split along rough
   // planes, so the pieces have real broken faces.
-  fracture(p, point, dir, energy = 1, minPasses = 1) {
+  fracture(p, point, dir, energy = 1, minPasses = 1, maxPasses = 3) {
     const P = this.pieces;
     if (p.state === 'dead') return;
+    const gen = (p.gen ?? 0) + 1;
+    const mass = p.volume * p.kind.density * 0.6;
+    const big = mass > BIG;
+    // Small stuff crumbles when the simulation is crowded or it is already a
+    // fragment of a fragment. Big stuff always breaks into chunks, and the
+    // small bits lying about are cleared to make room for them.
+    let room = MAX_LOOSE - this.pieces.physics.dynamic.size;
+    if (!big && (room < 2 || gen > MAX_GEN)) return this.crumble(p, point, dir);
+    if (big && room < 4) { this.fx.makeRoom?.(8); room = 4; }
     const vel = dir.clone().multiplyScalar(1 + energy * 1.5);
     const out = [];
     if (p.parts.length > 1) {
-      for (const q of p.parts) {
+      for (const q of p.parts.slice(0, Math.max(1, room))) {
         const g = q.geometry.clone();
         g.computeBoundingBox();
         const c = g.boundingBox.getCenter(new THREE.Vector3());
@@ -282,7 +344,8 @@ export class Damage {
       const inside = insideMaterial(q.kind.name);
       let bits = [{ geometry: q.geometry, materials: q.materials ?? [P._material(q)] }];
       const size = p.localBox.getSize(new THREE.Vector3());
-      const passes = Math.min(3, Math.max(minPasses, Math.round(Math.log2(Math.max(size.x, size.y, size.z) / 0.35))));
+      // At most as many pieces as there is room for.
+      const passes = Math.min(maxPasses, Math.floor(Math.log2(room)), Math.max(minPasses, Math.round(Math.log2(Math.max(size.x, size.y, size.z) / 0.35))));
       for (let pass = 0; pass < passes; pass++) {
         const next = [];
         for (const bit of bits) {
@@ -307,9 +370,11 @@ export class Damage {
         const pos = c.clone().applyQuaternion(p.quat).add(p.pos);
         const f = P.spawn({ parts: [{ kind: q.kind.name, geometry: g, materials: bit.materials }], pos, quat: p.quat, role: 'fragment', floor: p.floor, structural: false, hull: true },
           { dynamic: true, vel: vel.clone().add(new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.5, Math.random() - 0.5).multiplyScalar(2)), debris: g.boundingBox.getSize(_v).length() < 0.6 });
+        f.gen = gen;
         out.push(f);
       }
     }
+    for (const f of out) f.gen = gen;
     this.fx.chips.burst(chipKind(p.kind), point, dir, 25, 3, 0.04);
     this._dust(p.kind, point, dir.clone().negate(), 20);
     P.destroy(p);

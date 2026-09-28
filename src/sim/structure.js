@@ -1,5 +1,12 @@
 import * as THREE from 'three';
 import { unsupported } from '../building/support.js';
+import { crack } from '../damage/cracks.js';
+
+// The rhythm of a chain reaction. Nothing that gives way under a load does it
+// silently or all at once: it cracks, grit trickles out of it, it groans — and
+// then it goes. That half second is what lets you watch a collapse travel.
+const WARN = 0.8;            // s from the first crack to a column giving way
+const SAG = [0.35, 0.9];     // s a slab with nothing under it hangs before it drops
 
 // Keeping track of what is still standing, and bringing down what is not.
 //
@@ -26,7 +33,7 @@ const CHAIN_COLUMN = 3;      // lost neighbours that break an undamaged column..
 const CHAIN_CORE = 6;        // ...or an undamaged length of core wall
 const CHAIN_LOAD = 8;        // ...if it is carrying at least this many storeys
 
-const PANCAKE = 150;         // pieces: more than this falls together
+const PANCAKE = 80;          // pieces: more than this falls together, cheaply
 const G = 9.81 * 0.72;       // progressive collapse runs at about 0.7 g
 const _c = new THREE.Vector3();
 
@@ -40,6 +47,8 @@ export class Structure {
     this.onCrushPlayer = null;
     this.lost = [];          // where supports have given way: { floor, x, z }
     this.checks = [];        // neighbours to re-examine: { p, t }
+    this.warnings = [];      // supports about to go: { p, t }
+    this.sagging = [];       // slabs about to drop: { p, t }
     pieces.onChange = () => { this.dirty = true; };
   }
 
@@ -77,12 +86,44 @@ export class Structure {
       const lost = this._lostNear(p);
       const chain = p.load >= CHAIN_LOAD && lost >= (p.role === 'core' ? CHAIN_CORE : CHAIN_COLUMN);
       if (!chain && !this.mustFail(p)) continue;
+      if (p.warned) continue;
+      p.warned = true;
+      // First the warning: cracks up its faces, a groan, grit from the top.
       const c = p.box.getCenter(new THREE.Vector3());
-      // A crack, a shower of grit, and it goes.
-      this.fx.audio?.impact(c.x, c.y, c.z, 0.7);
-      for (let i = 0; i < 12; i++) this.fx.particles.spawn('dust', c.x + (Math.random() - 0.5), c.y + (Math.random() - 0.5) * 3, c.z + (Math.random() - 0.5), (Math.random() - 0.5) * 2, -0.5, (Math.random() - 0.5) * 2, 0xb8b2a8);
-      this.fx.damage.fail(p, c, new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize());
+      for (let n = 0; n < 2; n++) {
+        const side = new THREE.Vector3(...[[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]][(Math.random() * 4) | 0]);
+        const at = p.box.clampPoint(c.clone().addScaledVector(side, 2).setY(c.y + (Math.random() - 0.5) * 2), new THREE.Vector3());
+        crack(this.pieces, p, at, side, 1.2 + Math.random());
+      }
+      this.fx.audio?.creak?.(c.x, c.y, c.z);
+      this.warnings.push({ p, t: WARN + Math.random() * 0.4 });
     }
+  }
+
+  // Supports that have been warned about go; slabs that have been sagging drop.
+  _stage(dt) {
+    const P = this.pieces;
+    for (const w of this.warnings) {
+      w.t -= dt;
+      const p = w.p;
+      if (p.state !== 'static') { w.t = -1; continue; }
+      const c = p.box.getCenter(_c);
+      if (Math.random() < 0.5) this.fx.particles.spawn('dust', c.x + (Math.random() - 0.5) * 0.6, p.box.max.y - 0.1, c.z + (Math.random() - 0.5) * 0.6, 0, -1.5, 0, 0x9a948a);
+      if (w.t <= 0) this.fx.damage.failSoon(p, c.clone(), new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize());
+    }
+    this.warnings = this.warnings.filter((w) => w.t > 0);
+    for (const s of this.sagging) {
+      s.t -= dt;
+      const p = s.p;
+      if (p.state !== 'static') { s.t = -1; continue; }
+      // Dust sifting out of the joints along its edge.
+      if (Math.random() < 0.6) {
+        const b = p.box;
+        this.fx.particles.spawn('dust', b.min.x + Math.random() * (b.max.x - b.min.x), b.min.y - 0.05, b.min.z + Math.random() * (b.max.z - b.min.z), 0, -1.2, 0, 0x9a948a);
+      }
+      if (s.t <= 0) { p.sagging = false; P.makeDynamic(p, undefined, undefined, { quiet: true }); this.dirty = true; }
+    }
+    this.sagging = this.sagging.filter((s) => s.t > 0);
   }
 
   mark() { this.dirty = true; }
@@ -90,12 +131,23 @@ export class Structure {
   update(dt) {
     this._wait -= dt;
     this._check(dt);
+    this._stage(dt);
     if (this.dirty && this._wait <= 0 && this.falls.length === 0) {
       this.dirty = false;
       this._wait = 0.1;
       const loose = unsupported(this.pieces.list);
       if (loose.length > PANCAKE) this._pancake(loose);
-      else for (const p of loose) this.pieces.makeDynamic(p, undefined, undefined, { quiet: true });
+      else for (const p of loose) {
+        // A slab hangs a moment, groaning and shedding dust, before it goes;
+        // everything else just falls.
+        if (p.role === 'slab') {
+          if (p.sagging) continue;
+          p.sagging = true;
+          const c = p.box.getCenter(new THREE.Vector3());
+          this.fx.audio?.creak?.(c.x, c.y, c.z);
+          this.sagging.push({ p, t: SAG[0] + Math.random() * (SAG[1] - SAG[0]) });
+        } else this.pieces.makeDynamic(p, undefined, undefined, { quiet: true });
+      }
       if (loose.length) { this.fx.chips.unsettle(); this._wakeRubble(loose); }
       if (loose.length && loose.length <= PANCAKE) this.dirty = true;   // what they carried may go next
     }
@@ -214,7 +266,9 @@ export class Structure {
     const vol = p.volume * (p.kind.density > 1500 ? 0.35 : 0.08);
     if (p.role === 'slab' || p.role === 'column' || p.role === 'core' || p.role === 'stair') this.fx.heap.add(b, vol);
     if (p.kind.name === 'glass' && Math.random() < 0.08) this.fx.chips.burst('glass', b.getCenter(new THREE.Vector3()), new THREE.Vector3(0, 1, 0), 4, 4, 0.03);
-    if ((p.role === 'slab' || p.role === 'column') && Math.random() < 0.08 && this.pieces.physics.dynamic.size < 350) {
+    // Big broken slabs thrown clear of the crush line: the part of a pancake
+    // you can actually see.
+    if ((p.role === 'slab' || p.role === 'column') && Math.random() < 0.22 && this.pieces.physics.dynamic.size < 260) {
       const c = b.getCenter(new THREE.Vector3());
       const out = c.clone().sub(f.foot.getCenter(new THREE.Vector3())).setY(0).normalize();
       this.fx.throwChunk?.(p, c, out.multiplyScalar(4 + Math.random() * 6).setY(2 + Math.random() * 3));
@@ -224,6 +278,8 @@ export class Structure {
 
   clear() {
     this.falls.length = 0;
+    this.warnings.length = 0;
+    this.sagging.length = 0;
     this.lost.length = 0;
     this.checks.length = 0;
     this.dirty = false;

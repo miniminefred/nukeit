@@ -126,5 +126,6 @@ kbd {
 .slot b { color: var(--gold); margin-right: 6px; }
 .slot.on { color: var(--ink); border-color: var(--gold); background: rgba(0,0,0,0.6); }
 #tip { position: absolute; left: 50%; bottom: 72px; transform: translateX(-50%); color: var(--dim); font-size: 13px; text-shadow: 0 1px 2px #000; }
+#fps { position: absolute; right: 18px; top: 14px; color: var(--dim); font-size: 12px; text-shadow: 0 1px 2px #000; }
 #flash { position: absolute; left: 50%; top: 34%; transform: translateX(-50%); font-size: 30px; font-weight: 800; letter-spacing: 0.06em; opacity: 0; transition: opacity .3s; text-shadow: 0 2px 8px #000; }
 #flash.on { opacity: 1; }

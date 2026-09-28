@@ -38,6 +38,9 @@ export class Impacts {
 
   update(dt) {
     this.time += dt;
+    this._cracks = 3;
+    // When a lot is loose, small bits go sooner.
+    const crowded = this.physics.dynamic.size > 150;
     for (const p of this.physics.dynamic) {
       const b = p.body;
       if (!b) continue;
@@ -49,7 +52,7 @@ export class Impacts {
       // resting: a heap of them jostles for ever and never quite comes to rest.
       if (small && !this.fading.has(p)) {
         p.born ??= this.time;                  // simulation time, not the wall clock
-        if (this.time - p.born > FADE_AFTER + (p.id % 7) * 0.25) this.fading.set(p, 0);
+        if (this.time - p.born > (crowded ? 1.2 : FADE_AFTER) + (p.id % 7) * 0.25) this.fading.set(p, 0);
       }
       // Big ones that have stopped are frozen.
       if (b.isSleeping() || s < 0.15) {
@@ -98,7 +101,7 @@ export class Impacts {
     // And it smashes itself, if it came down hard enough.
     if (v > 6 && p.state === 'dynamic') {
       p.hp -= blows * 0.35;
-      if (p.hp <= 0 && p.volume > 0.004) damage.fracture(p, at, new THREE.Vector3(Math.random() - 0.5, -1, Math.random() - 0.5).normalize(), Math.min(4, v / 4), v > 12 ? 3 : 1);
+      if (p.hp <= 0 && p.volume > 0.004) damage.fractureSoon(p, at, new THREE.Vector3(Math.random() - 0.5, -1, Math.random() - 0.5).normalize(), Math.min(4, v / 4), v > 12 ? 3 : 1);
     }
   }
 
@@ -110,14 +113,22 @@ export class Impacts {
     q.hp -= blows;
     const point = q.box.clampPoint(from, new THREE.Vector3());
     point.y = Math.min(q.box.max.y, by.box.min.y + 0.01);
-    if (blows > 0.5 && q.parts.some((r) => r.mesh || q.state === 'static')) {
+    // Cracks cost a decal cut each, so only a few per frame.
+    if (blows > 0.5 && this._cracks-- > 0) {
       crack(this.pieces, q, point, new THREE.Vector3(0, 1, 0), Math.min(3, 0.8 + Math.sqrt(blows) * 0.4));
     }
     if (q.structural || q.role === 'slab') structure?.mark();
     if (q.hp > 0) return;
     const load = q.role === 'column' || q.role === 'core';
-    if (load) damage.fail(q, point, new THREE.Vector3(0, -1, 0));
-    else damage.fracture(q, point, new THREE.Vector3(0, -1, 0), Math.min(4, 1 + blows / 50), blows > 100 ? 2 : 1);
+    if (load) damage.failSoon(q, point, new THREE.Vector3(0, -1, 0));
+    else damage.fractureSoon(q, point, new THREE.Vector3(0, -1, 0), Math.min(4, 1 + blows / 50), blows > 100 ? 2 : 1);
+  }
+
+  // Fade out the n smallest loose bits, to make room for something bigger.
+  makeRoom(n) {
+    const small = [...this.physics.dynamic].filter((p) => !this.fading.has(p) && p.body && (p.role === 'fragment' || p.role === 'shard'))
+      .sort((a, b) => a.volume - b.volume).slice(0, n);
+    for (const p of small) this.fading.set(p, 0);
   }
 
   _freeze(p) {

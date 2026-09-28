@@ -70,7 +70,7 @@ export class Blast {
       const near = 1 - d / r;
       if (p.role === 'column' || p.role === 'core') {
         p.hp -= near * 30;
-        if (p.hp <= 0) damage.fail(p, _c.clone(), out.clone());
+        if (p.hp <= 0) damage.failSoon(p, _c.clone(), out.clone());
         continue;
       }
       if (p.role === 'slab') {
@@ -79,12 +79,12 @@ export class Blast {
           const hit = p.box.clampPoint(at, new THREE.Vector3());
           damage._bite(p, hit, out.clone().negate(), out.clone(), r * 0.45 * near, r * 0.5, p.kind);
           // Only something the size of a transformer breaks a whole floor bay.
-          if (near > 0.85 && r >= 5) damage.fracture(p, hit, out.clone(), 3);
+          if (near > 0.85 && r >= 5) damage.fractureSoon(p, hit, out.clone(), 3);
         }
         continue;
       }
       if (p.role === 'stair' || p.role === 'ceiling' || p.role === 'carpet' || p.role === 'mullion' || p.role === 'spandrel' || p.role === 'wall' || p.role === 'furniture' || p.role === 'lamp' || p.role === 'fragment' || p.role === 'tank') {
-        if (near > 0.35 && p.role !== 'stair' && p.volume < 6) damage.fracture(p, p.box.clampPoint(at, new THREE.Vector3()), out.clone(), 4 * near);
+        if (near > 0.35 && p.role !== 'stair' && p.volume < 6) damage.fractureSoon(p, p.box.clampPoint(at, new THREE.Vector3()), out.clone(), 4 * near);
         else {
           if (p.state === 'static' && p.role !== 'stair' && p.role !== 'carpet') pieces.makeDynamic(p);
           if (p.body) p.body.applyImpulse({ x: out.x * near * 600, y: out.y * near * 600 + 150 * near, z: out.z * near * 600 }, true);

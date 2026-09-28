@@ -41,12 +41,18 @@ export function createScene(renderer) {
   u.mieCoefficient.value = 0.0025;
   u.mieDirectionalG.value = 0.85;
   u.sunPosition.value.copy(SUN_DIR);
-  scene.add(sky);
 
-  // Bake the sky into an environment map once.
-  const pmrem = new THREE.PMREMGenerator(renderer);
+  // The sky never changes, so it is drawn once, into a cube map, and that is
+  // the background. Drawn live, its scattering shader ran for every sky pixel
+  // of every frame — most of the screen, looking up at a tower.
   const envScene = new THREE.Scene();
-  envScene.add(sky.clone());
+  envScene.add(sky);
+  const cube = new THREE.WebGLCubeRenderTarget(512, { type: THREE.HalfFloatType, generateMipmaps: false });
+  new THREE.CubeCamera(1, 5000, cube).update(renderer, envScene);
+  scene.background = cube.texture;
+
+  // And into an environment map, for reflections and daylight indoors.
+  const pmrem = new THREE.PMREMGenerator(renderer);
   const env = pmrem.fromScene(envScene, 0.02).texture;
   scene.environment = env;
   scene.environmentIntensity = 0.14;

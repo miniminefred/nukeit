@@ -356,7 +356,9 @@ function hullPoints(p) {
   const pts = [];
   for (const q of p.parts) {
     const a = q.geometry.attributes.position;
-    const step = Math.max(1, Math.floor(a.count / 300));
+    // A hull of a few dozen points is as good as one of hundreds for a lump of
+    // rubble, and far cheaper to collide.
+    const step = Math.max(1, Math.floor(a.count / 48));
     for (let i = 0; i < a.count; i += step) pts.push(a.getX(i), a.getY(i), a.getZ(i));
   }
   return new Float32Array(pts);

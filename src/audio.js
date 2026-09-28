@@ -166,6 +166,15 @@ export class Audio {
   spray(on) { this.ctx && this.loops.spray.gain.setTargetAtTime(on ? 0.25 : 0, this.ctx.currentTime, 0.03); }
   foam(on) { this.ctx && this.loops.foam.gain.setTargetAtTime(on ? 0.45 : 0, this.ctx.currentTime, 0.05); }
 
+  // Structure groaning under a load it can no longer carry.
+  creak(x, y, z) {
+    if (!this.ctx) return;
+    const { gain, pan } = this._place(x, y, z, 25);
+    const out = this._out(gain * 0.9, pan);
+    this._noise(out, { type: 'bandpass', f: 180, q: 6, len: 0.9, gain: 1, attack: 0.15, drop: 0.6 });
+    this._tone(out, { f: 70 + Math.random() * 30, len: 0.8, gain: 0.25, type: 'sawtooth', drop: 0.7 });
+  }
+
   // Gas escaping from a punctured tank.
   hiss(x, y, z) {
     if (!this.ctx) return;

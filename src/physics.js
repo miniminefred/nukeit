@@ -147,7 +147,8 @@ export class Physics {
   // --------------------------------------------------------- stepping
 
   step(dt) {
-    this._acc = Math.min(this._acc + dt, STEP * 3);
+    // Enough steps to keep up with real time down to 10 fps.
+    this._acc = Math.min(this._acc + dt, STEP * 6);
     let steps = 0;
     while (this._acc >= STEP) {
       this.world.timestep = STEP;
