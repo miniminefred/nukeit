@@ -32,7 +32,7 @@ const G = 9.81;
 const DOWN = { x: 0, y: -1, z: 0 };
 const REFRESH = 0.15;            // s between looks at what is under a piece
 const SLIDE = 0.08;              // s of its horizontal speed it slides on landing
-const LANDINGS_PER_FRAME = 60;   // more than this wait for the next frame, still in the air
+const LAND_MS = 5;               // ms a frame for landings: the rest wait for the next frame, still in the air
 const SETTLE = 3;                // columns that must touch: a piece beds into loose rubble until three do
 const SWEEP = 0.5;               // s between checks that what rubble lies on is still there
 const CHUNK = 1.2;               // m^3 of box: a piece this big breaks up where it lands...
@@ -51,6 +51,8 @@ const DUSTY = new Set(['concrete', 'marble', 'roofing', 'plaster', 'stone', 'gra
 const _o = { x: 0, y: 0, z: 0 };
 const UP = new THREE.Vector3(0, 1, 0);
 const GRID = [0.08, 0.5, 0.92];
+const GRID2 = [0.08, 0.5, 0.92];  // the same, but only its corners and middle are used (see _clearance)
+const GRID1 = [0.5];
 const AXES = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)];
 
 export class Rubble {
@@ -161,7 +163,11 @@ export class Rubble {
     const b = p.box, top = b.max.y + 0.5;
     let gap = Infinity, on = null, hard = Infinity;
     const gaps = [];
-    for (const fx of GRID) for (const fz of GRID) {
+    // Nine columns for anything the size of a desk or more; a small lump
+    // needs its middle and four corners, a chip just its middle.
+    const grid = p.volume > 0.4 ? GRID : p.volume > 0.03 ? GRID2 : GRID1;
+    for (const fx of grid) for (const fz of grid) {
+      if (grid === GRID2 && fx === 0.5 !== (fz === 0.5)) continue;
       const x = b.min.x + (b.max.x - b.min.x) * fx, z = b.min.z + (b.max.z - b.min.z) * fz;
       const t = rayThrough(p, x, top, z);
       if (!t) continue;
@@ -178,7 +184,7 @@ export class Rubble {
       if (!sup?.parts && g < hard) hard = g;
       if (g < gap) { gap = g; on = sup; }
     }
-    if (settle > 1 && gaps.length >= settle) {
+    if (settle > 1 && gaps.length >= settle && gaps.length > 3) {
       gaps.sort((a, c) => a[0] - c[0]);
       const [g, sup] = gaps[settle - 1];
       if (g < hard) return { gap: g, on: sup };
@@ -222,7 +228,7 @@ export class Rubble {
     while (this.broken.length && performance.now() - t0 < CHUNK_MS) this._chunks(this.broken.shift());
     if (!this.flying.length) return;
     const P = this.pieces;
-    let landings = LANDINGS_PER_FRAME;
+    let landings = 1;
     const keep = [];
     const cam = this.fx.camera?.position;
     this._dust = DUST_PER_FRAME;
@@ -242,15 +248,21 @@ export class Rubble {
       if (f.r === undefined) { f.c0 = p.localBox.getCenter(new THREE.Vector3()); f.r = p.localBox.getSize(_s).length() / 2; }
       const c = _c.copy(f.c0).applyQuaternion(p.quat).add(p.pos);
       // What is under it, now and then — and every frame once it is close.
+      // Once this frame's landings are spent, the rest close to the ground
+      // wait their turn without looking again: after a break, a thousand
+      // pieces arrive at once.
       f.look -= dt;
       const near = c.y - f.r - f.floor < Math.max(0.6, -f.v.y * dt * 3);
-      if (f.look <= 0 || near) {
+      if (f.look <= 0 || (near && landings > 0)) {
         f.look = REFRESH * (0.7 + Math.random() * 0.6);
         f.floor = this._under(c.x, c.z, c.y + f.r);
       }
-      if (near) {
+      if (near && landings > 0) {
         P._updateBox(p);
-        if (p.box.min.y <= f.floor + 0.02 && landings > 0 && this._land(f)) { landings--; continue; }
+        if (p.box.min.y <= f.floor + 0.02 && this._land(f)) {
+          if (performance.now() - t0 > LAND_MS + CHUNK_MS) landings = 0;
+          continue;
+        }
       }
       if (p.pos.y < -30) { P.destroy(p); continue; }
       // Hidden in the dust, it is not redrawn: the cloud occludes it.
