@@ -32,7 +32,8 @@ const G = 9.81;
 const DOWN = { x: 0, y: -1, z: 0 };
 const REFRESH = 0.15;            // s between looks at what is under a piece
 const SLIDE = 0.08;              // s of its horizontal speed it slides on landing
-const LANDINGS_PER_FRAME = 120;  // more than this wait for the next frame, still in the air
+const LANDINGS_PER_FRAME = 60;   // more than this wait for the next frame, still in the air
+const SETTLE = 3;                // columns that must touch: a piece beds into loose rubble until three do
 const SWEEP = 0.5;               // s between checks that what rubble lies on is still there
 const CHUNK = 1.2;               // m^3 of box: a piece this big breaks up where it lands...
 const CHUNK_SPEED = 3;           // ...if it lands at least this fast
@@ -136,7 +137,6 @@ export class Rubble {
     const on = this._support;
     if (import.meta.env.DEV) p.anchored = { on: on?.role ?? (on ? 'city' : 'ground'), state: on?.state, gap: +(p.box.min.y - y).toFixed(2) };
     if (on && on.parts && on !== p) this._rest(p, on);
-    else if (p.box.min.y > 0.3) this.resting.add(p);
   }
 
   _unrest(p) {
@@ -154,9 +154,10 @@ export class Rubble {
   // from above it, for a piece coming down (and at this frame's landings,
   // which Rapier cannot see yet); otherwise from just inside its underside,
   // for one that is lying somewhere.
-  _clearance(p, landing) {
+  _clearance(p, landing, settle = 1) {
     const b = p.box, top = b.max.y + 0.5;
-    let gap = Infinity, on = null;
+    let gap = Infinity, on = null, hard = Infinity;
+    const gaps = [];
     for (const fx of GRID) for (const fz of GRID) {
       const x = b.min.x + (b.max.x - b.min.x) * fx, z = b.min.z + (b.max.z - b.min.z) * fz;
       const t = rayThrough(p, x, top, z);
@@ -169,7 +170,16 @@ export class Rubble {
         const u = rayThrough(r, x, top, z);
         if (u && top - u[0] > y) { y = top - u[0]; sup = r; }
       }
-      if (bottom - y < gap) { gap = bottom - y; on = sup; }
+      const g = bottom - y;
+      gaps.push([g, sup]);
+      if (!sup?.parts && g < hard) hard = g;
+      if (g < gap) { gap = g; on = sup; }
+    }
+    if (settle > 1 && gaps.length >= settle) {
+      gaps.sort((a, c) => a[0] - c[0]);
+      const [g, sup] = gaps[settle - 1];
+      if (g < hard) return { gap: g, on: sup };
+      return { gap: hard, on: null };
     }
     if (gap === Infinity) {
       // Too thin to hit from nine columns: its bounding box, then.
@@ -195,9 +205,7 @@ export class Rubble {
     for (const r of this.resting) {
       if (r.state !== 'rubble' && r.state !== 'static') { this._unrest(r); continue; }
       const on = r.restOn;
-      // Lying on something that is not a piece — the lift car, the roof of a
-      // neighbour: look again, and fall if it has gone.
-      if (!on) { if (this._gap(r) > 0.15) this.add(r, new THREE.Vector3(), new THREE.Vector3()); continue; }
+      if (!on) { this.resting.delete(r); continue; }
       if ((on.state === 'static' || on.state === 'rubble') && (on.placed ?? 0) === r.restAt) continue;
       this.add(r, new THREE.Vector3(), new THREE.Vector3());
     }
@@ -273,18 +281,20 @@ export class Rubble {
     p.quat.premultiply(_q);
     // On the street a piece lies nearly flat; on the pile it lands however it
     // lands; a broken chunk comes to rest propped at any angle up to steep.
-    const tilt = f.chunk ? 0.2 + Math.random() * 0.8 : f.floor > 0.3 ? 0.1 + Math.random() * 0.45 : 0.04 + Math.random() * 0.14;
+    const tilt = f.chunk ? 0.15 + Math.random() * 0.6 : f.floor > 0.3 ? 0.1 + Math.random() * 0.4 : 0.04 + Math.random() * 0.14;
     const axis = new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
     p.quat.premultiply(_q.setFromAxisAngle(axis, tilt));
     P._updateBox(p);
     p.pos.add(c.sub(p.box.getCenter(_v)));
     P._updateBox(p);
     // Down until it touches: at nine columns across its footprint, how far
-    // its own underside is above whatever is under it. The least of those is
-    // how far it drops. (Putting the bottom of its bounding box on the
-    // highest thing under it held a tilted slab up by its high side, its low
-    // corner in the air.)
-    const { gap, on } = this._clearance(p, true);
+    // its own underside is above whatever is under it. (Putting the bottom of
+    // its bounding box on the highest thing under it held a tilted slab up by
+    // its high side, its low corner in the air.) On loose rubble it settles
+    // until three columns touch, bedding in among the pieces under it —
+    // stopped at the first, a piece balanced on a corner, and the pile was
+    // three parts air. The street and the city it never sinks into.
+    const { gap, on } = this._clearance(p, true, SETTLE);
     const b = p.box;
     const h = b.min.y - gap;
     const cx = (b.min.x + b.max.x) / 2, cz = (b.min.z + b.max.z) / 2;
@@ -300,7 +310,6 @@ export class Rubble {
     // are not pieces and never go.
     p.placed = (p.placed ?? 0) + 1;
     if (on && on.parts) this._rest(p, on);
-    else if (h > 0.3) this.resting.add(p);        // on something that is not a piece, off the street
     // Heavy things land with a thump and a cloud.
     const m = p.volume * p.kind.density;
     const v = Math.hypot(f.v.x, f.v.y, f.v.z);
