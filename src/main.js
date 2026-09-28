@@ -65,7 +65,7 @@ const player = new Player(camera, input, physics);
 const hud = new Hud();
 
 const damage = new Damage(pieces, { chips, particles, audio, shake });
-const rubble = new Rubble(pieces, physics, { chips, particles, audio });
+const rubble = new Rubble(pieces, physics, { chips, particles, audio, camera });
 const structure = new Structure(pieces, { particles, chips, rubble, audio, shake, player });
 const blast = new Blast({ pieces, damage, physics, particles, chips, audio, shake, player, structure, rubble });
 const fire = new Fire(scene, pieces, physics, { particles, chips, audio, explode: (p) => blast.tank(p) });
@@ -240,6 +240,22 @@ function finish() {
 
 // ---------------------------------------------------------------- loop
 
+// A collapse fills the air with dust, and the dust closes in the distance: the
+// fog thickens with how much of it there is, so the city beyond a collapse
+// fades out behind it. The cloud itself hides what is inside it
+// (fx/particles.js, the veil).
+const CLEAR = { near: scene.fog.near, far: scene.fog.far, colour: scene.fog.color.clone() };
+const DUSTY_AIR = { near: 25, far: 220, colour: new THREE.Color(0x8d8880) };
+let dustiness = 0;
+function haze(dt) {
+  const want = Math.min(1, particles.veil.thick / 2500);
+  dustiness += (want - dustiness) * Math.min(1, dt * (want > dustiness ? 1.5 : 0.25));
+  const k = dustiness;
+  scene.fog.near = CLEAR.near + (DUSTY_AIR.near - CLEAR.near) * k;
+  scene.fog.far = CLEAR.far + (DUSTY_AIR.far - CLEAR.far) * k;
+  scene.fog.color.copy(CLEAR.colour).lerp(DUSTY_AIR.colour, k);
+}
+
 function frame(dt) {
   const playing = state === 'play';
   if (playing && !player.dead) {
@@ -290,6 +306,7 @@ function frame(dt) {
   }
   chips.update(dt);
   particles.update(dt);
+  haze(dt);
   audio.setListener(camera);
   audio.update(dt);
   followShadow(lights, camera);

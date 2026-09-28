@@ -45,6 +45,9 @@ const _one = new THREE.Vector3(1, 1, 1);
 const _q = new THREE.Quaternion();
 const _v = new THREE.Vector3();
 const _s = new THREE.Vector3();
+const _c = new THREE.Vector3();
+const DUST_PER_FRAME = 40;       // dust particles landings may throw up in a frame
+const DUSTY = new Set(['concrete', 'marble', 'roofing', 'plaster', 'stone', 'granite', 'brick']);
 const _o = { x: 0, y: 0, z: 0 };
 const UP = new THREE.Vector3(0, 1, 0);
 const GRID = [0.08, 0.5, 0.92];
@@ -221,6 +224,8 @@ export class Rubble {
     const P = this.pieces;
     let landings = LANDINGS_PER_FRAME;
     const keep = [];
+    const cam = this.fx.camera?.position;
+    this._dust = DUST_PER_FRAME;
     for (const f of this.flying) {
       const p = f.p;
       if (p.state !== 'flying') continue;
@@ -231,18 +236,25 @@ export class Rubble {
         _q.setFromAxisAngle(_v.copy(f.w).divideScalar(w), w * dt);
         p.quat.premultiply(_q);
       }
-      P._updateBox(p);
+      // Where it is, as a sphere: its exact box only once it is close to
+      // landing. Boxes for three thousand pieces in the air every frame were
+      // most of what this cost.
+      if (f.r === undefined) { f.c0 = p.localBox.getCenter(new THREE.Vector3()); f.r = p.localBox.getSize(_s).length() / 2; }
+      const c = _c.copy(f.c0).applyQuaternion(p.quat).add(p.pos);
       // What is under it, now and then — and every frame once it is close.
       f.look -= dt;
-      const near = p.box.min.y - f.floor < Math.max(0.6, -f.v.y * dt * 3);
+      const near = c.y - f.r - f.floor < Math.max(0.6, -f.v.y * dt * 3);
       if (f.look <= 0 || near) {
         f.look = REFRESH * (0.7 + Math.random() * 0.6);
-        const c = p.box.getCenter(_v);
-        f.floor = this._under(c.x, c.z, p.box.max.y);
+        f.floor = this._under(c.x, c.z, c.y + f.r);
       }
-      if (p.box.min.y <= f.floor + 0.02 && landings > 0 && this._land(f)) { landings--; continue; }
+      if (near) {
+        P._updateBox(p);
+        if (p.box.min.y <= f.floor + 0.02 && landings > 0 && this._land(f)) { landings--; continue; }
+      }
       if (p.pos.y < -30) { P.destroy(p); continue; }
-      this._draw(p);
+      // Hidden in the dust, it is not redrawn: the cloud occludes it.
+      if (!cam || this.fx.particles?.veil.seen(cam, c.x, c.y, c.z) !== false) this._draw(p);
       keep.push(f);
     }
     this.flying = keep;
@@ -314,6 +326,15 @@ export class Rubble {
     const m = p.volume * p.kind.density;
     const v = Math.hypot(f.v.x, f.v.y, f.v.z);
     if (m > 3000 && v > 4 && Math.random() < 0.08) this.fx.cloud?.(new THREE.Vector3(cx, b.min.y + 0.3, cz), Math.min(2.5, Math.sqrt(m) / 60));
+    // Concrete and stone hitting anything throw up dust.
+    else if (m > 150 && v > 3 && this._dust > 0 && DUSTY.has(p.kind.name)) {
+      const pt = this.fx.particles, n = Math.min(this._dust, 2 + Math.round(Math.sqrt(m) / 12));
+      this._dust -= n;
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2, s = 1 + Math.random() * Math.min(6, v * 0.4);
+        pt?.spawn(i % 3 === 0 ? 'bigdust' : 'dust', cx, b.max.y, cz, Math.cos(a) * s, 0.5 + Math.random() * 1.5, Math.sin(a) * s, 0x8a847b);
+      }
+    }
     if (!f.chunk && !p.gen && v > CHUNK_SPEED && p.volume > CHUNK && p.parts.length === 1 && BREAKS.has(p.role)) this._breakUp(p, f.v);
     return true;
   }

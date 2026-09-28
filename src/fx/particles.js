@@ -208,11 +208,80 @@ class Pool {
   }
 }
 
+// How thick the dust is, in a coarse grid of 4 m cells round the site, built
+// from the dust particles every frame. It is what a collapse can be seen
+// through — or not: `seen(camera, x, y, z)` is whether a point can be seen
+// from the camera through the cloud, and `thick` is how much dust is in the
+// air altogether, which thickens the fog so that the far side of the city
+// fades out behind a collapse. Pieces hidden in the cloud are not redrawn
+// (sim/rubble.js): the cloud is an occluder, the way a wall is.
+const CELL = 4, NX = 48, NY = 18, NZ = 48;          // 192 x 72 x 192 m
+const OX = -NX * CELL / 2, OZ = -NZ * CELL / 2;
+const HIDDEN = 0.12;                                  // transmittance below which a point is hidden
+
+class Veil {
+  constructor() {
+    this.d = new Float32Array(NX * NY * NZ);          // optical depth per metre
+    this.thick = 0;
+    this._seen = new Int8Array(NX * NY * NZ);         // this frame: 0 unknown, 1 seen, -1 hidden
+    this._any = false;
+  }
+
+  build(pool) {
+    const d = this.d;
+    if (this._any) d.fill(0);
+    this._seen.fill(0);
+    this._any = false;
+    let total = 0;
+    const vol = CELL * CELL * CELL;
+    for (let p = 0; p < pool.n; p++) {
+      if (!pool.blowable[p]) continue;
+      const a = pool.tint[p * 4 + 3];
+      if (a < 0.05) continue;
+      const i = Math.floor((pool.pos[p * 3] - OX) / CELL), j = Math.floor(pool.pos[p * 3 + 1] / CELL), k = Math.floor((pool.pos[p * 3 + 2] - OZ) / CELL);
+      if (i < 0 || j < 0 || k < 0 || i >= NX || j >= NY || k >= NZ) continue;
+      const r = pool.size[p] * 0.5;
+      const sigma = (a * Math.PI * r * r) / vol;
+      d[(j * NZ + k) * NX + i] += sigma;
+      total += sigma * vol;
+      this._any = true;
+    }
+    this.thick = total;
+  }
+
+  // Can (x, y, z) be seen from the camera through the dust?
+  seen(cam, x, y, z) {
+    if (!this._any) return true;
+    const i = Math.floor((x - OX) / CELL), j = Math.floor(y / CELL), k = Math.floor((z - OZ) / CELL);
+    const inside = i >= 0 && j >= 0 && k >= 0 && i < NX && j < NY && k < NZ;
+    const c = inside ? (j * NZ + k) * NX + i : -1;
+    if (c >= 0 && this._seen[c]) return this._seen[c] > 0;
+    // March from the point back to the camera, adding up the dust.
+    const dx = cam.x - x, dy = cam.y - y, dz = cam.z - z;
+    const len = Math.hypot(dx, dy, dz);
+    const n = Math.min(40, Math.ceil(len / (CELL * 0.75)));
+    const step = len / n;
+    let tau = 0;
+    for (let s = 0; s < n; s++) {
+      const t = (s + 0.5) / n;
+      const px = x + dx * t, py = y + dy * t, pz = z + dz * t;
+      const a = Math.floor((px - OX) / CELL), b = Math.floor(py / CELL), e = Math.floor((pz - OZ) / CELL);
+      if (a < 0 || b < 0 || e < 0 || a >= NX || b >= NY || e >= NZ) continue;
+      tau += this.d[(b * NZ + e) * NX + a] * step;
+      if (tau > 2.2) break;
+    }
+    const ok = Math.exp(-tau) > HIDDEN;
+    if (c >= 0) this._seen[c] = ok ? 1 : -1;
+    return ok;
+  }
+}
+
 export class Particles {
   constructor(scene) {
     this.normal = new Pool(scene, 9000, false);
     this.glow = new Pool(scene, 4000, true);
     this._c = new THREE.Color();
+    this.veil = new Veil();
   }
 
   // spawn('dust', x, y, z, vx, vy, vz[, colour])
@@ -236,6 +305,7 @@ export class Particles {
   update(dt) {
     this.normal.update(dt);
     this.glow.update(dt);
+    this.veil.build(this.normal);
   }
 
   // A blast of air from `origin` along `dir` — the extinguisher — clears the
