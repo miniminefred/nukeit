@@ -431,3 +431,15 @@ function animate() {
 }
 openMenu();
 animate();
+
+// ?bench: run the collapse bench straight away, and post what it found to the
+// dev server, which writes it to bench/latest.json (vite.config.js).
+if (import.meta.env.DEV && new URLSearchParams(location.search).has('bench')) {
+  const q = new URLSearchParams(location.search);
+  const opts = { quality: +(q.get('quality') ?? 1), secs: +(q.get('secs') ?? 60), profile: q.has('profile') };
+  window.dev.bench(opts).then((r) => {
+    const { frames, ...rest } = r;
+    const slim = frames.map((f) => ({ t: +f.t.toFixed(3), ms: +(f.dt * 1000).toFixed(1), flying: f.flying, bodies: f.bodies, cpu: f.cpu }));
+    return fetch('/__bench', { method: 'POST', body: JSON.stringify({ ...rest, frames: slim, when: new Date().toISOString() }) });
+  }).catch((e) => fetch('/__bench', { method: 'POST', body: JSON.stringify({ error: String(e.stack || e) }) }));
+}
