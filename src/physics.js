@@ -19,6 +19,7 @@ export const GROUP_PLAYER = 0x0004;
 export const GROUP_RUBBLE = 0x0008;
 export const GROUP_MASS = 0x0010;
 export const GROUP_GROUND = 0x0020;
+export const GROUP_CITY = 0x0040;
 const groups = (member, filter) => (member << 16) | filter;
 export const G_WORLD = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER);
 // The street and the city: the world, and also what a tipping mass lands on.
@@ -39,6 +40,10 @@ export const G_RUBBLE = groups(GROUP_RUBBLE, GROUP_WORLD | GROUP_DEBRIS | GROUP_
 // forty metres a second, and the tower seemed to burst in mid-air. And it is
 // its own group, so nothing comes to rest on it: it is about to be gone.
 export const G_MASS = groups(GROUP_MASS, GROUP_GROUND);
+// While it still swings on its hinge, only the neighbours: the storeys on its
+// low side are crushed into the street (sim/topple.js), not stood on.
+export const G_MASS_HINGED = groups(GROUP_MASS, GROUP_CITY);
+export const G_CITY = groups(GROUP_WORLD | GROUP_GROUND | GROUP_CITY, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER | GROUP_MASS);
 // What a tool's ray can hit: the building, its rubble and debris, never the player.
 export const G_RAY = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS | GROUP_RUBBLE);
 // What rubble comes to rest on.

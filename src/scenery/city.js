@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { surface } from '../render/textures.js';
-import { G_GROUND } from '../physics.js';
+import { G_CITY } from '../physics.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // The city round the job: a street, pavements and the blocks on either side.
@@ -60,7 +60,7 @@ export function buildCity(scene, physics) {
     group.add(m);
     if (physics) {
       const c = physics.world.createCollider(
-        physics.R.ColliderDesc.cuboid(w / 2, h / 2, d / 2).setTranslation(x, h / 2, z).setFriction(0.35).setCollisionGroups(G_GROUND),
+        physics.R.ColliderDesc.cuboid(w / 2, h / 2, d / 2).setTranslation(x, h / 2, z).setFriction(0.35).setCollisionGroups(G_CITY),
         physics.fixed);
       physics.owner.set(c.handle, CITY);
     }
