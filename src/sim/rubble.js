@@ -39,6 +39,11 @@ const CHUNK = 1.2;               // m^3 of box: a piece this big breaks up where
 const CHUNK_SPEED = 3;           // ...if it lands at least this fast
 const CHUNK_MS = 3;              // ms a frame for putting the chunks in its place
 const BREAKS = new Set(['slab', 'core', 'column', 'wall', 'stair', 'spandrel']);
+// A floor carries its own weight and what it was built to hold — people,
+// furniture — and gives way under about three times its own weight in rubble:
+// a tower's worth of it on an office block's roof takes the roof, then the
+// floor under it, and so on down.
+const OVERLOAD = 3;
 
 const _m = new THREE.Matrix4();
 const _one = new THREE.Vector3(1, 1, 1);
@@ -159,6 +164,19 @@ export class Rubble {
     if (p.restOn) p.restOn.carried?.delete(p);
     p.restOn = null;
     this.resting.delete(p);
+    if (p.bears) { p.bears.burden -= p.bearing; p.bears = null; }
+  }
+
+  // Its weight goes down the pile to the floor that is carrying it all.
+  _bear(p, on) {
+    let q = on, guard = 0;
+    while (q && q.state === 'rubble' && q.restOn && guard++ < 16) q = q.restOn;
+    if (!q || q.state !== 'static' || q.role !== 'slab' || q.box.min.y < 0.05) return;
+    const m = p.volume * p.kind.density * 0.5;       // a chunk fills about half its box
+    q.burden = (q.burden ?? 0) + m;
+    p.bears = q;
+    p.bearing = m;
+    if (q.burden > q.volume * q.kind.density * OVERLOAD) this.fx.onOverload?.(q);
   }
 
   // How far the lowest of five points under a piece's footprint is above
@@ -344,7 +362,7 @@ export class Rubble {
     // What it lies on: if that goes, so does this. The street and the city
     // are not pieces and never go.
     p.placed = (p.placed ?? 0) + 1;
-    if (on && on.parts) this._rest(p, on);
+    if (on && on.parts) { this._rest(p, on); this._bear(p, on); }
     // Heavy things land with a thump and a cloud.
     const m = p.volume * p.kind.density;
     const v = Math.hypot(f.v.x, f.v.y, f.v.z);

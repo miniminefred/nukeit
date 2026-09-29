@@ -88,6 +88,14 @@ function cloud(at, scale = 1) {
 damage.fx.cloud = cloud;
 rubble.fx.cloud = cloud;
 rubble.fx.onLand = (q, blows, at, by) => impacts.absorb(q, blows, at, by);
+// A floor with more rubble on it than it can carry gives way.
+rubble.fx.onOverload = (q) => {
+  if (q.state !== 'static' || q.queued) return;
+  const c = q.box.getCenter(new THREE.Vector3());
+  audio.creak?.(c.x, c.y, c.z);
+  damage.fractureSoon(q, c, new THREE.Vector3(0, -1, 0), 2, 2);
+  structure.mark();
+};
 const impacts = new Impacts(pieces, physics, { damage, cloud, audio, shake, player, structure });
 damage.fx.makeRoom = (n) => impacts.makeRoom(n);
 const topple = new Topple(pieces, physics, { rubble, particles, chips, cloud, audio, shake, structure, player });
