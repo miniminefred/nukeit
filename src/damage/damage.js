@@ -385,7 +385,9 @@ export class Damage {
       const passes = Math.min(maxPasses, Math.floor(Math.log2(room)), Math.max(minPasses, Math.round(Math.log2(Math.max(size.x, size.y, size.z) / 0.35))));
       const job = { p, q, vel, gen, point: point.clone(), dir: dir.clone() };
       fractureAsync(q.geometry, q.materials ?? [P._material(q)], inside, passes, gen > 1 ? 5 : 12)
-        .then((bits) => { job.bits = bits; this.broken.push(job); })
+        // Structure first: a slab or a column waiting behind four hundred
+        // desks left a block standing under a tower's worth of rubble.
+        .then((bits) => { job.bits = bits; if (p.structural || p.role === 'slab') this.broken.unshift(job); else this.broken.push(job); })
         .catch(() => { p.breaking = false; if (p.state !== 'dead') this.crumble(p, job.point, job.dir); });
       return out;
     }
@@ -403,6 +405,9 @@ export class Damage {
     const P = this.pieces;
     p.breaking = false;
     if (p.state === 'dead') return;
+    // Backed up: small things that are not structure just crumble.
+    if (this.broken.length > 60 && !(p.structural || p.role === 'slab') && p.volume < 1.5) { this.crumble(p, point, dir); return; }
+    const full = P.overflow && P.physics.dynamic.size >= P.maxBodies;
     if (p.body) { const v = p.body.linvel(); vel = vel.clone().add(new THREE.Vector3(v.x, v.y, v.z)); }
     for (const bit of bits) {
       const g = bit.geometry;
@@ -410,9 +415,12 @@ export class Damage {
       const c = g.boundingBox.getCenter(new THREE.Vector3());
       g.translate(-c.x, -c.y, -c.z);
       const pos = c.clone().applyQuaternion(p.quat).add(p.pos);
-      const f = P.spawn({ parts: [{ kind: q.kind.name, geometry: g, materials: bit.materials }], pos, quat: p.quat, role: 'fragment', floor: p.floor, structural: false, hull: true },
-        { dynamic: true, vel: vel.clone().add(new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.5, Math.random() - 0.5).multiplyScalar(2)), debris: g.boundingBox.getSize(_v).length() < 0.6 });
+      const v = vel.clone().add(new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.5, Math.random() - 0.5).multiplyScalar(2));
+      const spec = { parts: [{ kind: q.kind.name, geometry: g, materials: bit.materials }], pos, quat: p.quat, role: 'fragment', floor: p.floor, building: p.building, structural: false, hull: true };
+      // No room for more bodies: straight into the batches, and off as rubble.
+      const f = full ? P.spawn(spec, { free: true }) : P.spawn(spec, { dynamic: true, vel: v, debris: g.boundingBox.getSize(_v).length() < 0.6 });
       f.gen = gen;
+      if (full) P.overflow(f, v);
     }
     this.fx.chips.burst(chipKind(p.kind), point, dir, 25, 3, 0.04);
     this._dust(p.kind, point, dir.clone().negate(), 20);
