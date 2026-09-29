@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { unsupported } from '../building/support.js';
 import { crack } from '../damage/cracks.js';
+import { G_LAND } from '../physics.js';
 
 // The rhythm of a chain reaction. Nothing that gives way under a load does it
 // silently or all at once: it cracks, grit trickles out of it, it groans — and
@@ -36,7 +37,7 @@ const SPREAD = 7.5;          // metres: how far a lost column's load moves
 // have; a length of core wall takes twice as many.
 const CHAIN_WEIGHT = 24;     // storeys x lost neighbours that break an undamaged column
 const CHAIN_MIN = 2;         // but never fewer than this
-const chainAt = (p) => Math.max(CHAIN_MIN, Math.ceil(CHAIN_WEIGHT / Math.max(1, p.load))) * (p.role === 'core' ? 2 : 1);
+const chainAt = (load, role) => Math.max(CHAIN_MIN, Math.ceil(CHAIN_WEIGHT / Math.max(1, load))) * (role === 'core' ? 2 : 1);
 
 const PANCAKE = 80;          // pieces: more than this falls together, cheaply
 const G = 9.81 * 0.72;       // progressive collapse runs at about 0.7 g
@@ -64,10 +65,31 @@ export class Structure {
     return n;
   }
 
+  // How many storeys a support carries now: not what stood over it when the
+  // building went up, but what still stands over it — a ray down its line
+  // from the sky to the top of its own building there. A podium column
+  // carries the tower until the tower has gone, and then only the podium.
+  loadOf(p) {
+    if (!p.load) return 0;
+    const now = this.time ?? 0;
+    if (p._loadAt !== undefined && now - p._loadAt < 1) return p._load;
+    const c = p.box.getCenter(_c), physics = this.pieces.physics;
+    const ray = (this._ray ??= new physics.R.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 }));
+    ray.origin.x = c.x; ray.origin.y = 300; ray.origin.z = c.z;
+    const mine = (k) => { const o = physics.owner.get(k.handle); return !!o && o.building === p.building && o.state === 'static' && (o.structural || o.role === 'slab'); };
+    const hit = physics.world.castRay(ray, 300, true, undefined, G_LAND, undefined, undefined, mine);
+    const top = hit ? 300 - hit.timeOfImpact : p.box.max.y;
+    const storey = Math.max(3, p.box.max.y - p.box.min.y + 0.3);
+    p._load = Math.min(p.load, Math.max(0, Math.round((top - p.box.max.y) / storey)));
+    p._loadAt = now;
+    return p._load;
+  }
+
   // Has a damaged support taken more than it can carry?
   mustFail(p) {
-    if (!p.load || p.hpMax === null) return false;
-    const share = p.load * (1 + this._lostNear(p) * 0.5);
+    const load = this.loadOf(p);
+    if (!load || p.hpMax === null) return false;
+    const share = load * (1 + this._lostNear(p) * 0.5);
     return p.hp <= p.hpMax * share / (share + 14);
   }
 
@@ -91,7 +113,8 @@ export class Structure {
     for (const { p } of due) {
       if (p.state !== 'static') continue;
       const lost = this._lostNear(p);
-      const chain = p.load > 0 && lost >= chainAt(p);
+      const load = this.loadOf(p);
+      const chain = load > 0 && lost >= chainAt(load, p.role);
       if (!chain && !this.mustFail(p)) continue;
       if (p.warned) continue;
       p.warned = true;
@@ -136,6 +159,7 @@ export class Structure {
   mark() { this.dirty = true; }
 
   update(dt) {
+    this.time = (this.time ?? 0) + dt;
     this._wait -= dt;
     this._check(dt);
     this._stage(dt);

@@ -94,6 +94,14 @@ export class Topple {
     const dir = new THREE.Vector3(com.x - centre.x, 0, com.z - centre.z);
     if (dir.lengthSq() < 1e-4) dir.set(Math.random() - 0.5, 0, Math.random() - 0.5);
     dir.normalize();
+    // Only something tall for its base goes over. A low, wide block — the
+    // podium with a corner crushed — does not tip as one: the part that has
+    // lost its supports comes down on its own, and the rest stands.
+    let top = 0;
+    for (const p of above) if (p.box.max.y > top) top = p.box.max.y;
+    const size = area.getSize(_v);
+    const wide = Math.abs(dir.x) * size.x + Math.abs(dir.z) * size.z;
+    if (top - base < wide * 0.8) return false;
     // Struck hard a moment ago — a tower falling into it — it is still moving
     // the way the blow drove it, and goes over that way, away from what hit it,
     // not back onto it.
