@@ -96,16 +96,17 @@ function curtain(P, g, f, y0, y1) {
   }
 }
 
-// A storey of glass as one band a face, and the spandrel over it in the
-// block's own colour: the city seen from a street away.
+// A storey of glass as one band a face, and the wall over it in the block's
+// own colour, in the proportions of the box it replaces — 2.1 m of window,
+// 1.5 m of wall — so that waking it does not change how the street looks.
 function bands(P, g, f, y0, y1) {
   const { spec, slab } = g;
-  const cs = corners(spec), yTop = y1 - 0.9;
+  const cs = corners(spec), yTop = y0 + 2.1;
   for (let e = 0; e < 4; e++) {
     const A = cs[e], B = cs[(e + 1) % 4];
     const d = B.clone().sub(A).normalize();
-    panel(P, 'glass', A.clone().addScaledVector(d, 0.2), B.clone().addScaledVector(d, -0.2), y0 + 0.02, yTop - 0.02, 0.04, 0.12, 'glass', opts(g, { floor: f, tint: spec.glass ?? 0x4a5560 }));
-    panel(P, 'concrete', A, B, yTop, y1 + slab, 0.25, 0.14, 'spandrel', opts(g, { floor: f, tint: spec.tint ?? 0xb9b2a6, structural: false }));
+    panel(P, 'glass', A.clone().addScaledVector(d, 0.2), B.clone().addScaledVector(d, -0.2), y0 + 0.02, yTop - 0.02, 0.04, 0.12, 'glass', opts(g, { floor: f, tint: spec.glass ?? 0x39414d }));
+    panel(P, 'plaster', A, B, yTop, y1 + slab, 0.25, 0.14, 'spandrel', opts(g, { floor: f, tint: spec.tint ?? 0xb9b2a6, structural: false }));
   }
 }
 
