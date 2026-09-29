@@ -171,6 +171,8 @@ export class Rubble {
   _bear(p, on) {
     let q = on, guard = 0;
     while (q && q.state === 'rubble' && q.restOn && guard++ < 16) q = q.restOn;
+    // Through a carpet, a desk, a floor finish, to the slab under it.
+    for (let d = 0; d < 3 && q && q.state === 'static' && q.role !== 'slab'; d++) q = q.rests?.find((r) => r.state === 'static') ?? null;
     if (!q || q.state !== 'static' || q.role !== 'slab' || q.box.min.y < 0.05) return;
     const m = p.volume * p.kind.density * 0.5;       // a chunk fills about half its box
     q.burden = (q.burden ?? 0) + m;
