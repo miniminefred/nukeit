@@ -347,6 +347,13 @@ function frame(dt) {
   particles.update(dt);
   haze(dt);
   audio.setListener(camera);
+  // Inside, on the floors where money is spent, there is music and talk.
+  if (state === 'play' && job) {
+    const at = player.pos, f = Math.floor((at.y + 0.5) / 4);
+    const inside = Math.abs(at.x) < 20 && at.z > -12 && at.z < 12;
+    const lounge = inside && [0, 2, 4, 9, 10, 11].includes(f) && !structure.collapsing && !topple.active;
+    audio.ambience(inside ? people.crowdAt(at) : 0, lounge ? 1 : 0);
+  } else audio.ambience(0, 0);
   audio.update(dt);
   followShadow(lights, camera);
   shake.apply(camera, dt);

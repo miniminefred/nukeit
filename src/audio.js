@@ -46,7 +46,53 @@ export class Audio {
       fire: this._loop('bandpass', 2400, 0.6),
       spray: this._loop('highpass', 5000, 0.5),
       foam: this._loop('bandpass', 1400, 0.4),
+      murmur: this._loop('bandpass', 420, 1.1),
     };
+    // The lounge music on the good floors: a soft chord that moves every few
+    // seconds, a slow piano note over it.
+    this.music = ctx.createGain();
+    this.music.gain.value = 0;
+    const warm = ctx.createBiquadFilter();
+    warm.type = 'lowpass'; warm.frequency.value = 1400;
+    this.music.connect(warm).connect(this.master);
+    this._chord = 0;
+    this._next = 0;
+    this._crowd = 0;
+  }
+
+  // How the place sounds: `crowd` 0..1 is how many people are about you and
+  // at ease; `music` 0..1 whether you are somewhere with music playing.
+  ambience(crowd, music) {
+    if (!this.ctx) return;
+    this._crowd = crowd;
+    this.music.gain.setTargetAtTime(music * 0.16, this.ctx.currentTime, 0.8);
+  }
+
+  // Maj7 chords round a slow, expensive-sounding progression.
+  _lounge() {
+    const ctx = this.ctx, t = ctx.currentTime;
+    const ROOTS = [196, 164.8, 174.6, 146.8];           // G, E, F, D
+    const root = ROOTS[this._chord++ % ROOTS.length];
+    for (const r of [1, 1.26, 1.5, 1.89]) {             // root, third, fifth, seventh
+      const o = ctx.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = root * r;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.18, t + 0.6);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 4.2);
+      o.connect(g).connect(this.music);
+      o.start(t); o.stop(t + 4.3);
+    }
+    // A piano-ish note over it: a bright attack that decays.
+    const n = ctx.createOscillator();
+    n.type = 'sine';
+    n.frequency.value = root * [2, 2.52, 3, 3.78][(Math.random() * 4) | 0];
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.35, t + 0.8);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 3.4);
+    n.connect(g).connect(this.music);
+    n.start(t + 0.8); n.stop(t + 3.5);
   }
 
   _loop(type, freq, q) {
@@ -199,6 +245,10 @@ export class Audio {
     if (!this.ctx) return;
     this.loops.rumble.gain.setTargetAtTime(this._rumble * 1.4, this.ctx.currentTime, 0.2);
     this._rumble = Math.max(0, this._rumble - dt * 0.35);
+    // Voices rise and fall: talk is a murmur that is never steady.
+    this.loops.murmur.gain.setTargetAtTime(this._crowd * 0.22 * (0.6 + Math.random() * 0.8), this.ctx.currentTime, 0.15);
+    this._next -= dt;
+    if (this._next <= 0) { this._next = 4; if (this.music.gain.value > 0.005) this._lounge(); }
   }
 
   silence() {

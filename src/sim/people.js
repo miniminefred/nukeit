@@ -165,6 +165,13 @@ export class People {
     return true;
   }
 
+  // How many are about `at`, and at ease: 0..1, for the murmur of a crowd.
+  crowdAt(at, r = 14) {
+    let n = 0;
+    for (const p of this.list) if (p.state === 'calm' && Math.abs(p.pos.y - at.y) < 3 && Math.hypot(p.pos.x - at.x, p.pos.z - at.z) < r) n++;
+    return Math.min(1, n / 8);
+  }
+
   // Something went bang at `at`: everyone within earshot runs.
   alarm(at, r = HEAR) { this._alarm.push({ at: at.clone(), r }); }
 
