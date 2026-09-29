@@ -153,6 +153,9 @@ export class Impacts {
 
   _freeze(p) {
     if (p.role !== 'fragment' && p.role !== 'shard') return;
+    // Glass that has come down does not lie there in panes: it breaks up, and
+    // goes like the other small bits.
+    if (p.kind.name === 'glass') { this.fading.set(p, 0); return; }
     this.rest.delete(p);
     this.speed.delete(p);
     this.pieces.freeze(p);
