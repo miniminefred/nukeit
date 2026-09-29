@@ -214,15 +214,25 @@ export class Structure {
     const stump = P.list.filter((p) => p.state === 'static' && p.box.max.y <= list[0].box.min.y + 0.15 &&
       p.box.max.x > inner.min.x && p.box.min.x < inner.max.x && p.box.max.z > inner.min.z && p.box.min.z < inner.max.z);
     stump.sort((a, b) => b.box.max.y - a.box.max.y);
-    this.falls.push({ list, stump, foot, offset: 0, v: 0, low: 0, s: 0, alive: true, t: 0 });
+    // How much it weighs: what it has to break through the floors below with.
+    let mass = 0;
+    for (const p of list) mass += p.volume * p.kind.density;
+    this.falls.push({ list, stump, foot, offset: 0, v: 0, low: 0, s: 0, alive: true, t: 0, mass, energy: 0 });
     this.fx.audio?.rumble(1);
   }
 
+  // It goes on down for as long as it has the energy to. Falling, it gains
+  // its weight times the drop; every floor it meets takes that floor's own
+  // weight falling three metres to break. A tower's worth goes all the way to
+  // the ground; three storeys of slab dropping onto a podium roof break the
+  // roof and perhaps the floor under it, and stop there — what is still
+  // falling comes down on the floor that held, as rubble.
   _fall(f, dt) {
     const P = this.pieces, fx = this.fx;
     f.t += dt;
     f.v = Math.min(30, f.v + G * dt);
     f.offset -= f.v * dt;
+    f.energy += f.mass * G * f.v * dt;
     // Skip what has already been crushed.
     while (f.low < f.list.length && f.list[f.low].state !== 'falling') f.low++;
     while (f.s < f.stump.length && f.stump[f.s].state !== 'static') f.s++;
@@ -239,6 +249,7 @@ export class Structure {
         const p = f.list[n];
         if (p.state !== 'falling') continue;
         if (p.box.min.y + f.offset > top + reach) break;
+        f.mass -= p.volume * p.kind.density;
         this._crush(p, f.offset, f);
         crushed++;
       }
@@ -246,6 +257,9 @@ export class Structure {
         const p = f.stump[n];
         if (p.state !== 'static') continue;
         if (p.box.max.y < bottom - reach) break;
+        const cost = p.volume * p.kind.density * 9.81 * 3 * (p.structural || p.role === 'slab' ? 1 : 0.1);
+        if (cost > f.energy) return this._stop(f);
+        f.energy -= cost;
         this._crush(p, 0, f);
         crushed++;
       }
@@ -284,6 +298,20 @@ export class Structure {
         if (bottom < pl.pos.y + 1.8 && bottom > pl.pos.y - 3) this.onCrushPlayer?.();
       }
     }
+  }
+
+  // Out of energy: what is still falling lands on what held it.
+  _stop(f) {
+    for (let n = f.low; n < f.list.length; n++) {
+      const p = f.list[n];
+      if (p.state !== 'falling') continue;
+      p.pos.y += f.offset;
+      this.pieces._updateBox(p);
+      p.state = 'static';
+      this.fx.rubble.add(p, new THREE.Vector3((Math.random() - 0.5) * 1.5, -f.v * 0.5, (Math.random() - 0.5) * 1.5));
+    }
+    f.alive = false;
+    this.dirty = true;
   }
 
   // A piece broken up in the collapse: it spills out of the crush line, down
