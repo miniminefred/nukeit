@@ -300,6 +300,35 @@ export class Topple {
     return hit.size;
   }
 
+  // It has come to rest leaning on another building. Its weight is on that
+  // building's side now, and the columns and walls under where it leans —
+  // every storey of them, down to the street — were never built to carry a
+  // tower. They give way, and that building's own collapse takes it from
+  // there, away from the push (see `blows`).
+  _overload() {
+    const M = this.mass, b = M.body, { world, owner } = this.physics;
+    const zone = new THREE.Box3();
+    let building = null;
+    for (let n = 0; n < b.numColliders(); n++) {
+      world.contactPairsWith(b.collider(n), (k) => {
+        const o = owner.get(k.handle);
+        if (o?.parts && o.state === 'static' && o.building !== M.building) { zone.union(o.box); building = o.building; }
+      });
+    }
+    if (!building) return;
+    zone.expandByVector(new THREE.Vector3(3, 0, 3));
+    zone.min.y = -1;
+    const damage = this.fx.structure?.fx.damage;
+    const c = new THREE.Vector3();
+    for (const p of this.pieces.list) {
+      if (p.state !== 'static' || p.building !== building || (p.role !== 'column' && p.role !== 'core')) continue;
+      p.box.getCenter(c);
+      if (!zone.containsPoint(c)) continue;
+      damage?.failSoon(p, c.clone(), M.dir.clone());
+    }
+    this.blows.set(building, { dir: M.dir.clone(), t: this.time });
+  }
+
   // Everything of the mass that has swung below the street is ground off:
   // rubble where it is, going the way that part of the mass was going.
   _grind(mat) {
@@ -379,7 +408,10 @@ export class Topple {
     // a building that can lean; left standing there it was four thousand
     // pieces supported by links to where they used to be.
     if (b.isSleeping() || speed < 0.2) M.still += dt; else M.still = 0;
-    if (M.still > 1.2 || M.t > 25) return this._break(speed, 'rest');
+    if (M.still > 1.2 || M.t > 25) {
+      this._overload();
+      return this._break(speed, 'rest');
+    }
   }
 
   // Put every rider where the body has carried it.
