@@ -17,6 +17,7 @@ import { Impacts } from './sim/impacts.js';
 import { Lift } from './sim/lift.js';
 import { Topple } from './sim/topple.js';
 import { Rubble } from './sim/rubble.js';
+import { People } from './sim/people.js';
 import { TOOL_CLASSES } from './tools/tools.js';
 import { Menu } from './ui/menu.js';
 import { Hud, screens } from './ui/hud.js';
@@ -105,8 +106,15 @@ damage.fx.onPuncture = (p, point, normal) => {
 structure.onCrushPlayer = () => player.damage(500, 'crushed');
 
 const lift = new Lift(scene, physics);
+const people = new People(scene, physics);
+// People hear things: a blast, a support giving way, a building going over.
+const bang = blast.explode.bind(blast);
+blast.explode = (at, r) => { people.alarm(at, Math.max(26, r * 9)); return bang(at, r); };
+const gave = damage.fx.onFailed;
+damage.fx.onFailed = (p) => { people.alarm(p.box.getCenter(new THREE.Vector3()), 18); return gave(p); };
 let liftTip = null;
 let rig = null;           // dev: { at, look } to hold the camera there
+let toppling = false;
 
 const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene };
 
@@ -148,6 +156,7 @@ async function start(jobId, toolIds) {
   await frames(2);
   world.load(job.build);
   lift.attach(pieces);
+  people.populate(pieces);
   screens.loading('Wiring the gas and the lights', 0.85);
   await frames(2);
   tools = toolIds.filter((id) => TOOL_CLASSES[id]).map((id) => new TOOL_CLASSES[id]());
@@ -180,6 +189,7 @@ function unloadJob() {
   damage.clear();
   chips.clear();
   rubble.clear();
+  people.clear();
   particles.clear();
   world.unload();
 }
@@ -283,6 +293,9 @@ function frame(dt) {
     pieces.sync();
     topple.update(dt);
     rubble.update(dt);
+    if (topple.active && !toppling) people.alarm(camera.position.clone().set(0, 20, 0), 90);
+    toppling = topple.active;
+    people.update(dt);
     structure.update(dt);
     impacts.update(dt);
     damage.update();
@@ -351,7 +364,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, particles, audio, ctx, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.
