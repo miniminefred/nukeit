@@ -270,10 +270,13 @@ export class Topple {
         if (other(o)) hit.add(o);
         return hit.size < 60;
       }, undefined, G_LAND);
-      // Off its hinge, lying on its own podium, it crushes what it lies on:
-      // a roof built for people and furniture, not for a tower. So it sinks
-      // and slides off the edge, rather than resting there.
-      if (!M.joint) world.contactPairsWith(c, (k) => { const o = owner.get(k.handle); if ((other(o) || (o?.parts && o.state === 'static' && o.building === M.building)) && hit.size < 60) hit.add(o); });
+      // Off its hinge, it crushes the storey it stood on where it lies on it —
+      // a roof built for people and furniture, not for a tower lying across
+      // it. Below that its own building is whole and carries it, and it slides
+      // off. (Crushing all the way down, it sank through the podium to the
+      // street.)
+      const own = (o) => o?.parts && o.state === 'static' && o.building === M.building && o.floor >= M.floor - 1;
+      if (!M.joint) world.contactPairsWith(c, (k) => { const o = owner.get(k.handle); if ((other(o) || own(o)) && hit.size < 60) hit.add(o); });
       if (hit.size >= 60) break;
     }
     if (!hit.size) return 0;
