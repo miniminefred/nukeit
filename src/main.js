@@ -92,6 +92,23 @@ const impacts = new Impacts(pieces, physics, { damage, cloud, audio, shake, play
 damage.fx.makeRoom = (n) => impacts.makeRoom(n);
 const topple = new Topple(pieces, physics, { rubble, particles, chips, cloud, audio, shake, structure, player });
 structure.fx.topple = topple;
+// Thousands of tonnes coming down next to a building shake it: in what is
+// still standing, furniture goes over — more of it the nearer the blow —
+// hanging lamps come down, and windows burst. The structure stands; its
+// contents do not.
+topple.fx.quake = (at, mass) => {
+  const reach = 12 + Math.sqrt(mass / 1000) * 1.2;
+  const near = pieces.list.filter((p) => p.state === 'static' && (p.role === 'furniture' || p.role === 'lamp' || p.role === 'glass'))
+    .map((p) => [p, p.box.distanceToPoint(at)]).filter(([, d]) => d < reach).sort((a, b) => a[1] - b[1]).slice(0, 400);
+  for (const [p, d] of near) {
+    const k = 1 - d / reach;
+    if (Math.random() > k * 1.3) continue;
+    if (p.role === 'glass') { if (Math.random() < 0.5) { chips.burst('glass', p.box.getCenter(new THREE.Vector3()), new THREE.Vector3(0, 1, 0), 4, 3, 0.03); pieces.destroy(p); } continue; }
+    const a = Math.random() * Math.PI * 2, s = 0.6 + k * 2.2;
+    rubble.add(p, new THREE.Vector3(Math.cos(a) * s, 0.6 + k * 1.5, Math.sin(a) * s), new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(4 * k));
+  }
+  structure.mark();
+};
 damage.fx.mustFail = (p) => structure.mustFail(p);
 damage.fx.onFailed = (p) => structure.failed(p);
 structure.fx.damage = damage;

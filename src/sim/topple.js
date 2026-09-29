@@ -418,6 +418,7 @@ export class Topple {
       fx.cloud?.(p.box.getCenter(new THREE.Vector3()).setY(0.5), 2.5);
     }
     fx.audio?.impact(com.x, 1, com.z, 1);
+    fx.quake?.(new THREE.Vector3(com.x, com.y, com.z), M.mass);
     fx.audio?.rumble(1);
     fx.shake?.add(1);
     fx.structure?.mark();
