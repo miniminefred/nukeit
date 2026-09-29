@@ -32,6 +32,8 @@ const CELL = 2;
 const MAX_DEPTH = 3;
 const WRECKAGE = new Set(['stub', 'rebar', 'shard', 'fragment']);
 const SMALL_BAY = 12;
+const GROUND = 0.45;        // m: anything whose foot is this near the ground stands on it — a
+                            // column's base is on its foundation, broken floor slab or not
 const WEAK = 0.25;          // below this fraction of its durability a support carries nothing       // m^2: a bay this small can cantilever
 
 export function link(pieces) {
@@ -114,7 +116,7 @@ export function unsupported(pieces) {
     if (p.structural) return 0;
     let d = 99;
     for (const q of p.rests) if (holds(p, q) && q.depth + 1 < d) d = q.depth + 1;
-    return p.box.min.y < 0.05 ? 1 : d;
+    return p.box.min.y < GROUND ? 1 : d;
   };
 
   let n = 0;
@@ -129,7 +131,7 @@ export function unsupported(pieces) {
       let n = 0;
       for (const q of p.rests) if (holds(p, q)) n++;
       p.held = n;
-      if (p.box.min.y < 0.05 || n > 0) { p.sup = true; p.direct = true; p.depth = depthOf(p); }
+      if (p.box.min.y < GROUND || n > 0) { p.sup = true; p.direct = true; p.depth = depthOf(p); }
     }
     // Small bays cantilever off a firmly held neighbour.
     for (let i = n; i < m; i++) {
