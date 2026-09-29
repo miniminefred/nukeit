@@ -52,15 +52,20 @@ function slabs(P, f) {
   // court, oak in the restaurant and the café, carpet in the offices.
   const FINISH = { 1: 'marble', 2: 'marble', 3: 'ceramic', 4: 'wood', 5: 'wood' };
   const finish = f === ROOF ? null : f >= PENTHOUSE ? 'marble' : f >= PODIUM_FLOORS ? 'carpet' : FINISH[f] ?? null;
+  // The public floors and the penthouse are warm: cream marble, warm plaster
+  // overhead. The offices stay the cool grey of offices.
+  const rich = (g) => g < PODIUM_FLOORS || g >= PENTHOUSE;
+  const ceilingTint = rich(f - 1) ? 0xf6e9d2 : 0xf2efe8;
+  const marbleTint = 0xf1e3cc;
   const add = (x0, z0, x1, z1, kind, outdoors = false) => {
-    const s = block(P, kind, x0, y0, z0, x1, y1, z1, 'slab', { floor: f, lateral: true });
-    if (f >= 1) block(P, 'plaster', x0, y0 - 0.03, z0, x1, y0, z1, 'ceiling', { floor: f - 1, hang: true, tint: 0xf2efe8 });
-    if (finish && !outdoors) block(P, finish, x0, y1, z0, x1, y1 + 0.02, z1, 'carpet', { floor: f, structural: false, tint: finish === 'wood' ? 0xf2dcbc : finish === 'ceramic' ? 0xe8e2d8 : undefined });
+    const s = block(P, kind, x0, y0, z0, x1, y1, z1, 'slab', { floor: f, lateral: true, tint: kind === 'marble' ? marbleTint : undefined });
+    if (f >= 1) block(P, 'plaster', x0, y0 - 0.03, z0, x1, y0, z1, 'ceiling', { floor: f - 1, hang: true, tint: ceilingTint });
+    if (finish && !outdoors) block(P, finish, x0, y1, z0, x1, y1 + 0.02, z1, 'carpet', { floor: f, structural: false, tint: finish === 'wood' ? 0xf2dcbc : finish === 'ceramic' ? 0xe8e2d8 : finish === 'marble' ? marbleTint : undefined });
     return s;
   };
   const addPlate = (poly, kind) => {
     plate(P, kind, poly, y0, y1, 'slab', { floor: f, lateral: true });
-    plate(P, 'plaster', poly, y0 - 0.03, y0, 'ceiling', { floor: f - 1, hang: true, tint: 0xf2efe8 });
+    plate(P, 'plaster', poly, y0 - 0.03, y0, 'ceiling', { floor: f - 1, hang: true, tint: ceilingTint });
     if (finish) plate(P, finish, poly, y1, y1 + 0.02, 'carpet', { floor: f, structural: false });
   };
 

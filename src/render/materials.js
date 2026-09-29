@@ -72,7 +72,8 @@ function build(name, def, surf) {
     });
   }
   if (name === 'lamp') {
-    return new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff4e0, emissiveIntensity: 2.2 });
+    // Warm white: the light of a hotel lobby, not a strip light.
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffe2b8, emissiveIntensity: 2.2 });
   }
   const s = surface(surf);
   const tile = (t) => {
