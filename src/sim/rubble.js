@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { G_LAND } from '../physics.js';
 import { fractureAsync } from '../damage/csg.js';
 import { insideMaterial } from '../render/materials.js';
+import { groundAt } from '../building/plan.js';
 
 // What a collapse leaves behind is the building itself.
 //
@@ -173,7 +174,7 @@ export class Rubble {
     while (q && q.state === 'rubble' && q.restOn && guard++ < 16) q = q.restOn;
     // Through a carpet, a desk, a floor finish, to the slab under it.
     for (let d = 0; d < 3 && q && q.state === 'static' && q.role !== 'slab'; d++) q = q.rests?.find((r) => r.state === 'static') ?? null;
-    if (!q || q.state !== 'static' || q.role !== 'slab' || q.box.min.y < 0.05) return;
+    if (!q || q.state !== 'static' || q.role !== 'slab' || q.box.min.y < groundAt((q.box.min.x + q.box.max.x) / 2, (q.box.min.z + q.box.max.z) / 2) + 0.05) return;
     const m = p.volume * p.kind.density * 0.5;       // a chunk fills about half its box
     q.burden = (q.burden ?? 0) + m;
     p.bears = q;

@@ -19,22 +19,34 @@ export const SLAB = 0.3;
 export const PODIUM_FLOORS = 6;
 export const TOP_FLOOR = 11;         // 12 storeys: the roof at 48 m, the plant room to 52
 export const ROOF = TOP_FLOOR + 1;
+export const LOWER = -1;             // the lower level, under the whole podium
+// The pit the lower level stands in: the podium's plan, a storey deep.
+export const BASEMENT = { x0: -20, x1: 20, z0: -12, z1: 12, depth: FLOOR_H };
+// Where the ground is under (x, z): the pit's floor under the podium, the
+// street everywhere else. What stands on the ground stands on this.
+export const groundAt = (x, z) => (x > BASEMENT.x0 && x < BASEMENT.x1 && z > BASEMENT.z0 && z < BASEMENT.z1 ? -BASEMENT.depth : 0);
 
-// What each floor is. The podium is the public part of the building; the
-// penthouse is the top three storeys of the tower.
-export const PENTHOUSE = TOP_FLOOR - 2;   // the top three storeys
+// What each floor is — the real tower's programme, in the same proportions on
+// twelve storeys: under it all a lower level of vault, goods, plant and
+// kitchens; a public atrium of shops, cafés and the Grill round an 18-metre
+// waterfall and gold escalators; offices of glass-walled rooms on long
+// corridors; the Trump Organization's floor; and the residences on top, the
+// penthouse the top two.
+export const PENTHOUSE = TOP_FLOOR - 2;   // the residential storeys
+export const HQ = PENTHOUSE - 1;          // the Trump Organization
 export const PROGRAMME = {
+  [LOWER]: 'lower level',
   0: 'lobby',
   1: 'boutiques',
   2: 'jewellers',
   3: 'food court',
   4: 'restaurant',
-  5: 'café and books',
-  [PENTHOUSE]: 'penthouse: living',
-  [PENTHOUSE + 1]: 'penthouse: bedrooms',
+  [HQ]: 'headquarters',
+  [PENTHOUSE]: 'condominiums',
+  [PENTHOUSE + 1]: 'penthouse: living',
   [PENTHOUSE + 2]: 'penthouse: master suite',
 };
-export const floorUse = (f) => PROGRAMME[f] ?? (f >= PODIUM_FLOORS && f < PENTHOUSE ? 'offices' : '');
+export const floorUse = (f) => PROGRAMME[f] ?? (f >= 5 && f < HQ ? 'offices' : '');
 
 export const T = (f) => f * FLOOR_H + SLAB;        // top of floor f's slab
 export const U = (f) => (f + 1) * FLOOR_H;         // underside of the slab above it

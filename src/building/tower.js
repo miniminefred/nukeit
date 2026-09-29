@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { block, panel, plate, assembly } from './kit.js';
 import * as F from './furniture.js';
 import { fitOut as furnish } from './interiors.js';
-import { FLOOR_H, SLAB, PODIUM_FLOORS, TOP_FLOOR, ROOF, PENTHOUSE, T, U, CORE, ATRIUM, podiumFront, OUTLINE, inPoly, inCore, rectPoly } from './plan.js';
+import { FLOOR_H, SLAB, PODIUM_FLOORS, TOP_FLOOR, ROOF, PENTHOUSE, HQ, LOWER, BASEMENT, T, U, CORE, ATRIUM, podiumFront, OUTLINE, inPoly, inCore, rectPoly } from './plan.js';
 
 // Trump Tower, at 50 m.
 //
@@ -25,19 +25,33 @@ export const SITE = { x0: -21, x1: 21, z0: -13, z1: 14 };      // what the job m
 export const ENTRY = { x: 0, z: 20, yaw: 0 };                   // where you arrive, facing the door
 
 export function buildTower(P) {
-  for (let f = 0; f <= ROOF; f++) {
+  for (let f = LOWER; f <= ROOF; f++) {
     slabs(P, f);
     if (f <= TOP_FLOOR) {
       columns(P, f);
       core(P, f);
       stair(P, f);
-      facade(P, f);
+      if (f === LOWER) retaining(P);
+      else facade(P, f);
       furnish(P, f);
     }
   }
   terraces(P);
   roof(P);
   sign(P);
+}
+
+// ---------------------------------------------------------------- the lower level
+
+// Concrete walls round the pit, holding the street back, and carrying the
+// edge of the lobby floor.
+function retaining(P) {
+  const { x0, x1, z0, z1 } = BASEMENT, y0 = T(LOWER), y1 = U(LOWER), t = 0.4;
+  const w = (a0, b0, a1, b1) => block(P, 'concrete', a0, y0, b0, a1, y1, b1, 'wall', { floor: LOWER, load: ROOF });
+  w(x0, z0, x0 + t, z1);
+  w(x1 - t, z0, x1, z1);
+  w(x0 + t, z0, x1 - t, z0 + t);
+  w(x0 + t, z1 - t, x1 - t, z1);
 }
 
 // ---------------------------------------------------------------- slabs
@@ -50,16 +64,16 @@ function slabs(P, f) {
   // below), and on the office floors carpet over it.
   // What you walk on: marble in the shops and the penthouse, tiles in the food
   // court, oak in the restaurant and the café, carpet in the offices.
-  const FINISH = { 1: 'marble', 2: 'marble', 3: 'ceramic', 4: 'wood', 5: 'wood' };
+  const FINISH = { 1: 'marble', 2: 'marble', 3: 'ceramic', 4: 'wood', 5: 'carpet' };
   const finish = f === ROOF ? null : f >= PENTHOUSE ? 'marble' : f >= PODIUM_FLOORS ? 'carpet' : FINISH[f] ?? null;
   // The public floors and the penthouse are warm: cream marble, warm plaster
   // overhead. The offices stay the cool grey of offices.
-  const rich = (g) => g < PODIUM_FLOORS || g >= PENTHOUSE;
+  const rich = (g) => (g >= 0 && g < 5) || g >= HQ;
   const ceilingTint = rich(f - 1) ? 0xf6e9d2 : 0xf2efe8;
   const marbleTint = 0xf1e3cc;
   const add = (x0, z0, x1, z1, kind, outdoors = false) => {
     const s = block(P, kind, x0, y0, z0, x1, y1, z1, 'slab', { floor: f, lateral: true, tint: kind === 'marble' ? marbleTint : undefined });
-    if (f >= 1) block(P, 'plaster', x0, y0 - 0.03, z0, x1, y0, z1, 'ceiling', { floor: f - 1, hang: true, tint: ceilingTint });
+    if (f > LOWER) block(P, 'plaster', x0, y0 - 0.03, z0, x1, y0, z1, 'ceiling', { floor: f - 1, hang: true, tint: f === 0 ? 0xdcd6ca : ceilingTint });
     if (finish && !outdoors) block(P, finish, x0, y1, z0, x1, y1 + 0.02, z1, 'carpet', { floor: f, structural: false, tint: finish === 'wood' ? 0xf2dcbc : finish === 'ceramic' ? 0xe8e2d8 : finish === 'marble' ? marbleTint : undefined });
     return s;
   };
@@ -80,7 +94,8 @@ function slabs(P, f) {
       for (let k = 0; k < zs.length - 1; k++) {
         const x0 = xs[i], x1 = xs[i + 1], z0 = zs[k], z1 = zs[k + 1];
         const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-        if (f >= 1 && inCore(cx, cz)) continue;
+        // The core is open above the lower level's floor: the stair and the lift.
+        if (f >= 0 && inCore(cx, cz)) continue;
         if (f >= 1 && f < PODIUM_FLOORS && cx > ATRIUM.x0 && cx < ATRIUM.x1 && cz > ATRIUM.z0 && cz < ATRIUM.z1) continue;
         const roofHere = f === PODIUM_FLOORS || cz > here;
         if (f === PODIUM_FLOORS) {
@@ -108,7 +123,7 @@ function slabs(P, f) {
   }
   // Inside the core: the stair landing. The lift shaft stays open.
   // It runs over the tops of the core walls, which is what it rests on.
-  if (f >= 1) block(P, f === ROOF ? 'roofing' : 'concrete', CORE.x0, y0, 1.5, 0.2, y1, CORE.z1, 'slab', { floor: f, lateral: true });
+  if (f >= 0) block(P, f === ROOF ? 'roofing' : 'concrete', CORE.x0, y0, 1.5, 0.2, y1, CORE.z1, 'slab', { floor: f, lateral: true });
 }
 
 // The triangles of podium roof left between the tower's teeth.
@@ -155,7 +170,7 @@ function core(P, f) {
   const { x0, x1, z0, z1, t } = CORE;
   // Full storey height, through the slab line: there is no slab inside the core
   // for a wall to stand on, so each storey's walls stand on the ones below.
-  const y0 = f === 0 ? T(0) : f * FLOOR_H, y1 = U(f);
+  const y0 = f === LOWER ? T(f) : f * FLOOR_H, y1 = U(f);
   const kind = f === 0 ? 'marble' : 'concrete';
   const wall = (a0, b0, a1, b1, ya = y0, yb = y1) => block(P, kind, a0, ya, b0, a1, yb, b1, 'core', { floor: f, load: ROOF - f });
   wall(x0, z0, x0 + t, z1);
@@ -178,7 +193,8 @@ function core(P, f) {
   const yd = T(f);
   // A brass sill across the lift doorway, so there is floor between the car
   // and the landing. It rests on the core wall below.
-  if (f >= 1) block(P, 'brass', 0.9, f * FLOOR_H, 3.05, 3.4, T(f), z1, 'furniture', { floor: f, structural: false });
+  if (f === LOWER) return;               // the lift does not go down to the lower level
+  if (f >= 0) block(P, 'brass', 0.9, f * FLOOR_H, 3.05, 3.4, T(f), z1, 'furniture', { floor: f, structural: false });
   // Tagged so the lift can find them and slide them open.
   block(P, 'brass', 0.9, yd, z1, 2.15, yd + 2.4, z1 + 0.04, 'liftdoor', { floor: f, tag: 'left', structural: false });
   block(P, 'brass', 2.15, yd, z1, 3.4, yd + 2.4, z1 + 0.04, 'liftdoor', { floor: f, tag: 'right', structural: false });

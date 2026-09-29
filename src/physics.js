@@ -2,6 +2,7 @@
 // every browser that runs WebGL2 has WebAssembly SIMD.
 import RAPIER from '@dimforge/rapier3d-simd-compat';
 import * as THREE from 'three';
+import { BASEMENT } from './building/plan.js';
 
 // Rigid-body physics, through Rapier.
 //
@@ -84,12 +85,24 @@ export class Physics {
     // The ground: a grid of 40 m tiles with their tops at y = 0. It was one
     // 2 km box first, and a shape that big loses enough precision in contact
     // tests that the player's capsule sank a few centimetres into it and stuck.
+    // Under the podium the ground is a pit a storey deep, for the lower level:
+    // the four tiles round it are cut to leave the hole, and its floor is a
+    // storey down.
+    const slab = (x0, x1, z0, z1, top) => this.ground.add(this.world.createCollider(
+      RAPIER.ColliderDesc.cuboid((x1 - x0) / 2, 1, (z1 - z0) / 2).setTranslation((x0 + x1) / 2, top - 1, (z0 + z1) / 2).setCollisionGroups(G_GROUND).setFriction(0.9),
+      this.fixed,
+    ).handle);
     for (let x = -200; x < 200; x += 40)
-      for (let z = -200; z < 200; z += 40)
-        this.ground.add(this.world.createCollider(
-          RAPIER.ColliderDesc.cuboid(20, 1, 20).setTranslation(x + 20, -1, z + 20).setCollisionGroups(G_GROUND).setFriction(0.9),
-          this.fixed,
-        ).handle);
+      for (let z = -200; z < 200; z += 40) {
+        if (x >= -40 && x < 40 && z >= -40 && z < 40) continue;
+        slab(x, x + 40, z, z + 40, 0);
+      }
+    const B = BASEMENT;
+    slab(-40, 40, -40, B.z0, 0);
+    slab(-40, 40, B.z1, 40, 0);
+    slab(-40, B.x0, B.z0, B.z1, 0);
+    slab(B.x1, 40, B.z0, B.z1, 0);
+    slab(B.x0, B.x1, B.z0, B.z1, -B.depth);
   }
 
   // --------------------------------------------------------- colliders

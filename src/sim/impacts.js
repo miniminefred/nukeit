@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { crack } from '../damage/cracks.js';
+import { groundAt } from '../building/plan.js';
 
 // What happens when something lands.
 //
@@ -120,7 +121,7 @@ export class Impacts {
     if (q.structural || q.role === 'slab') structure?.mark();
     if (q.hp > 0) return;
     // A floor laid on the ground cracks, but there is nowhere for it to fall.
-    if (q.role === 'slab' && q.box.min.y < 0.05) { q.hp = Math.max(q.hp, 0.01); return; }
+    if (q.role === 'slab' && q.box.min.y < groundAt((q.box.min.x + q.box.max.x) / 2, (q.box.min.z + q.box.max.z) / 2) + 0.05) { q.hp = Math.max(q.hp, 0.01); return; }
     const load = q.role === 'column' || q.role === 'core';
     if (load) damage.failSoon(q, point, new THREE.Vector3(0, -1, 0));
     else damage.fractureSoon(q, point, new THREE.Vector3(0, -1, 0), Math.min(4, 1 + blows / 50), blows > 100 ? 2 : 1);

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { chargeModel } from '../tools/viewmodels.js';
 import { unsupported } from '../building/support.js';
 import { job as jobById } from '../data/catalog.js';
+import { groundAt } from '../building/plan.js';
 
 // The collapse bench: an automated, repeatable test of the thing the game is
 // for. It loads Trump Tower, puts remote charges on a set of ground-floor
@@ -181,7 +182,7 @@ const WRECKAGE = new Set(['stub', 'rebar', 'shard', 'fragment']);
 export function floaters(dev) {
   const floating = [];
   for (const p of dev.pieces.list) {
-    if (!(p.state === 'rubble' || (p.state === 'static' && WRECKAGE.has(p.role))) || p.box.min.y < 0.3) continue;
+    if (!(p.state === 'rubble' || (p.state === 'static' && WRECKAGE.has(p.role))) || p.box.min.y < groundAt((p.box.min.x + p.box.max.x) / 2, (p.box.min.z + p.box.max.z) / 2) + 0.3) continue;
     // How far its own underside is above what is under it, at the closest of
     // nine columns across it: the same measure rubble lands by.
     const gap = dev.rubble._gap(p);

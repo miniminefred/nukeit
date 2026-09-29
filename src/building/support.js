@@ -26,6 +26,8 @@
 //
 // This is connectivity, not stress: nothing here knows how heavy anything is.
 
+import { groundAt } from './plan.js';
+
 const TOL = 0.06;
 const MIN_OVERLAP = 0.005;   // a 2 cm glass rail on a slab edge still counts
 const CELL = 2;
@@ -96,6 +98,10 @@ function relate(A, B) {
   }
 }
 
+// Its foot is on the ground there: the street, or the floor of the pit under
+// the podium.
+export const onGround = (p) => p.box.min.y < groundAt((p.box.min.x + p.box.max.x) / 2, (p.box.min.z + p.box.max.z) / 2) + GROUND;
+
 // Which standing pieces have lost their support. `pieces` must be the full
 // list; dead and moving ones are ignored.
 export function unsupported(pieces) {
@@ -116,7 +122,7 @@ export function unsupported(pieces) {
     if (p.structural) return 0;
     let d = 99;
     for (const q of p.rests) if (holds(p, q) && q.depth + 1 < d) d = q.depth + 1;
-    return p.box.min.y < GROUND ? 1 : d;
+    return onGround(p) ? 1 : d;
   };
 
   let n = 0;
@@ -131,7 +137,7 @@ export function unsupported(pieces) {
       let n = 0;
       for (const q of p.rests) if (holds(p, q)) n++;
       p.held = n;
-      if (p.box.min.y < GROUND || n > 0) { p.sup = true; p.direct = true; p.depth = depthOf(p); }
+      if (onGround(p) || n > 0) { p.sup = true; p.direct = true; p.depth = depthOf(p); }
     }
     // Small bays cantilever off a firmly held neighbour.
     for (let i = n; i < m; i++) {
