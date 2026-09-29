@@ -270,7 +270,10 @@ export class Topple {
         if (other(o)) hit.add(o);
         return hit.size < 60;
       }, undefined, G_LAND);
-      if (!M.joint) world.contactPairsWith(c, (k) => { const o = owner.get(k.handle); if (other(o) && hit.size < 60) hit.add(o); });
+      // Off its hinge, lying on its own podium, it crushes what it lies on:
+      // a roof built for people and furniture, not for a tower. So it sinks
+      // and slides off the edge, rather than resting there.
+      if (!M.joint) world.contactPairsWith(c, (k) => { const o = owner.get(k.handle); if ((other(o) || (o?.parts && o.state === 'static' && o.building === M.building)) && hit.size < 60) hit.add(o); });
       if (hit.size >= 60) break;
     }
     if (!hit.size) return 0;
@@ -289,7 +292,7 @@ export class Topple {
       if (support) fx.structure?.failed(p);
     }
     // Momentum into what it hit, and a note of which way.
-    const hitBuilding = [...hit][0]?.building;
+    const hitBuilding = [...hit].find((p) => p.building !== M.building)?.building;
     if (hitBuilding) this.blows.set(hitBuilding, { dir: M.dir.clone(), t: this.time });
     const k = Math.max(0.85, 1 - (tonnes * 1000) / M.mass * 2);
     b.setLinvel({ x: lv.x * k, y: lv.y * k, z: lv.z * k }, true);
