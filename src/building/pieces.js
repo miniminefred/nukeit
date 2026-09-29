@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { KIND } from '../render/materials.js';
-import { G_WORLD, G_RUBBLE } from '../physics.js';
+import { G_WORLD, G_RUBBLE, inBuilding } from '../physics.js';
 
 // Every wall, slab, column, pane of glass and chair in the building is a piece.
 //
@@ -174,7 +174,7 @@ export class Pieces {
   _addFixedCollider(p) {
     const ph = this.physics;
     const boxes = p.colliderBoxes ?? [[p.localBox.min.x, p.localBox.min.y, p.localBox.min.z, p.localBox.max.x, p.localBox.max.y, p.localBox.max.z]];
-    const group = p.state === 'rubble' ? G_RUBBLE : G_WORLD;
+    const group = p.state === 'rubble' ? G_RUBBLE : inBuilding(G_WORLD, p.building);
     p.colliders = boxes.map(([x0, y0, z0, x1, y1, z1]) => {
       const c = new THREE.Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2).applyQuaternion(p.quat).add(p.pos);
       return ph.addFixedBox(p, c, p.quat, Math.max(0.005, (x1 - x0) / 2), Math.max(0.005, (y1 - y0) / 2), Math.max(0.005, (z1 - z0) / 2), group);
@@ -249,7 +249,7 @@ export class Pieces {
       // One trimesh per part, in world space.
       for (const r of p.parts) {
         const w = r.geometry.clone().applyMatrix4(_m.compose(p.pos, p.quat, _one));
-        p.colliders.push(this.physics.addFixedMesh(p, w, p.state === 'rubble' ? G_RUBBLE : G_WORLD));
+        p.colliders.push(this.physics.addFixedMesh(p, w, p.state === 'rubble' ? G_RUBBLE : inBuilding(G_WORLD, p.building)));
         w.dispose();
       }
     }

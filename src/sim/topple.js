@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { FLOOR_H } from '../building/plan.js';
-import { G_MASS, G_MASS_HINGED, G_LAND } from '../physics.js';
+import { G_MASS_HINGED, G_LAND, massGroups } from '../physics.js';
 
 // A tower that has lost one side tips over.
 //
@@ -228,7 +228,9 @@ export class Topple {
       (byFloor.get(k) ?? byFloor.set(k, new THREE.Box3()).get(k)).union(rd.box);
     }
     for (let n = body.numColliders() - 1; n >= 0; n--) world.removeCollider(body.collider(n), false);
-    if (byFloor.size) this._boxes(body, [...byFloor.values()], M.density, G_MASS);
+    // Its own building it lands on and slides off; another it ploughs into
+    // (`_smash`). Colliding with the office block, it bounced off it upright.
+    if (byFloor.size) this._boxes(body, [...byFloor.values()], M.density, massGroups(M.building));
   }
 
   // What is under the ground it may swing over: a height map, 2 m squares, of
