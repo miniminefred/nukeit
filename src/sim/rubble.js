@@ -246,7 +246,12 @@ export class Rubble {
       if (r.state !== 'rubble' && r.state !== 'static') { this._unrest(r); continue; }
       const on = r.restOn;
       if (!on) { this.resting.delete(r); continue; }
-      if ((on.state === 'static' || on.state === 'rubble') && (on.placed ?? 0) === r.restAt) continue;
+      if ((on.state === 'static' || on.state === 'rubble') && (on.placed ?? 0) === r.restAt) {
+        // Small things — a shard, a chip of concrete — are looked under
+        // again as well, which is one ray each: what they lie on can settle
+        // under them in ways that are not a move.
+        if (r.volume > 0.05 || this._gap(r) < 0.15) continue;
+      }
       this.add(r, new THREE.Vector3(), new THREE.Vector3());
     }
   }
