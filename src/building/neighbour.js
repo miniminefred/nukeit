@@ -73,19 +73,21 @@ function facade(P, f, y0, y1) {
   const v = (x, z) => new THREE.Vector3(x, 0, z);
   const corners = [v(x0, z0), v(x1, z0), v(x1, z1), v(x0, z1)];
   const yTop = y1 - 0.45;
+  // Set just inside the slab edge, which is what it stands on (the corners go
+  // round anticlockwise, so inside is to the left).
   for (let e = 0; e < 4; e++) {
     const A = corners[e], B = corners[(e + 1) % 4];
     const len = A.distanceTo(B), n = Math.round(len / 2.5);
     const d = B.clone().sub(A).normalize();
     for (let i = 0; i <= n; i++) {
       const c = A.clone().lerp(B, i / n);
-      panel(P, 'metal', c.clone().addScaledVector(d, -0.04), c.clone().addScaledVector(d, 0.04), y0, yTop, 0.12, -0.06, 'mullion', { floor: f, tint: 0x8c939a });
+      panel(P, 'metal', c.clone().addScaledVector(d, -0.04), c.clone().addScaledVector(d, 0.04), y0, yTop, 0.12, 0.12, 'mullion', { floor: f, tint: 0x8c939a });
       if (i === n) continue;
       const p0 = c.clone().addScaledVector(d, 0.04), p1 = A.clone().lerp(B, (i + 1) / n).addScaledVector(d, -0.04);
-      panel(P, 'glass', p0, p1, y0 + 0.02, yTop - 0.02, 0.03, -0.06, 'glass', { floor: f, tint: 0x9fb2c4 });
+      panel(P, 'glass', p0, p1, y0 + 0.02, yTop - 0.02, 0.03, 0.12, 'glass', { floor: f, tint: 0x9fb2c4 });
     }
     // The band at each slab edge.
-    panel(P, 'metal', A, B, yTop, y1 + NEIGHBOUR.slab, 0.16, -0.02, 'spandrel', { floor: f, tint: 0x4d545c });
+    panel(P, 'metal', A, B, yTop, y1 + NEIGHBOUR.slab, 0.16, 0.1, 'spandrel', { floor: f, tint: 0x4d545c });
   }
 }
 
