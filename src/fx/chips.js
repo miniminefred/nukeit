@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { KIND } from '../render/materials.js';
 import { blob } from '../damage/cutter.js';
+import { G_RAY } from '../physics.js';
 
 // Small bits: the chips of timber, grit of concrete, crumbs of plaster and
 // slivers of glass that a blow throws off.
@@ -10,7 +11,7 @@ import { blob } from '../damage/cutter.js';
 // rest on whatever they land on. A few seconds later they shrink away: small
 // broken bits do not pile up, only the big chunks (which are pieces) stay.
 
-const MAX = 1800;
+const MAX = 1000;
 const COLOURS = {
   wood: 0xc79a62, concrete: 0x9b958c, marble: 0xcf9f92, plaster: 0xeeeae2, carpet: 0x55505a,
   fabric: 0x3a4250, plastic: 0x2a2a2c, metal: 0x8a8d90, bronze: 0x5a4a38, roofing: 0x555555,
@@ -27,7 +28,7 @@ export class Chips {
     // Irregular lumps, not cubes: a coarse blob, squashed per chip below.
     const g = blob(3.1, 0.45, 0).scale(0.5, 0.5, 0.5);
     this.solid = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ roughness: 0.9 }), MAX);
-    this.glass = new THREE.InstancedMesh(g, KIND.glass.material, 1500);
+    this.glass = new THREE.InstancedMesh(g, KIND.glass.material, 800);
     for (const m of [this.solid, this.glass]) {
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       m.frustumCulled = false;
@@ -46,12 +47,13 @@ export class Chips {
     this._dir = { x: 0, y: 0, z: 0 };
     this._org = { x: 0, y: 0, z: 0 };
     this.dirty = { solid: true, glass: true };
+    this.recolour = { solid: true, glass: true };
   }
 
   // A burst of `n` chips of `kind` at `at`, thrown about `dir` at `speed`.
   burst(kind, at, dir, n, speed = 3, size = 0.03) {
     const list = kind === 'glass' ? this.items.glass : this.items.solid;
-    const max = kind === 'glass' ? 1500 : MAX;
+    const max = kind === 'glass' ? 800 : MAX;
     const shape = SHAPES[kind] ?? [1, 0.8, 0.9];
     const colour = COLOURS[kind] ?? 0x888888;
     for (let i = 0; i < n; i++) {
@@ -69,6 +71,7 @@ export class Chips {
       });
     }
     this.dirty[kind === 'glass' ? 'glass' : 'solid'] = true;
+    this.recolour[kind === 'glass' ? 'glass' : 'solid'] = true;
   }
 
   update(dt) {
@@ -78,13 +81,15 @@ export class Chips {
       let changed = false;
       for (const c of list) if (c.rest) { c.t = (c.t ?? 0) + dt; if (c.t > LINGER) changed = true; }
       if (changed) {
+        const before = list.length;
         this.items[key] = list.filter((c) => !(c.rest && c.t > LINGER + SHRINK));
         this.dirty[key] = true;
+        if (this.items[key].length !== before) this.recolour[key] = true;
       }
     }
     // Ray tests are the whole cost, so only so many chips get one each frame;
     // the rest coast for a frame and take their turn next time.
-    let rays = 160;
+    let rays = 60;
     for (const key of ['solid', 'glass']) {
       const list = this.items[key];
       let moving = false;
@@ -101,7 +106,7 @@ export class Chips {
         if (len > 1e-5 && test) {
           this._org.x = c.x; this._org.y = c.y; this._org.z = c.z;
           this._dir.x = dx / len; this._dir.y = dy / len; this._dir.z = dz / len;
-          const hit = this.physics.raycast(this._org, this._dir, len + 0.01);
+          const hit = this._cast(len + 0.01);
           if (hit) {
             const n = hit.normal;
             const vn = c.vx * n.x + c.vy * n.y + c.vz * n.z;
@@ -136,16 +141,34 @@ export class Chips {
       this._s.set(c.w * k, c.h * k, c.d * k);
       this._m.compose(this._s.clone().set(c.x, c.y, c.z), this._q, this._s);
       mesh.setMatrixAt(i, this._m);
-      if (key === 'solid') mesh.setColorAt(i, this._c.set(c.colour));
+      if (key === 'solid' && this.recolour.solid) mesh.setColorAt(i, this._c.set(c.colour));
     }
     mesh.count = list.length;
     mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    if (mesh.instanceColor && this.recolour[key]) mesh.instanceColor.needsUpdate = true;
+    this.recolour[key] = false;
   }
 
-  // Wake everything: the floor under the chips may have gone.
-  unsettle() {
-    for (const list of Object.values(this.items)) for (const c of list) { if (c.rest) { c.rest = false; c.vx = c.vz = 0; c.vy = 0; } }
+  // One ray from _org along _dir, without making new objects: a chip's bounce.
+  _cast(len) {
+    const ray = this._ray ??= new this.physics.R.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
+    ray.origin.x = this._org.x; ray.origin.y = this._org.y; ray.origin.z = this._org.z;
+    ray.dir.x = this._dir.x; ray.dir.y = this._dir.y; ray.dir.z = this._dir.z;
+    const hit = this.physics.world.castRayAndGetNormal(ray, len, true, undefined, G_RAY);
+    if (!hit) return null;
+    const t = hit.timeOfImpact;
+    const h = this._hit ??= { point: new THREE.Vector3(), normal: new THREE.Vector3() };
+    h.point.set(ray.origin.x + ray.dir.x * t, ray.origin.y + ray.dir.y * t, ray.origin.z + ray.dir.z * t);
+    h.normal.set(hit.normal.x, hit.normal.y, hit.normal.z);
+    return h;
+  }
+
+  // Wake what lies in `zone` (or everything): the floor under it may have gone.
+  unsettle(zone = null) {
+    for (const list of Object.values(this.items)) for (const c of list) {
+      if (!c.rest || (zone && (c.x < zone.min.x || c.x > zone.max.x || c.z < zone.min.z || c.z > zone.max.z || c.y < zone.min.y - 1 || c.y > zone.max.y + 1))) continue;
+      c.rest = false; c.vx = c.vz = 0; c.vy = 0;
+    }
   }
 
   clear() {

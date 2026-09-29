@@ -179,7 +179,7 @@ export class Structure {
           this.sagging.push({ p, t: SAG[0] + Math.random() * (SAG[1] - SAG[0]) });
         } else this.pieces.makeDynamic(p, undefined, undefined, { quiet: true });
       }
-      if (loose.length) { this.fx.chips.unsettle(); this._wakeRubble(loose); }
+      if (loose.length) this._wakeRubble(loose);
       if (loose.length && loose.length <= PANCAKE) this.dirty = true;   // what they carried may go next
     }
     for (const f of this.falls) this._fall(f, dt);
@@ -195,6 +195,7 @@ export class Structure {
     const zone = new THREE.Box3();
     for (const p of loose) zone.union(p.box);
     zone.expandByScalar(0.3);
+    this.fx.chips.unsettle(zone);
     for (const r of this.pieces.list) {
       if (r.state === 'rubble' && r.box.intersectsBox(zone)) this.pieces.makeDynamic(r, undefined, undefined, { quiet: true, debris: true });
     }
