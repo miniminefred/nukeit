@@ -22,9 +22,13 @@ export const GROUP_GROUND = 0x0020;
 export const GROUP_CITY = 0x0040;
 // Which building a standing piece belongs to, so that a tipping mass can meet
 // its own building and pass into another, smashing it (sim/topple.js).
-export const BUILDING_GROUP = { tower: 0x0080, neighbour: 0x0100 };
-export const inBuilding = (g, building) => g | ((BUILDING_GROUP[building] ?? 0) << 16);
-export const massGroups = (building) => groups(0x0010, 0x0020 | (BUILDING_GROUP[building] ?? 0));
+// The city's blocks share the seven bits left, in turn: a block falling into
+// another with its bit slides off it instead of ploughing into it, which is
+// rare and harmless.
+const BUILDING_GROUP = { tower: 0x0080, neighbour: 0x0100 };
+const bitOf = (b) => BUILDING_GROUP[b] ?? (/^block(\d+)$/.test(b) ? 0x0200 << (+b.slice(5) % 7) : 0);
+export const inBuilding = (g, building) => g | (bitOf(building) << 16);
+export const massGroups = (building) => groups(0x0010, 0x0020 | bitOf(building));
 const groups = (member, filter) => (member << 16) | filter;
 export const G_WORLD = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER | GROUP_MASS);
 // The street and the city: the world, and also what a tipping mass lands on.
