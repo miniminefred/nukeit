@@ -5,11 +5,15 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 
 // The city round the job: a street, pavements and the blocks on either side.
 //
-// None of it can be broken. The job site is the only part of the world made of
-// pieces; this is stage scenery, and nothing you do reaches it.
+// Every block can be broken. Until something reaches one it is a single box —
+// one mesh, one collider — and the moment something could (a blast near it, a
+// tower falling its way, a sledge on its wall) it is swapped for a real
+// building of the same size made of pieces (building/block.js, world.js
+// `wakeBlock`). That is how a whole city can be breakable and still cost next
+// to nothing while it stands. `blocks` lists them.
 
-// Neighbours are solid but not breakable: a tower toppling into one slides off
-// it. The collider owner is a marker, not a piece, so tools ignore it.
+// A block's collider is owned by the block's record (role 'city'), not a
+// piece: until it is woken, rubble lies on it as on the street.
 export const CITY = { role: 'city' };
 
 export function buildCity(scene, physics) {
@@ -48,6 +52,7 @@ export function buildCity(scene, physics) {
   // stands in anything you can break.
   const windows = windowTexture();
   const rand = mulberry(7);
+  const blocks = [];
   const tower = (x, z, w, d, h, tint) => {
     const tex = windows.clone();
     tex.needsUpdate = true;
@@ -58,12 +63,17 @@ export function buildCity(scene, physics) {
     m.castShadow = true;
     m.receiveShadow = true;
     group.add(m);
-    if (physics) {
+    const block = { role: 'city', id: blocks.length, x, z, w, d, h, tint, mesh: m, collider: null, built: false };
+    block.solid = () => {
+      if (!physics || block.collider) return;
       const c = physics.world.createCollider(
         physics.R.ColliderDesc.cuboid(w / 2, h / 2, d / 2).setTranslation(x, h / 2, z).setFriction(0.35).setCollisionGroups(G_CITY),
         physics.fixed);
-      physics.owner.set(c.handle, CITY);
-    }
+      physics.owner.set(c.handle, block);
+      block.collider = c;
+    };
+    block.solid();
+    blocks.push(block);
   };
 
   const tints = [0xb9b2a6, 0x9ea3a8, 0xc7b89c, 0x8f9499, 0xa89586];
@@ -94,7 +104,7 @@ export function buildCity(scene, physics) {
   }
 
   scene.add(group);
-  return group;
+  return { group, blocks };
 }
 
 // One storey-and-bay of facade, repeated across every block.

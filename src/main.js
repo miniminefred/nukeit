@@ -98,7 +98,7 @@ rubble.fx.onOverload = (q) => {
 };
 const impacts = new Impacts(pieces, physics, { damage, cloud, audio, shake, player, structure });
 damage.fx.makeRoom = (n) => impacts.makeRoom(n);
-const topple = new Topple(pieces, physics, { rubble, particles, chips, cloud, audio, shake, structure, player });
+const topple = new Topple(pieces, physics, { rubble, particles, chips, cloud, audio, shake, structure, player, wake: (box) => world.wakeIn(box) });
 structure.fx.topple = topple;
 // Thousands of tonnes coming down next to a building shake it: in what is
 // still standing, furniture goes over — more of it the nearer the blow —
@@ -134,14 +134,18 @@ const lift = new Lift(scene, physics);
 const people = new People(scene, physics);
 // People hear things: a blast, a support giving way, a building going over.
 const bang = blast.explode.bind(blast);
-blast.explode = (at, r) => { people.alarm(at, Math.max(26, r * 9)); return bang(at, r); };
+blast.explode = (at, r) => {
+  people.alarm(at, Math.max(26, r * 9));
+  world.wakeNear(at, Math.max(6, r * 3));     // a city block near a blast is a building now
+  return bang(at, r);
+};
 const gave = damage.fx.onFailed;
 damage.fx.onFailed = (p) => { people.alarm(p.box.getCenter(new THREE.Vector3()), 18); return gave(p); };
 let liftTip = null;
 let rig = null;           // dev: { at, look } to hold the camera there
 let toppling = false;
 
-const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene };
+const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene, world };
 
 // ---------------------------------------------------------------- state
 

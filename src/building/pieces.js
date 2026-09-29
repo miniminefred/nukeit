@@ -129,10 +129,11 @@ export class Pieces {
   }
 
   // After the builders have run: pack every piece into its batch and give it a
-  // collider.
-  finalize() {
+  // collider. `list` and `tag`: a building added later — a city block that
+  // something has reached — gets batches of its own.
+  finalize(list = this.list, tag = '') {
     const need = new Map();
-    for (const p of this.list) {
+    for (const p of list) {
       for (const q of p.parts) {
         const k = q.kind.name;
         const n = need.get(k) ?? { inst: 0, vert: 0, idx: 0 };
@@ -142,6 +143,7 @@ export class Pieces {
         need.set(k, n);
       }
     }
+    const made = new Map();
     for (const [k, n] of need) {
       const b = new THREE.BatchedMesh(n.inst, n.vert, n.idx, KIND[k].material);
       b.castShadow = KIND[k].name !== 'glass';
@@ -152,14 +154,15 @@ export class Pieces {
       // is left unsorted too — sorting two thousand panes a frame is what cost.
       b.perObjectFrustumCulled = false;
       b.sortObjects = false;
-      b.name = `batch:${k}`;
-      this.batches.set(k, b);
+      b.name = `batch:${tag}${k}`;
+      this.batches.set(tag + k, b);
+      made.set(k, b);
       this.root.add(b);
     }
-    for (const p of this.list) {
+    for (const p of list) {
       _m.compose(p.pos, p.quat, _one);
       for (const q of p.parts) {
-        const b = this.batches.get(q.kind.name);
+        const b = made.get(q.kind.name);
         const g = b.addGeometry(q.geometry);
         const i = b.addInstance(g);
         q.draws = [{ b, i, g, spare: false }];

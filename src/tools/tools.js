@@ -19,7 +19,13 @@ const ease = (t) => t * t * (3 - 2 * t);
 function aim(ctx, range) {
   ctx.camera.getWorldDirection(_dir);
   _org.copy(ctx.camera.position);
-  const hit = ctx.physics.raycast(_org, _dir, range);
+  let hit = ctx.physics.raycast(_org, _dir, range);
+  // A city block, still a box: the blow wakes it into a building, and lands
+  // on that.
+  if (hit?.owner?.role === 'city' && hit.owner.mesh && ctx.world) {
+    ctx.world.wakeBlock(hit.owner);
+    hit = ctx.physics.raycast(_org, _dir, range);
+  }
   return { hit, dir: _dir.clone(), origin: _org.clone() };
 }
 

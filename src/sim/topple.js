@@ -242,6 +242,8 @@ export class Topple {
     for (const p of list) zone.union(p.box);
     const reach = zone.max.y - zone.min.y;
     zone.expandByVector(new THREE.Vector3(Math.abs(dir.x) * reach + 4, 0, Math.abs(dir.z) * reach + 4));
+    // Any city block it could come down on is a building from now on.
+    this.fx.wake?.(new THREE.Box3(zone.min.clone().setY(0), zone.max.clone()));
     const C = 2, x0 = zone.min.x, z0 = zone.min.z;
     const nx = Math.ceil((zone.max.x - x0) / C), nz = Math.ceil((zone.max.z - z0) / C);
     const h = new Float32Array(nx * nz);
