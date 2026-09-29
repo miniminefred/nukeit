@@ -71,7 +71,7 @@ export function buildCity(scene, physics) {
   // West of the plot, first, is the office block next door, which is part of
   // the job (building/neighbour.js): the city starts beyond it.
   for (const side of [-1, 1]) {
-    let x = side === -1 ? -62 : 36;
+    let x = side === -1 ? -48 : 36;
     while (Math.abs(x) < 300) {
       const w = 14 + rand() * 18;
       const h = 30 + rand() * 120;

@@ -16,9 +16,10 @@ export const JOBS = [
     id: 'trump',
     title: 'Trump Tower',
     where: 'Fifth Avenue, New York',
-    brief: 'Fifty metres of bronze glass on a six-storey podium: shops, restaurants, offices and a penthouse on top. The client wants it on the ground: bring the whole thing below 10 metres. '
+    brief: 'Fifty metres of bronze glass on a six-storey podium: shops, restaurants, offices and a penthouse on top. The owner of the office block next door wants the view back, and so does the city: '
+      + 'bring the tower above the podium down — and the block next door with it — to below the podium roof, 26 metres. The podium stays. '
       + 'The gas is still connected in the plant room and the kitchens, so mind the tanks — and if something catches, put it out before it spreads.',
-    target: 10,
+    target: 26,
     storeys: 12,
     height: 52,
     build: trumpAndNeighbour,

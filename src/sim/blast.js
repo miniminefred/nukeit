@@ -52,11 +52,15 @@ export class Blast {
     for (const p of hits) {
       if (p.state === 'dead') continue;
       const d = Math.max(0.05, p.box.distanceToPoint(at));
+      // Shielded: a slab, a wall or a column between the charge and the piece
+      // takes the blast instead. A charge on a column does not bring down the
+      // one on the storey below, through a floor of concrete.
+      const shield = this._shielded(p, at, d) ? 0.2 : 1;
       p.box.getCenter(_c);
       const out = _d.copy(_c).sub(at);
       if (out.lengthSq() < 1e-4) out.set(0, 1, 0);
       out.normalize();
-      const k = 1 - d / (r * 2);
+      const k = (1 - d / (r * 2)) * shield;
       if (p.kind.explodes > 0 && d < r) { this.later(() => this.tank(p), 0.08 + Math.random() * 0.25); continue; }
       if (p.role === 'glass') {
         const local = damage.toLocal(p, p.box.clampPoint(at, new THREE.Vector3()));
@@ -67,7 +71,7 @@ export class Blast {
         if (p.body) p.body.applyImpulse({ x: out.x * k * 400, y: out.y * k * 400 + 80 * k, z: out.z * k * 400 }, true);
         continue;
       }
-      const near = 1 - d / r;
+      const near = (1 - d / r) * shield;
       if (p.role === 'column' || p.role === 'core') {
         p.hp -= near * 30;
         if (p.hp <= 0) damage.failSoon(p, _c.clone(), out.clone());
@@ -104,6 +108,17 @@ export class Blast {
       if (d < r * 2.5) player.damage(140 * (1 - d / (r * 2.5)) ** 1.5, 'explosion');
       shake?.add(Math.max(0, 1.3 - d / (r * 7)));
     }
+  }
+
+  // Is there solid structure between the blast and the nearest point of p?
+  _shielded(p, at, d) {
+    if (d < 0.3) return false;
+    const to = p.box.clampPoint(at, _d.clone()).sub(at);
+    const len = to.length();
+    if (len < 1e-3) return false;
+    const hit = this.ctx.physics.raycast(at, to.divideScalar(len), len - 0.05, { skip: (o) => o === p });
+    const o = hit?.owner;
+    return !!(o && o.parts && o !== p && o.state === 'static' && (o.role === 'slab' || o.role === 'core' || o.role === 'column' || o.structural));
   }
 
   update(dt) {

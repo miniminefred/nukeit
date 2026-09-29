@@ -30,7 +30,7 @@ import { G_MASS, G_MASS_HINGED, G_LAND } from '../physics.js';
 // being the body's transform times where it stood.
 
 const MARGIN = 0.6;          // m: how far off its support the weight must be to tip
-const LOW = 0.5;             // remaining strength below which an off-centre load tips
+const LOW = 0.67;            // a third of the strength gone, all on one side, and it tips
 const OFF = 3;               // m: how far off the strength that is left it must be
 const HINGE_SHARE = 0.15;    // of what is left: stragglers past this on the fall side are no hinge
 const BREAK_SPEED = 5;       // m/s at which hitting the street breaks it apart

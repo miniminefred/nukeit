@@ -30,9 +30,13 @@ const SAG = [0.35, 0.9];     // s a slab with nothing under it hangs before it d
 // is how taking out three or four columns low down can bring a whole floor
 // down on its own, and a floor coming down brings the rest with it.
 const SPREAD = 7.5;          // metres: how far a lost column's load moves
-const CHAIN_COLUMN = 3;      // lost neighbours that break an undamaged column...
-const CHAIN_CORE = 6;        // ...or an undamaged length of core wall
-const CHAIN_LOAD = 8;        // ...if it is carrying at least this many storeys
+// How many lost neighbours an undamaged support survives depends on how much
+// it carries: the more storeys above it, the fewer it takes. A column under
+// twelve storeys goes when two round it have gone, one under six when four
+// have; a length of core wall takes twice as many.
+const CHAIN_WEIGHT = 24;     // storeys x lost neighbours that break an undamaged column
+const CHAIN_MIN = 2;         // but never fewer than this
+const chainAt = (p) => Math.max(CHAIN_MIN, Math.ceil(CHAIN_WEIGHT / Math.max(1, p.load))) * (p.role === 'core' ? 2 : 1);
 
 const PANCAKE = 80;          // pieces: more than this falls together, cheaply
 const G = 9.81 * 0.72;       // progressive collapse runs at about 0.7 g
@@ -87,7 +91,7 @@ export class Structure {
     for (const { p } of due) {
       if (p.state !== 'static') continue;
       const lost = this._lostNear(p);
-      const chain = p.load >= CHAIN_LOAD && lost >= (p.role === 'core' ? CHAIN_CORE : CHAIN_COLUMN);
+      const chain = p.load > 0 && lost >= chainAt(p);
       if (!chain && !this.mustFail(p)) continue;
       if (p.warned) continue;
       p.warned = true;

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { chargeModel } from '../tools/viewmodels.js';
 import { unsupported } from '../building/support.js';
+import { job as jobById } from '../data/catalog.js';
 
 // The collapse bench: an automated, repeatable test of the thing the game is
 // for. It loads Trump Tower, puts remote charges on a set of ground-floor
@@ -145,7 +146,7 @@ export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, 
   const minFps = Math.min(...windows.map((w) => w.fps));
   const height = dev.measure();
   return {
-    pass: !hidden && minFps >= 30 && hanging === 0 && inAir === 0 && floating.length === 0 && height < 10,
+    pass: !hidden && minFps >= 30 && hanging === 0 && inAir === 0 && floating.length === 0 && height < jobById('trump').target,
     minFps,
     worstFrameMs: +(worst.dt * 1000).toFixed(1),
     worstAt: +worst.t.toFixed(2),
@@ -249,7 +250,7 @@ export async function trial(dev, charges, secs = 30) {
   try {
     for (; t < secs; t += 1 / 30) {
       dev.step(1 / 30, 1);
-      if (down < 0 && dev.measure() < 10) down = t;
+      if (down < 0 && dev.measure() < jobById('trump').target) down = t;
       if (down >= 0 && t > down + 4 && !dev.rubble.active && !dev.topple.active && !dev.structure.collapsing) break;
     }
   } finally { dev.post.composer.render = render; }
