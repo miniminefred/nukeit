@@ -112,6 +112,12 @@ export class Topple {
     const along = standing.map((p) => [p, p.box.getCenter(new THREE.Vector3()).dot(dir)]).sort((a, b) => b[1] - a[1]);
     let acc = 0, edge = along[0][1];
     for (const [p, d] of along) { acc += p.hp; edge = d; if (acc >= left * HINGE_SHARE) break; }
+    // And never in front of the weight. Where the weight is still behind the
+    // supports on the fall side, those supports are what it now bears down on
+    // off-centre, and they crush: the pivot moves back until the weight is
+    // over it, and past it. A hinge in front of the weight would stand the
+    // tower up again.
+    edge = Math.min(edge, com.dot(dir) - 0.6);
     const hinge = along.filter(([, d]) => d <= edge + 0.01).map(([p]) => p);
     const anchor = centre.clone().addScaledVector(dir, edge - centre.dot(dir) + 0.4);
     this.lastTip = { floor: f, dir: [+dir.x.toFixed(2), +dir.z.toFixed(2)], left: +(left / all).toFixed(2) };
