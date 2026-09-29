@@ -2,24 +2,26 @@ import * as THREE from 'three';
 import { block, panel } from './kit.js';
 import * as F from './furniture.js';
 
-// The office block next door, to the west of Trump Tower across a four-metre
-// service yard: twelve storeys of 3.6 m on a 20 by 24 metre plan, concrete frame and
+// The office block next door, behind Trump Tower across a four-metre service
+// yard: twelve storeys of 3.6 m on a 26 by 24 metre plan, concrete frame and
 // core, blue-grey glass curtain wall, open-plan offices. It is built of pieces
 // like the tower, so it breaks like the tower — and it is what the tower
-// falls into when its west side goes.
+// falls into when its north side goes.
 //
-//          x -44                  -24
-//   z -14   +-----------------------+
-//           |   .   .   .   .   .   |   columns on a 5 m grid
+//          x -13                   13
+//   z -40   +-----------------------+
+//           |   .   .   .   .   .   |   columns on a 6.5 by 6 m grid
 //           |   .  +--core--+   .   |
-//           |   .  |        |   .   |   Trump Tower's podium starts at x = -20,
-//           |   .  +--------+   .   |   its tower at x = -14
-//   z  10   +-----------------------+
+//           |   .  |        |   .   |
+//           |   .  +--------+   .   |
+//   z -16   +-----------------------+
+//                  service yard
+//   z -12   ===== Trump Tower's podium; its tower's north face at z = -9 =====
 
-export const NEIGHBOUR = { x0: -44, x1: -24, z0: -14, z1: 10, storeys: 12, h: 3.6, slab: 0.25 };
-const CORE = { x0: -37, x1: -31, z0: -5, z1: 1, t: 0.35 };
-const XS = [-44, -39, -34, -29, -24];
-const ZS = [-14, -8, -2, 4, 10];
+export const NEIGHBOUR = { x0: -13, x1: 13, z0: -40, z1: -16, storeys: 12, h: 3.6, slab: 0.25 };
+const CORE = { x0: -3, x1: 3, z0: -31, z1: -25, t: 0.35 };
+const XS = [-13, -6.5, 0, 6.5, 13];
+const ZS = [-40, -34, -28, -22, -16];
 
 const inCore = (x, z, m = 0) => x > CORE.x0 - m && x < CORE.x1 + m && z > CORE.z0 - m && z < CORE.z1 + m;
 
@@ -94,16 +96,16 @@ function facade(P, f, y0, y1) {
 // Open-plan offices: rows of desks round the core, a meeting table.
 function offices(P, f, y) {
   if (f === 0) {
-    F.sofa(P, -26.8, y, -4, -Math.PI / 2, 0x3a4450);
-    F.plant(P, -26.8, y, 2, true);
-    F.plant(P, -26.8, y, -9, true);
+    F.sofa(P, -8, y, -17.4, Math.PI, 0x3a4450);
+    F.plant(P, 8, y, -17.4, true);
+    F.plant(P, -11.4, y, -17.4, true);
     return;
   }
-  for (const x of [-42, -27]) for (const z of [-11, -5, 1, 7]) {
-    F.desk(P, x, y, z, x < -34 ? Math.PI / 2 : -Math.PI / 2);
-    F.officeChair(P, x + (x < -34 ? 0.9 : -0.9), y, z, x < -34 ? -Math.PI / 2 : Math.PI / 2);
+  for (const z of [-38, -18]) for (const x of [-10, -5, 5, 10]) {
+    F.desk(P, x, y, z, z < -28 ? 0 : Math.PI);
+    F.officeChair(P, x, y, z + (z < -28 ? 0.9 : -0.9), z < -28 ? Math.PI : 0);
   }
-  if (f % 3 === 1) F.meetingTable(P, -34, y, 6.5, 0);
-  if (f % 2 === 0) F.filingCabinet(P, -39.5, y, -12.8, 0);
-  F.plant(P, -39.5, y, 8.6);
+  if (f % 3 === 1) F.meetingTable(P, 8.5, y, -28, Math.PI / 2);
+  if (f % 2 === 0) F.filingCabinet(P, -11.8, y, -34.5, Math.PI / 2);
+  F.plant(P, 11.6, y, -34.5);
 }

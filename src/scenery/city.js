@@ -68,10 +68,8 @@ export function buildCity(scene, physics) {
 
   const tints = [0xb9b2a6, 0x9ea3a8, 0xc7b89c, 0x8f9499, 0xa89586];
   // Along our side of the avenue, left and right of the plot.
-  // West of the plot, first, is the office block next door, which is part of
-  // the job (building/neighbour.js): the city starts beyond it.
   for (const side of [-1, 1]) {
-    let x = side === -1 ? -48 : 36;
+    let x = side * 36;
     while (Math.abs(x) < 300) {
       const w = 14 + rand() * 18;
       const h = 30 + rand() * 120;
@@ -79,10 +77,13 @@ export function buildCity(scene, physics) {
       x += side * (w + 2);
     }
   }
-  // Behind the plot.
+  // Behind the plot. Straight behind it, first, is the office block next door,
+  // which is part of the job (building/neighbour.js); the row stands back to
+  // leave its plot.
   for (let x = -280; x < 280;) {
     const w = 16 + rand() * 20;
-    tower(x + w / 2, -48, w, 40, 40 + rand() * 140, tints[(rand() * tints.length) | 0]);
+    const z = x + w > -17 && x < 17 ? -66 : -48;
+    tower(x + w / 2, z, w, 40, 40 + rand() * 140, tints[(rand() * tints.length) | 0]);
     x += w + 3;
   }
   // Across the avenue.
