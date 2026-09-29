@@ -33,7 +33,7 @@ export const JOBS = [
 
 export const TOOLS = [
   { id: 'sledge', name: 'Sledgehammer', kind: 'demolition', desc: 'Twelve pounds on a yard of hickory. Splinters wood, crumbles plaster, chips concrete — slowly.' },
-  { id: 'bomb', name: 'Remote charges', kind: 'demolition', desc: 'Eight charges and a detonator. Left click to stick one on, right click to set them all off.', unlockedBy: 'trump' },
+  { id: 'bomb', name: 'Remote charges', kind: 'demolition', desc: 'A dozen charges and a detonator. Left click to stick one on, right click to set them all off.', unlockedBy: 'trump' },
   { id: 'jackhammer', name: 'Jackhammer', kind: 'demolition', desc: 'Breaks concrete properly.', unlockedBy: 'job2', soon: true },
   { id: 'torch', name: 'Cutting torch', kind: 'demolition', desc: 'Cuts through steel.', unlockedBy: 'job3', soon: true },
   { id: 'spray', name: 'Spray can', kind: 'helper', desc: 'Mark what comes down first. Right click changes colour.' },

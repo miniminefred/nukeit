@@ -155,12 +155,16 @@ export class Extinguisher {
 
 // ---------------------------------------------------------------- charges
 
+// A dozen: enough to take out every support on one side of a storey and the
+// core wall beside them, which is what it takes to fell a tower that way.
+const CHARGES = 12;
+
 export class Charges {
   constructor() {
     this.id = 'bomb';
     this.name = 'Remote charges';
     this.model = detonatorModel();
-    this.left = 8;
+    this.left = CHARGES;
     this.placed = [];
     this._chain = [];
     this._t = 0;
@@ -218,7 +222,7 @@ export class Charges {
     for (const c of this.placed) c.mesh.removeFromParent();
     this.placed.length = 0;
     this._chain.length = 0;
-    this.left = 8;
+    this.left = CHARGES;
   }
 }
 
