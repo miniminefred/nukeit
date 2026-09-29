@@ -38,12 +38,14 @@ const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Eule
 function parts() {
   const rb = (w, h, d, r) => new THREE.CapsuleGeometry(Math.min(w, d) / 2, Math.max(0.01, h - Math.min(w, d)), 4, 8).scale(w / Math.min(w, d), 1, d / Math.min(w, d));
   return {
-    leg: rb(0.13, 0.86, 0.14).translate(0, -0.43, 0),          // hangs from the hip
-    hips: rb(0.34, 0.24, 0.2).translate(0, 0, 0),
-    body: rb(0.4, 0.58, 0.23).translate(0, 0.29, 0),           // from the waist up
-    arm: rb(0.1, 0.66, 0.1).translate(0, -0.33, 0),            // hangs from the shoulder
-    head: new THREE.SphereGeometry(0.115, 12, 10).scale(1, 1.15, 1.05),
-    hair: new THREE.SphereGeometry(0.122, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55).scale(1, 1.1, 1.08),
+    leg: rb(0.16, 0.88, 0.17).translate(0, -0.44, 0),          // hangs from the hip
+    hips: rb(0.38, 0.26, 0.24).translate(0, 0, 0),
+    body: rb(0.46, 0.62, 0.27).translate(0, 0.31, 0),          // from the waist up
+    arm: rb(0.115, 0.66, 0.12).translate(0, -0.33, 0),         // hangs from the shoulder
+    head: new THREE.SphereGeometry(0.12, 12, 10).scale(1, 1.15, 1.05),
+    hair: new THREE.SphereGeometry(0.128, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55).scale(1, 1.1, 1.08),
+    // A dress's skirt, waist to knee.
+    skirt: new THREE.CylinderGeometry(0.2, 0.33, 0.62, 14, 1, true).translate(0, -0.31, 0),
   };
 }
 
@@ -67,6 +69,7 @@ export class People {
     this.mesh = {
       leg: make(g.leg, mat(0.8), 2), hips: make(g.hips, mat(0.8), 1), body: make(g.body, mat(0.7), 1),
       arm: make(g.arm, mat(0.7), 2), head: make(g.head, mat(0.6), 1), hair: make(g.hair, mat(0.9), 1),
+      skirt: make(g.skirt, new THREE.MeshStandardMaterial({ roughness: 0.75, side: THREE.DoubleSide }), 1),
     };
     this._ray = new physics.R.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
     this._alarm = [];            // { at, r, t }: things that went bang
@@ -91,12 +94,13 @@ export class People {
     const woman = Math.random() < 0.5;
     const pick = (a) => a[(Math.random() * a.length) | 0];
     const skin = pick(SKIN);
+    const dress = pick(DRESS);
     const p = {
       f, pos: at.clone(), yaw: Math.random() * Math.PI * 2, target: null, wait: Math.random() * 3,
       phase: Math.random() * 10, speed: WALK * (0.85 + Math.random() * 0.3), vy: 0, floorY: at.y,
       look: Math.random() * LOOK, state: 'calm', t: 0, height: (woman ? 0.94 : 1) * (0.95 + Math.random() * 0.1),
       colours: {
-        leg: woman ? skin : pick(SUIT), hips: woman ? pick(DRESS) : pick(SUIT), body: woman ? pick(DRESS) : pick(SUIT),
+        leg: woman ? skin : pick(SUIT), hips: woman ? dress : pick(SUIT), body: woman ? dress : pick(SUIT), skirt: dress,
         arm: woman ? skin : pick(SUIT), head: skin, hair: pick(HAIR),
       },
       shirt: pick(SHIRT), woman,
@@ -255,6 +259,8 @@ export class People {
       part(M.arm, i * 2 + 1, 0.25, hip + 0.6, lean * 0.5, swing * 0.8, -0.06);
       part(M.head, i, 0, hip + 0.83, lean * 0.4, 0);
       part(M.hair, i, 0, hip + 0.86, lean * 0.4 - 0.01, -0.15);
+      if (p.woman) part(M.skirt, i, 0, hip + 0.12, 0, swing * 0.15);
+      else set(M.skirt, i, hide);
     }
     for (const k in M) { M[k].instanceMatrix.needsUpdate = true; if (M[k].instanceColor) M[k].instanceColor.needsUpdate = true; }
   }
