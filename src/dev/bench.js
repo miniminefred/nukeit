@@ -27,19 +27,19 @@ import { job as jobById } from '../data/catalog.js';
 // 5 on screen, drawing 41 against 4 — so a hidden run is only a sketch, and
 // never counts as a pass.
 
-// The reference demolition: eleven charges on storey 6, the tower's first
-// storey above the podium — every column west of the core, and the core's west
-// wall. That is the fewest that fell it: without the core wall and the column
-// line beside it the weight is still over what is left. It tips west, crushes
-// its low side on the podium roof and falls into the office block next door,
-// which comes down too. The podium stands.
-export const REFERENCE = [[-13.6, -8.6, 6], [-13.6, -3.5, 6], [-13.6, 3.5, 6], [-13.6, 6.6, 6], [-9.5, -8.6, 6], [-9.5, -3.5, 6],
-  [-9.5, 3.5, 6], [-9.5, 6.6, 6], [-5, -8.6, 6], [-5, 6.6, 6], [-5.5, 0, 6]];
+// The reference demolition: twelve charges, the detonator's dozen, on storey
+// 6, the tower's first storey above the podium — the whole north column line,
+// the ends of the next, and the core's north and side walls. That is the
+// fewest that fell it: with ten, the weight is still over what is left. It
+// tips north, crushes the storey it stood on, and goes over the podium's edge
+// into the office block behind, which comes down too. The podium stands.
+export const REFERENCE = [[-13.6, -8.6, 6], [-9.5, -8.6, 6], [-5, -8.6, 6], [0, -8.6, 6], [5, -8.6, 6], [9.6, -8.6, 6],
+  [-13.6, -3.5, 6], [-9.5, -3.5, 6], [9.6, -3.5, 6], [0, -3.6, 6], [-5.2, -1, 6], [5.2, -1, 6]];
 
-// Held over the far pavement of the avenue, 40 m up — the avenue is the one
+// Held over the avenue to the south-east, 42 m up — the avenue is the one
 // clear line of sight in the city — framing the whole tower, top to street,
-// and the ground to the west of it, where it falls.
-const VIEW = { at: [-4, 40, 49], look: [-20, 24, 0] };
+// and the office block behind it that it falls into.
+const VIEW = { at: [34, 42, 36], look: [-2, 20, -16] };
 
 // Every system's share of a frame, in milliseconds of CPU, when `profile` is on.
 const SYSTEMS = [['physics', 'step'], ['pieces', 'sync'], ['topple', 'update'], ['rubble', 'update'], ['structure', 'update'],
