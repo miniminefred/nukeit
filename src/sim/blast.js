@@ -26,12 +26,16 @@ export class Blast {
     const r = Math.max(...p.parts.map((q) => q.kind.explodes)) || 3;
     const at = _c.clone();
     this.ctx.pieces.destroy(p);
-    this.explode(at, r);
+    // A gas bottle or a transformer going up wrecks a room — glass, furniture,
+    // partitions — but it is not a cutting charge on a column: a quarter of
+    // the power against concrete.
+    this.explode(at, r, 0.25);
   }
 
   later(fn, delay) { this.queue.push({ fn, t: delay }); }
 
-  explode(at, r) {
+  // `power` is against structure: 1 for a demolition charge stuck to a column.
+  explode(at, r, power = 1) {
     const { pieces, damage, physics, particles, chips, fire, audio, shake, player, structure, rubble } = this.ctx;
     this.count++;
     // Fireball, sparks, smoke.
@@ -73,7 +77,7 @@ export class Blast {
       }
       const near = (1 - d / r) * shield;
       if (p.role === 'column' || p.role === 'core') {
-        p.hp -= near * 30;
+        p.hp -= near * near * 30 * power;
         if (p.hp <= 0) damage.failSoon(p, _c.clone(), out.clone());
         continue;
       }
@@ -83,7 +87,7 @@ export class Blast {
           const hit = p.box.clampPoint(at, new THREE.Vector3());
           damage._bite(p, hit, out.clone().negate(), out.clone(), r * 0.45 * near, r * 0.5, p.kind, { soon: true });
           // Only something the size of a transformer breaks a whole floor bay.
-          if (near > 0.85 && r >= 5) damage.fractureSoon(p, hit, out.clone(), 3);
+          if (near > 0.85 && r >= 5 && power >= 0.5) damage.fractureSoon(p, hit, out.clone(), 3);
         }
         continue;
       }

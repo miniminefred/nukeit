@@ -31,13 +31,18 @@ const SAG = [0.35, 0.9];     // s a slab with nothing under it hangs before it d
 // is how taking out three or four columns low down can bring a whole floor
 // down on its own, and a floor coming down brings the rest with it.
 const SPREAD = 7.5;          // metres: how far a lost column's load moves
-// How many lost neighbours an undamaged support survives depends on how much
-// it carries: the more storeys above it, the fewer it takes. A column under
-// twelve storeys goes when two round it have gone, one under six when four
-// have; a length of core wall takes twice as many.
-const CHAIN_WEIGHT = 24;     // storeys x lost neighbours that break an undamaged column
-const CHAIN_MIN = 2;         // but never fewer than this
-const chainAt = (load, role) => Math.max(CHAIN_MIN, Math.ceil(CHAIN_WEIGHT / Math.max(1, load))) * (role === 'core' ? 2 : 1);
+// An undamaged support gives way when the load it has picked up from lost
+// neighbours is more than it was built to take. Each adjacent support lost
+// puts about half its share on each of those beside it, and a column is built
+// for about twice its share: so it takes three lost beside it — at any
+// height — and a length of core wall five. That is redundancy: a frame loses a
+// column and stands. (Counting every loss within seven and a half metres, and
+// fewer the more storeys above, one gas bottle in the plant room took the
+// whole lower level and the tower with it.)
+const ADJACENT = 6.2;        // m: a support beside this one — a bay away, not two
+// Built for twice its share, each lost neighbour adding half a share: past two
+// is three lost beside a column; a core wall, stiffer and tied in, five.
+const chainAt = (role) => (role === 'core' ? 5 : 3);
 
 const PANCAKE = 80;          // pieces: more than this falls together, cheaply
 const G = 9.81 * 0.72;       // progressive collapse runs at about 0.7 g
@@ -63,10 +68,10 @@ export class Structure {
     pieces.onChange = (p) => this.mark(p?.building);
   }
 
-  _lostNear(p) {
+  _lostNear(p, within = SPREAD) {
     const c = p.box.getCenter(_c);
     let n = 0;
-    for (const l of this.lost) if (l.floor === p.floor && l.building === p.building && Math.hypot(l.x - c.x, l.z - c.z) < SPREAD) n++;
+    for (const l of this.lost) if (l.floor === p.floor && l.building === p.building && Math.hypot(l.x - c.x, l.z - c.z) < within) n++;
     return n;
   }
 
@@ -117,9 +122,9 @@ export class Structure {
     this.checks = this.checks.filter((e) => ((e.t -= dt) > 0 ? true : (due.push(e), false)));
     for (const { p } of due) {
       if (p.state !== 'static') continue;
-      const lost = this._lostNear(p);
+      const lost = this._lostNear(p, ADJACENT);
       const load = this.loadOf(p);
-      const chain = load > 0 && lost >= chainAt(load, p.role);
+      const chain = load > 0 && lost >= chainAt(p.role);
       if (!chain && !this.mustFail(p)) continue;
       if (p.warned) continue;
       p.warned = true;

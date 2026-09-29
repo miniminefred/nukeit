@@ -134,10 +134,10 @@ const lift = new Lift(scene, physics);
 const people = new People(scene, physics);
 // People hear things: a blast, a support giving way, a building going over.
 const bang = blast.explode.bind(blast);
-blast.explode = (at, r) => {
+blast.explode = (at, r, power) => {
   people.alarm(at, Math.max(26, r * 9));
   world.wakeNear(at, Math.max(6, r * 3));     // a city block near a blast is a building now
-  return bang(at, r);
+  return bang(at, r, power);
 };
 const gave = damage.fx.onFailed;
 damage.fx.onFailed = (p) => { people.alarm(p.box.getCenter(new THREE.Vector3()), 18); return gave(p); };
