@@ -104,18 +104,28 @@ Not a stack of offices — the owner asked for restaurants, shops and Trump's
 house on top. `building/plan.js` holds the plan and `PROGRAMME`;
 `building/interiors.js` furnishes each floor from it:
 
+The programme is **the real tower's**, in its proportions on twelve storeys (the owner
+supplied it):
+
 | floor | what it is |
 |---|---|
-| 0 | lobby: reception, waterfall, escalator, café bar, plant room with transformers and gas |
-| 1 | fashion boutiques, changing rooms |
+| LL | the lower level, in a pit a storey deep under the podium: the vault behind a round steel door, goods receiving (pallets, a forklift, the roller door), the plant (transformers, gas, boiler, switchgear), the restaurants' kitchens |
+| 0 | lobby: reception, the **18 m waterfall** of pink marble down the atrium wall, gold escalators, café |
+| 1 | fashion boutiques, and the flagship store behind a gold portal (no real brand's name or logo) |
 | 2 | jewellers: glass cases of gold and stones |
 | 3 | food court: three counters with griddles, fridges and gas; seating |
-| 4 | the Grill: white tablecloths, a bar, a walled kitchen with gas, a piano |
-| 5 | café and bookshop |
-| 6–8 | offices |
-| 9 | penthouse living: fireplace, piano, sofas, dining for ten, kitchen |
-| 10 | three bedrooms, each with a bathroom |
+| 4 | the Grill: white tablecloths, a bar, a piano; its kitchen is on the lower level |
+| 5–7 | offices: glass-walled rooms either side of long corridors |
+| 8 | the Trump Organization: the corner office, the boardroom for fourteen, reception |
+| 9 | condominiums: two apartments |
+| 10 | penthouse living: fireplace, piano, sofas, dining for ten, kitchen |
 | 11 | master bedroom, dressing room, bathroom, study |
+
+**The gold escalators** criss-cross the atrium, one from each public floor to the next
+(`ESCALATORS` in `interiors.js`); furniture keeps clear of their feet and heads, and the
+atrium rail is open where they arrive. **The ground under the podium is the pit's floor**
+(`groundAt` in `plan.js`): what stands on the ground there stands at −4 m, and the lobby
+floor stands on the lower level's columns and retaining walls, not on the ground.
 
 The tower is **50 m**: 12 storeys of 4 m, roof at 48 m, rooftop plant room to 52 m.
 It was 100 m, then 70 m; the owner asked for each cut.

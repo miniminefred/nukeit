@@ -144,6 +144,7 @@ damage.fx.onFailed = (p) => { people.alarm(p.box.getCenter(new THREE.Vector3()),
 let liftTip = null;
 let rig = null;           // dev: { at, look } to hold the camera there
 let toppling = false;
+let waterfall = null;     // the sheet of water down the atrium wall, while it stands
 
 const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene, world };
 
@@ -186,6 +187,7 @@ async function start(jobId, toolIds) {
   world.load(job.build);
   lift.attach(pieces);
   people.populate(pieces);
+  waterfall = pieces.list.find((p) => p.tag === 'waterfall') ?? null;
   screens.loading('Wiring the gas and the lights', 0.85);
   await frames(2);
   tools = toolIds.filter((id) => TOOL_CLASSES[id]).map((id) => new TOOL_CLASSES[id]());
@@ -348,6 +350,11 @@ function frame(dt) {
     }
   }
   chips.update(dt);
+  // Water down the atrium wall, as long as the wall and the sheet are there.
+  if (waterfall && waterfall.state === 'static') {
+    const b = waterfall.box;
+    for (let i = 0; i < 6; i++) particles.spawn('water', b.min.x + Math.random() * (b.max.x - b.min.x), b.max.y - 0.2, b.max.z + 0.05, 0, -1, 0.15 + Math.random() * 0.2);
+  }
   particles.update(dt);
   haze(dt);
   audio.setListener(camera);
@@ -355,7 +362,7 @@ function frame(dt) {
   if (state === 'play' && job) {
     const at = player.pos, f = Math.floor((at.y + 0.5) / 4);
     const inside = Math.abs(at.x) < 20 && at.z > -12 && at.z < 12;
-    const lounge = inside && [0, 2, 4, 9, 10, 11].includes(f) && !structure.collapsing && !topple.active;
+    const lounge = inside && [0, 1, 2, 4, 8, 10, 11].includes(f) && !structure.collapsing && !topple.active;
     audio.ambience(inside ? people.crowdAt(at) : 0, lounge ? 1 : 0);
   } else audio.ambience(0, 0);
   audio.update(dt);

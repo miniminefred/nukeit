@@ -67,6 +67,8 @@ const KINDS = {
   spark: { life: [0.3, 0.8], size: [0.06, 0.12], grow: 0, drag: 0.5, grav: 9.8, colour: 0xffc060, alpha: 1, add: true },
   flash: { life: [0.12, 0.2], size: [6, 9], grow: 20, drag: 0, grav: 0, colour: 0xffd9a0, alpha: 1, add: true },
   paint: { life: [0.25, 0.45], size: [0.08, 0.16], grow: 0.3, drag: 2.5, grav: 1, colour: 0xffffff, alpha: 0.8, add: false, blow: false },
+  // The atrium waterfall: water falling eighteen metres down the marble.
+  water: { life: [1.9, 2.1], size: [0.12, 0.3], grow: 0.05, drag: 0.05, grav: 9.8, colour: 0xe2f0f6, alpha: 0.45, add: false, blow: false },
   foam:  { life: [0.5, 1.0], size: [0.25, 0.45], grow: 1.2, drag: 2.2, grav: 1.5, colour: 0xf2f4f5, alpha: 0.75, add: false, blow: false },
 };
 
