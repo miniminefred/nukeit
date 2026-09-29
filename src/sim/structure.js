@@ -55,7 +55,12 @@ export class Structure {
     this.checks = [];        // neighbours to re-examine: { p, t }
     this.warnings = [];      // supports about to go: { p, t }
     this.sagging = [];       // slabs about to drop: { p, t }
-    pieces.onChange = () => { this.dirty = true; };
+    // Which buildings have changed since the last support pass: only those are
+    // looked at again. A city with a dozen buildings woken would otherwise pay
+    // for all of them every tenth of a second.
+    this.which = new Set();
+    this.all = false;
+    pieces.onChange = (p) => this.mark(p?.building);
   }
 
   _lostNear(p) {
@@ -151,12 +156,16 @@ export class Structure {
         const b = p.box;
         this.fx.particles.spawn('dust', b.min.x + Math.random() * (b.max.x - b.min.x), b.min.y - 0.05, b.min.z + Math.random() * (b.max.z - b.min.z), 0, -1.2, 0, 0x9a948a);
       }
-      if (s.t <= 0) { p.sagging = false; P.makeDynamic(p, undefined, undefined, { quiet: true }); this.dirty = true; }
+      if (s.t <= 0) { p.sagging = false; P.makeDynamic(p, undefined, undefined, { quiet: true }); this.mark(p.building); }
     }
     this.sagging = this.sagging.filter((s) => s.t > 0);
   }
 
-  mark() { this.dirty = true; }
+  // Something changed in `building` (or anywhere, if none is named).
+  mark(building) {
+    this.dirty = true;
+    if (building) this.which.add(building); else this.all = true;
+  }
 
   update(dt) {
     this.time = (this.time ?? 0) + dt;
@@ -166,7 +175,12 @@ export class Structure {
     if (this.dirty && this._wait <= 0 && this.falls.length === 0) {
       this.dirty = false;
       this._wait = 0.1;
-      const loose = unsupported(this.pieces.list);
+      let loose;
+      if (this.all) loose = unsupported(this.pieces.list);
+      else { loose = []; for (const b of this.which) for (const p of unsupported(this.pieces.inBuilding(b))) loose.push(p); }
+      const was = this.all ? null : [...this.which];
+      this.all = false;
+      this.which.clear();
       if (loose.length > PANCAKE) this._pancake(loose);
       else for (const p of loose) {
         // A slab hangs a moment, groaning and shedding dust, before it goes;
@@ -180,12 +194,14 @@ export class Structure {
         } else this.pieces.makeDynamic(p, undefined, undefined, { quiet: true });
       }
       if (loose.length) this._wakeRubble(loose);
-      if (loose.length && loose.length <= PANCAKE) this.dirty = true;   // what they carried may go next
+      if (loose.length && loose.length <= PANCAKE) {                     // what they carried may go next
+        if (was) for (const b of was) this.mark(b); else this.mark();
+      }
     }
     for (const f of this.falls) this._fall(f, dt);
     const before = this.falls.length;
     this.falls = this.falls.filter((f) => f.alive);
-    if (before && this.falls.length === 0) this.dirty = true;
+    if (before && this.falls.length === 0) this.mark();
   }
 
   get collapsing() { return this.falls.length > 0; }
@@ -312,7 +328,7 @@ export class Structure {
       this.fx.rubble.add(p, new THREE.Vector3((Math.random() - 0.5) * 1.5, -f.v * 0.5, (Math.random() - 0.5) * 1.5));
     }
     f.alive = false;
-    this.dirty = true;
+    this.mark();
   }
 
   // A piece broken up in the collapse: it spills out of the crush line, down
@@ -334,5 +350,7 @@ export class Structure {
     this.lost.length = 0;
     this.checks.length = 0;
     this.dirty = false;
+    this.which.clear();
+    this.all = false;
   }
 }

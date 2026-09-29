@@ -35,7 +35,8 @@ export class Pieces {
     this.root = new THREE.Group();
     this.root.name = 'building';
     scene.add(this.root);
-    this.onChange = null;           // called when the set of standing pieces changes
+    this.onChange = null;           // (piece): the set of standing pieces has changed
+    this.byBuilding = new Map();    // building -> its pieces
     this.onLeave = null;            // (piece): a piece that was solid has left where it was
     this.overflow = null;           // (piece, vel, spin): loose, but no room for another body
     this.onAnchor = null;           // (piece): wreckage made standing, to find what it sits on
@@ -100,8 +101,12 @@ export class Pieces {
     p.hpMax = p.hp = spec.hp ?? +(hits * THREE.MathUtils.clamp(Math.cbrt(p.volume / 0.5), 0.5, 3)).toFixed(2);
     this._updateBox(p);
     this.list.push(p);
+    const mine = this.byBuilding.get(p.building);
+    if (mine) mine.push(p); else this.byBuilding.set(p.building, [p]);
     return p;
   }
+
+  inBuilding(b) { return this.byBuilding.get(b) ?? []; }
 
   // A piece made after the building was finalized — a shard, a fragment. It
   // never goes into a batch; it has its own meshes from the start.
@@ -269,7 +274,7 @@ export class Pieces {
     if (this.overflow && this.physics.dynamic.size >= this.maxBodies) {
       const was = p.state;
       this.overflow(p, vel, spin);
-      if (was === 'static' && !quiet) this.onChange?.();
+      if (was === 'static' && !quiet) this.onChange?.(p);
       return;
     }
     this.promote(p);
@@ -296,7 +301,7 @@ export class Pieces {
     p.body = body;
     p.state = 'dynamic';
     this.physics.dynamic.add(p);
-    if (!quiet) this.onChange?.();
+    if (!quiet) this.onChange?.(p);
   }
 
   // Take a standing piece's colliders away as it starts to move with a
@@ -348,7 +353,7 @@ export class Pieces {
     }
     if (p.object) p.object.removeFromParent();
     p.state = 'dead';
-    if (wasStanding) this.onChange?.();
+    if (wasStanding) this.onChange?.(p);
   }
 
   // Where a batched piece is drawn.
@@ -489,6 +494,7 @@ export class Pieces {
     this.batches.clear();
     this.spares.clear();
     this.list.length = 0;
+    this.byBuilding.clear();
   }
 }
 

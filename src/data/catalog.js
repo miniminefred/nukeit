@@ -4,9 +4,7 @@ import { buildNeighbour } from '../building/neighbour.js';
 // Trump Tower, and the office block next door that it can be felled into.
 function trumpAndNeighbour(P) {
   buildTower(P);
-  const n = P.list.length;
   buildNeighbour(P);
-  for (let i = n; i < P.list.length; i++) P.list[i].building = 'neighbour';
 }
 
 // The jobs and the tools, as data. The menus draw from this and nothing else.
