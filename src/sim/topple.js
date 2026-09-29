@@ -50,6 +50,8 @@ export class Topple {
     this.physics = physics;
     this.fx = fx;              // { rubble, particles, chips, cloud, audio, shake, structure, player }
     this.mass = null;
+    this.blows = new Map();    // building -> { dir, t }: the last heavy blow it took
+    this.time = 0;
   }
 
   get active() { return this.mass !== null; }
@@ -92,6 +94,11 @@ export class Topple {
     const dir = new THREE.Vector3(com.x - centre.x, 0, com.z - centre.z);
     if (dir.lengthSq() < 1e-4) dir.set(Math.random() - 0.5, 0, Math.random() - 0.5);
     dir.normalize();
+    // Struck hard a moment ago — a tower falling into it — it is still moving
+    // the way the blow drove it, and goes over that way, away from what hit it,
+    // not back onto it.
+    const blow = this.blows.get(building);
+    if (blow && this.time - blow.t < 12) dir.addScaledVector(blow.dir, 2.5).setY(0).normalize();
     // The hinge: the fall-side edge of what is left, less any stragglers out
     // beyond it on the fall side. Those are under the weight, and go with it.
     const along = standing.map((p) => [p, p.box.getCenter(new THREE.Vector3()).dot(dir)]).sort((a, b) => b[1] - a[1]);
@@ -269,7 +276,9 @@ export class Topple {
       // that building has to carry its share — or go too.
       if (support) fx.structure?.failed(p);
     }
-    // Momentum into what it hit.
+    // Momentum into what it hit, and a note of which way.
+    const hitBuilding = [...hit][0]?.building;
+    if (hitBuilding) this.blows.set(hitBuilding, { dir: M.dir.clone(), t: this.time });
     const k = Math.max(0.85, 1 - (tonnes * 1000) / M.mass * 2);
     b.setLinvel({ x: lv.x * k, y: lv.y * k, z: lv.z * k }, true);
     b.setAngvel({ x: av.x * k, y: av.y * k, z: av.z * k }, true);
@@ -310,6 +319,7 @@ export class Topple {
   }
 
   update(dt) {
+    this.time += dt;
     const M = this.mass;
     if (!M) return;
     M.t += dt;
@@ -414,6 +424,7 @@ export class Topple {
   }
 
   clear() {
+    this.blows.clear();
     this._release();
     if (this.mass) this.physics.world.removeRigidBody(this.mass.body);
     this.mass = null;
