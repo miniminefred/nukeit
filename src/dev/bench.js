@@ -209,17 +209,18 @@ export function pile(dev) {
   return { pieces: n, volume: Math.round(volume), tonnes: Math.round(tons), area: h.length, mean: +(h.reduce((a, b) => a + b, 0) / Math.max(1, h.length)).toFixed(2), p50: at(0.5), p90: at(0.9), max: at(1) };
 }
 
-// Put charges on the ground-floor supports nearest each [x, z], on the face
-// toward it, as you would with the detonator in your hand.
+// Put charges on the tower's supports nearest each [x, z, storey], on the
+// face toward it, a metre up, as you would with the detonator in your hand.
 function place(dev, charges) {
   const bomb = dev.tools.find((t) => t.id === 'bomb');
-  const supports = dev.pieces.list.filter((p) => p.floor === 0 && (p.role === 'column' || p.role === 'core') && p.state === 'static');
   const V = new THREE.Vector3();
-  for (const [cx, cz] of charges) {
-    const want = new THREE.Vector3(cx, 1.2, cz);
+  for (const [cx, cz, floor = 0] of charges) {
+    const supports = dev.pieces.list.filter((p) => p.floor === floor && p.building === 'tower' && (p.role === 'column' || p.role === 'core') && p.state === 'static');
+    const y = supports.reduce((a, p) => Math.min(a, p.box.min.y), Infinity) + 1.2;
+    const want = new THREE.Vector3(cx, y, cz);
     const p = supports.reduce((a, b) => (b.box.distanceToPoint(want) < a.box.distanceToPoint(want) ? b : a));
     const at = p.box.clampPoint(want, new THREE.Vector3());
-    at.y = 1.2;
+    at.y = y;
     const normal = want.clone().sub(p.box.getCenter(V)).setY(0).normalize();
     const mesh = chargeModel();
     mesh.position.copy(at).addScaledVector(normal, 0.025);

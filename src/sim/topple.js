@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { FLOOR_H } from '../building/plan.js';
-import { G_MASS, G_MASS_HINGED } from '../physics.js';
+import { G_MASS, G_MASS_HINGED, G_LAND } from '../physics.js';
 
 // A tower that has lost one side tips over.
 //
@@ -56,13 +56,15 @@ export class Topple {
 
   // After a support on storey f gives way: is the weight above still over
   // what is left? Returns true if it tipped.
-  check(f) {
+  check(f, building = 'tower') {
     if (this.mass) return false;
     const P = this.pieces;
-    const base = (f + 1) * FLOOR_H - 0.1;     // the underside of the slab above storey f
-    const above = P.list.filter((p) => p.state === 'static' && p.box.min.y >= base);
+    const supports = P.list.filter((p) => p.floor === f && p.building === building && (p.role === 'column' || p.role === 'core'));
+    if (!supports.length) return false;
+    // The underside of the slab above storey f: the tops of its supports.
+    const base = supports.reduce((y, p) => Math.max(y, p.box.max.y), 0) - 0.1;
+    const above = P.list.filter((p) => p.state === 'static' && p.building === building && p.box.min.y >= base);
     if (above.length < 40) return false;
-    const supports = P.list.filter((p) => p.floor === f && (p.role === 'column' || p.role === 'core'));
     const standing = supports.filter((p) => p.state === 'static' && p.hp > p.hpMax * 0.25);
     if (standing.length === 0) return false;      // nothing left at all: it drops straight down
     // Where the weight is.
@@ -98,7 +100,7 @@ export class Topple {
     const hinge = along.filter(([, d]) => d <= edge + 0.01).map(([p]) => p);
     const anchor = centre.clone().addScaledVector(dir, edge - centre.dot(dir) + 0.4);
     this.lastTip = { floor: f, dir: [+dir.x.toFixed(2), +dir.z.toFixed(2)], left: +(left / all).toFixed(2) };
-    this._crush(f, hinge, base);
+    this._crush(f, hinge, base, building);
     this._start(above, dir, m, f, hinge, anchor);
     return true;
   }
@@ -108,11 +110,11 @@ export class Topple {
   // None of it props the mass up: it is ground to rubble on the spot. Left
   // standing, the stairs and spandrels held the tower up at a 2.5 degree lean
   // and it never went over.
-  _crush(f, standing, base) {
+  _crush(f, standing, base, building) {
     const P = this.pieces, fx = this.fx, keep = new Set(standing);
-    const lo = f * FLOOR_H - 0.05;
+    const lo = standing.reduce((y, p) => Math.min(y, p.box.min.y), Infinity) - 0.35;
     for (const p of [...P.list]) {
-      if (p.state !== 'static' || keep.has(p)) continue;
+      if (p.state !== 'static' || keep.has(p) || p.building !== building) continue;
       // Everything that starts in the storey, including what reaches up into
       // the one above — a stair, a wall, a spandrel. Left, those stood inside
       // the tipping mass's first box and the solver threw four thousand tonnes
@@ -178,7 +180,8 @@ export class Topple {
     const base = list.reduce((y, p) => Math.min(y, p.box.min.y), Infinity);
     const a = { x: anchor.x, y: base, z: anchor.z };
     const joint = world.createImpulseJoint(R.JointData.revolute(a, a, { x: axis.x, y: 0, z: axis.z }), this.physics.fixed, body, true);
-    this.mass = { body, riders, dir, t: 0, still: 0, floor: f, hit: false, hinge, joint, density };
+    this.mass = { body, riders, dir, t: 0, still: 0, floor: f, hit: false, hinge, joint, density, mass, building: list[0]?.building,
+      under: this._heights(list, dir) };
     this.fx.audio?.creak?.(0, (f + 1) * FLOOR_H, 0);
     this.fx.audio?.rumble(1);
   }
@@ -207,6 +210,71 @@ export class Topple {
     if (byFloor.size) this._boxes(body, [...byFloor.values()], M.density, G_MASS);
   }
 
+  // What is under the ground it may swing over: a height map, 2 m squares, of
+  // the tops of everything standing that is not the mass itself — the podium
+  // roof under the tower, the yard, the office block next door. Taken once, as
+  // it starts to tip.
+  _heights(list, dir) {
+    const zone = new THREE.Box3();
+    for (const p of list) zone.union(p.box);
+    const reach = zone.max.y - zone.min.y;
+    zone.expandByVector(new THREE.Vector3(Math.abs(dir.x) * reach + 4, 0, Math.abs(dir.z) * reach + 4));
+    const C = 2, x0 = zone.min.x, z0 = zone.min.z;
+    const nx = Math.ceil((zone.max.x - x0) / C), nz = Math.ceil((zone.max.z - z0) / C);
+    const h = new Float32Array(nx * nz);
+    const riding = new Set(list);
+    const { world, R, owner, ground } = this.physics;
+    const ray = new R.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
+    const keep = (c) => { const o = owner.get(c.handle); return o ? !riding.has(o) && (o.parts !== undefined || o.role === 'city') : ground.has(c.handle); };
+    for (let i = 0; i < nx; i++) for (let k = 0; k < nz; k++) {
+      ray.origin = { x: x0 + (i + 0.5) * C, y: 200, z: z0 + (k + 0.5) * C };
+      const hit = world.castRay(ray, 250, true, undefined, G_LAND, undefined, undefined, keep);
+      h[k * nx + i] = hit ? 200 - hit.timeOfImpact : 0;
+    }
+    return { h, x0, z0, nx, nz, C, at: (x, z) => {
+      const i = Math.floor((x - x0) / C), k = Math.floor((z - z0) / C);
+      return i < 0 || k < 0 || i >= nx || k >= nz ? 0 : h[k * nx + i];
+    } };
+  }
+
+  // What the mass sweeps through of another building — the office block next
+  // door — is smashed out of the way: its pieces go flying on with the part of
+  // the mass that hit them, and the mass loses a little of its swing for each.
+  // What is left of that building then has to stand on what is left of it.
+  _smash() {
+    const M = this.mass, b = M.body, fx = this.fx, { world, owner } = this.physics;
+    const lv = b.linvel(), av = b.angvel(), com = b.translation();
+    const hit = new Set();
+    for (let n = 0; n < b.numColliders(); n++) {
+      const c = b.collider(n);
+      world.intersectionsWithShape(c.translation(), c.rotation(), c.shape, (k) => {
+        const o = owner.get(k.handle);
+        if (o?.parts && o.state === 'static' && o.building !== M.building) hit.add(o);
+        return hit.size < 60;
+      }, undefined, G_LAND);
+      if (hit.size >= 60) break;
+    }
+    if (!hit.size) return 0;
+    let tonnes = 0;
+    for (const p of hit) {
+      const c = p.box.getCenter(new THREE.Vector3());
+      const r = _t.set(c.x - com.x, c.y - com.y, c.z - com.z);
+      const v = new THREE.Vector3(lv.x + av.y * r.z - av.z * r.y, lv.y + av.z * r.x - av.x * r.z, lv.z + av.x * r.y - av.y * r.x)
+        .multiplyScalar(0.6).add(new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.5, Math.random() - 0.5));
+      tonnes += p.volume * p.kind.density / 1000;
+      if (Math.random() < 0.08) fx.cloud?.(c.clone(), 1.4);
+      fx.rubble.add(p, v, new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(2));
+    }
+    // Momentum into what it hit.
+    const k = Math.max(0.85, 1 - (tonnes * 1000) / M.mass * 2);
+    b.setLinvel({ x: lv.x * k, y: lv.y * k, z: lv.z * k }, true);
+    b.setAngvel({ x: av.x * k, y: av.y * k, z: av.z * k }, true);
+    fx.structure?.mark();
+    fx.audio?.rumble(1);
+    fx.shake?.add(0.3);
+    return hit.size;
+  }
+
   // Everything of the mass that has swung below the street is ground off:
   // rubble where it is, going the way that part of the mass was going.
   _grind(mat) {
@@ -217,7 +285,7 @@ export class Topple {
       const p = rd.p;
       if (p.state !== 'tipping') continue;
       const c = _v.copy(rd.c0).applyMatrix4(mat);
-      if (c.y - rd.r * 0.5 > 0.3) continue;
+      if (c.y - rd.r * 0.5 > M.under.at(c.x, c.z) + 0.3) continue;
       rd.m.multiplyMatrices(mat, rd.m0).decompose(p.pos, p.quat, _s);
       _s.set(1, 1, 1);
       if (p.object) { p.object.matrixAutoUpdate = true; p.object.position.copy(p.pos); p.object.quaternion.copy(p.quat); }
@@ -245,6 +313,7 @@ export class Topple {
     const t = b.translation(), r = b.rotation();
     _m.compose(_t.set(t.x, t.y, t.z), _q.set(r.x, r.y, r.z, r.w), _s);
     if (M.joint) this._grind(_m);
+    this._smash();
     for (const rd of M.riders) {
       const p = rd.p;
       if (p.state !== 'tipping') continue;

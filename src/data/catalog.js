@@ -1,4 +1,13 @@
 import { buildTower, ENTRY as TOWER_ENTRY, SITE as TOWER_SITE } from '../building/tower.js';
+import { buildNeighbour } from '../building/neighbour.js';
+
+// Trump Tower, and the office block next door that it can be felled into.
+function trumpAndNeighbour(P) {
+  buildTower(P);
+  const n = P.list.length;
+  buildNeighbour(P);
+  for (let i = n; i < P.list.length; i++) P.list[i].building = 'neighbour';
+}
 
 // The jobs and the tools, as data. The menus draw from this and nothing else.
 
@@ -12,7 +21,7 @@ export const JOBS = [
     target: 10,
     storeys: 12,
     height: 52,
-    build: buildTower,
+    build: trumpAndNeighbour,
     entry: TOWER_ENTRY,
     site: TOWER_SITE,
     unlocks: 'bomb',

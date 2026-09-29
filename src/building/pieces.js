@@ -54,6 +54,7 @@ export class Pieces {
       quat: spec.quat ? spec.quat.clone() : new THREE.Quaternion(),
       role: spec.role,
       floor: spec.floor ?? 0,
+      building: spec.building ?? 'tower',   // which building it belongs to: storeys are counted per building
       structural: spec.structural ?? KIND[spec.parts[0].kind].structural,
       hang: !!spec.hang,
       lateral: !!spec.lateral,

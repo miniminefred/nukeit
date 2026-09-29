@@ -68,8 +68,10 @@ export function buildCity(scene, physics) {
 
   const tints = [0xb9b2a6, 0x9ea3a8, 0xc7b89c, 0x8f9499, 0xa89586];
   // Along our side of the avenue, left and right of the plot.
+  // West of the plot, first, is the office block next door, which is part of
+  // the job (building/neighbour.js): the city starts beyond it.
   for (const side of [-1, 1]) {
-    let x = side * 36;
+    let x = side === -1 ? -62 : 36;
     while (Math.abs(x) < 300) {
       const w = 14 + rand() * 18;
       const h = 30 + rand() * 120;
