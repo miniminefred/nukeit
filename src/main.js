@@ -86,6 +86,7 @@ function cloud(at, scale = 1) {
 }
 damage.fx.cloud = cloud;
 rubble.fx.cloud = cloud;
+rubble.fx.onLand = (q, blows, at, by) => impacts._take(q, blows, at, by);
 const impacts = new Impacts(pieces, physics, { damage, cloud, audio, shake, player, structure });
 damage.fx.makeRoom = (n) => impacts.makeRoom(n);
 const topple = new Topple(pieces, physics, { rubble, particles, chips, cloud, audio, shake, structure, player });

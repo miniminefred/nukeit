@@ -136,11 +136,22 @@ export class Rubble {
     for (const r of on) if ((r.state === 'rubble' || r.state === 'static') && r.restOn === p) this.add(r, new THREE.Vector3(), new THREE.Vector3());
   }
 
+  // Wreckage made standing — a stub and its bars, a pane's edge in its frame,
+  // a lump come to rest — finds what it is on. Made in the same frame as the
+  // stub it stands on, a bar cannot see it through Rapier yet, so this frame's
+  // new pieces are looked at too. And if there is air under it, it falls.
   anchor(p) {
     const c = p.box.getCenter(_v);
-    const y = this._under(c.x, c.z, p.box.min.y + 0.05, p);
-    const on = this._support;
+    const top = p.box.min.y + 0.05;
+    let y = this._under(c.x, c.z, top, p), on = this._support;
+    for (const r of this.recent) {
+      if (r === p || r.box.max.y <= y || c.x < r.box.min.x || c.x > r.box.max.x || c.z < r.box.min.z || c.z > r.box.max.z) continue;
+      const u = rayThrough(r, c.x, top, c.z);
+      if (u && top - u[0] > y) { y = top - u[0]; on = r; }
+    }
+    this.recent.push(p);
     if (import.meta.env.DEV) p.anchored = { on: on?.role ?? (on ? 'city' : 'ground'), state: on?.state, gap: +(p.box.min.y - y).toFixed(2) };
+    if (p.box.min.y - y > 0.15) { this.add(p, new THREE.Vector3(), new THREE.Vector3()); return; }
     if (on && on.parts && on !== p) this._rest(p, on);
   }
 
@@ -348,6 +359,13 @@ export class Rubble {
       }
     }
     if (!f.chunk && !p.gen && v > CHUNK_SPEED && p.volume > CHUNK && p.parts.length === 1 && BREAKS.has(p.role)) this._breakUp(p, f.v);
+    // And what it came down on takes the blow: a tonne of slab falling a
+    // storey cracks the floor it lands on, ten of them break it, and what
+    // breaks falls in turn (sim/impacts.js).
+    if (on?.parts && on.state === 'static' && v > 3) {
+      const blows = (0.5 * m * v * v) / 560;
+      if (blows > 1) this.fx.onLand?.(on, blows, new THREE.Vector3(cx, b.min.y, cz), p);
+    }
     return true;
   }
 

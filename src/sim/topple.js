@@ -263,7 +263,11 @@ export class Topple {
         .multiplyScalar(0.6).add(new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.5, Math.random() - 0.5));
       tonnes += p.volume * p.kind.density / 1000;
       if (Math.random() < 0.08) fx.cloud?.(c.clone(), 1.4);
+      const support = p.role === 'column' || p.role === 'core';
       fx.rubble.add(p, v, new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(2));
+      // A column or wall smashed away is a support lost, and what is left of
+      // that building has to carry its share — or go too.
+      if (support) fx.structure?.failed(p);
     }
     // Momentum into what it hit.
     const k = Math.max(0.85, 1 - (tonnes * 1000) / M.mass * 2);
