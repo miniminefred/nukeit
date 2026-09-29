@@ -126,6 +126,23 @@ export class Impacts {
     else damage.fractureSoon(q, point, new THREE.Vector3(0, -1, 0), Math.min(4, 1 + blows / 50), blows > 100 ? 2 : 1);
   }
 
+  // Rubble landing on something still standing. A floor is built to carry its
+  // load and then some: it breaks when what lands on it has put more into it,
+  // all told, than its own weight falling three metres. Until then it cracks —
+  // the more, the nearer it is to going. A column or wall the same.
+  absorb(q, blows, from, by) {
+    if (!(q.structural || q.role === 'slab')) return this._take(q, blows, from, by);
+    const J = blows * BLOW;
+    const cap = q.volume * q.kind.density * 9.81 * 3;
+    q.shock = (q.shock ?? 0) + J;
+    const point = q.box.clampPoint(from, new THREE.Vector3());
+    point.y = Math.min(q.box.max.y, by.box.min.y + 0.01);
+    if (J > cap * 0.05 && this._cracks-- > 0) crack(this.pieces, q, point, new THREE.Vector3(0, 1, 0), Math.min(3, 0.8 + 2.2 * Math.min(1, q.shock / cap)));
+    if (q.shock < cap) return;
+    q.hp = 0;
+    this._take(q, 1, from, by);
+  }
+
   // Fade out the n smallest loose bits, to make room for something bigger.
   makeRoom(n) {
     const small = [...this.physics.dynamic].filter((p) => !this.fading.has(p) && p.body && (p.role === 'fragment' || p.role === 'shard'))
