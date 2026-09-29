@@ -56,6 +56,7 @@ Check it in the browser; keep `npm run build` green (it checks imports, not type
 In dev, `window.dev` has everything, including:
 
 - `dev.start('trump', ['sledge', 'spray', 'extinguisher'])` loads a job without the menu.
+- `dev.bench()` is the collapse bench; `dev.rig = { at, look }` holds the camera.
 - `dev.step(dt, n)` runs whole frames by hand. **The test tab is always hidden**, so
   `requestAnimationFrame` never fires. Pretend the pointer is locked with
   `dev.input.mouse.locked = true; dev.state = 'play'`, and hold a tool down with
@@ -90,9 +91,10 @@ always come along. Then the job loads and you are put at the door.
 - **Jobs and tools are data** in `data/catalog.js`. Trump Tower is open, and two more slots
   are shown locked as "coming soon". Tools unlock by finishing jobs (`data/progress.js`,
   `localStorage` with every access guarded): Trump Tower unlocks the remote charges.
-- **The job is a height**: bring the building below 10 m. Height is the top of every
-  *static* piece that is not debris. The job ends 3.5 s after the target is met with
-  nothing still collapsing.
+- **The job is a height**: bring the tower above the podium, and the office block next
+  door, below the podium roof — 26 m. Height is the top of every *static* piece that is
+  not debris, in both buildings. The job ends 3.5 s after the target is met with nothing
+  still collapsing. The podium is meant to be left standing.
 - **You can die**: falls, blasts, fire, being under a collapse. You come back at the door
   and the building stays as broken as you left it.
 
@@ -121,7 +123,21 @@ It was 100 m, then 70 m; the owner asked for each cut.
 
 Floors are finished to their use (marble, tile, oak, carpet), and furniture is
 placed through `freePodium` so nothing stands in a column, the core or the atrium.
-New furniture lives in `furniture-home.js` and `furniture-food.js`.
+New furniture lives in `furniture-home.js` and `furniture-food.js`. The public floors
+and the penthouse are warm (cream marble, warm plaster, warm-white lamps), with lounge
+music and the murmur of the people about you (`audio.ambience`); the offices are grey.
+
+**The office block next door** (`building/neighbour.js`) stands behind the tower across
+a 4 m yard: twelve storeys of 3.6 m, a concrete frame and core, a glass curtain wall,
+offices — built of pieces like the tower, and part of the same job. Every piece has a
+`building` ('tower' | 'neighbour'): storeys, support failures and toppling are counted
+per building.
+
+**People** (`sim/people.js`): about ninety — shoppers, diners, office workers, the
+family upstairs — walk between free spots on their floor, a few instanced parts each
+(a dozen draw calls in all). They stand on whatever is really under them and fall
+when it goes; a blast, a support giving way or a building going over sends everyone in
+earshot running; knocked down by a fall they lie still and later are gone.
 
 ### The lift
 
@@ -148,10 +164,14 @@ src/
   player.js            Kinematic character controller
   input.js, audio.js   Input with press edges; synthesised Web Audio
   render/              textures (procedural PBR), materials (the material table), geometry
-  building/            pieces (the store), support (what holds what), kit, furniture, tower
-  damage/              damage (what a blow does), cutter (CSG), splinters, glass, paint
-  sim/                 structure (support + weight + pancake), topple, impacts, fire, blast, lift
-  fx/                  particles, chips, heap (rubble heightfield), shake
+  building/            pieces (the store), support (what holds what), kit, furniture, tower,
+                       neighbour (the office block next door)
+  damage/              damage (what a blow does), cutter (CSG), csg + csg.worker (breaking
+                       in Web Workers), splinters, glass, paint
+  sim/                 structure (support + weight + pancake), topple, rubble, impacts,
+                       fire, blast, lift, people
+  fx/                  particles (and the dust veil), chips, shake
+  dev/bench.js         the collapse bench: an automated demolition, timed (see below)
   tools/               tools (sledge, spray, extinguisher, charges), viewmodels
   ui/                  menu, hud (and every overlay screen)
   data/                catalog, progress
@@ -162,15 +182,23 @@ src/
 
 Everything breakable is a **piece** (`building/pieces.js`): parts (geometry and material
 kind), a pose, a role (`slab`, `column`, `core`, `glass`, `mullion`, `spandrel`,
-`furniture`, `lamp`, `tank`, `fragment`, …) and a state: `static`, `dynamic`, `falling`,
-`rubble` or `dead`. The tower is about 10,000 pieces.
+`furniture`, `lamp`, `tank`, `fragment`, …), a `building`, and a state: `static`,
+`dynamic` (a Rapier body), `falling` (in a pancake), `tipping` (riding a topple),
+`flying` (in the air as rubble), `rubble` (come to rest) or `dead`. The job is about
+6,600 pieces: 4,700 in the tower, 1,900 next door.
 
 - **Untouched pieces are drawn in a `BatchedMesh` per material**, a couple of dozen draw
   calls for the whole tower. A piece is *promoted* to its own meshes only when something
   happens to it. A collapsing floor stays batched and moves by instance matrix.
-- **Each static piece has fixed colliders** on one fixed body. A piece gets a dynamic body
-  only when knocked loose. Resting debris is **frozen** (`freeze`): it leaves the
+- **Each static piece has fixed colliders** on one fixed body, in a collision group that
+  names its building (`inBuilding` in `physics.js`). A piece gets a dynamic body only
+  when knocked loose, and **at most 50 at once** (`maxBodies`): past that, a piece knocked
+  loose falls as rubble instead. Resting debris is **frozen** (`freeze`): it leaves the
   simulation but keeps a collider, so a floor of rubble costs nothing.
+- **Rubble goes back into batches** (`rejoin`): a piece that has come to rest is drawn in
+  its own batch instance again, or, if it was made or cut since, in a *spare* batch per
+  material — a fragment is two, its outside and its broken inside. Six thousand pieces of
+  a fallen tower as meshes were thousands of draw calls and 30 ms of CPU a frame.
 - **Masses are real kilograms** (`setDensity(kind.density)`). They were tonnes once, so a
   desk weighed half a kilo and a sledge sent it across the room.
 
@@ -192,7 +220,16 @@ things carry less; big falling things break what they land on; small bits go.
   in `support.js`).
 - **Falling things deal blows** (`sim/impacts.js`): energy / 560 J (one swing)
   goes to whatever they land on, which cracks and may break, and what broke
-  falls in turn. A 1.6 t lump dropped 6 m broke a slab bay and itself.
+  falls in turn. A 1.6 t lump dropped 6 m broke a slab bay and itself. Rubble
+  landing on standing structure goes through `impacts.absorb`: a floor, column
+  or wall breaks only when it has taken, all told, **more than its own weight
+  falling 3 m** — sledge durability is far too little for a tonne of debris,
+  and judged by it the podium fell storey by storey under the tower's rubble.
+- **Weight at rest** (`rubble._bear`): each piece of rubble adds half its box's
+  mass to the standing slab that carries it, down through the pile and through
+  carpets and desks. A slab carrying more than **three times its own weight**
+  breaks, and what lay on it lands on the floor below. That is how a tower's
+  worth of rubble on an office roof takes the block down floor by floor.
 - **Small bits go.** Fragments under 25 kg fade about four seconds after they
   break off, by simulation time (a heap of them jostles for ever and never
   counts as resting); chips fade four seconds after they land.
@@ -230,21 +267,48 @@ bays. It then answers which standing pieces have lost their support. The rules:
   a load: it must return nothing.** For a long time it returned 123 core pieces, which fell
   on the first frame, and nobody noticed.
 
-**Weight** (`sim/structure.js`): a column or core wall has `hp` and `load` (the storeys
-above it), and fails when `hp <= hpMax · share / (share + 14)`, where share grows with the
-supports already lost within 7.5 m. So a floor-1 column goes on the fourth blow and a
-floor-20 one on the eighth. When one fails, its neighbours are rechecked a moment later;
-an undamaged one carrying 8+ storeys with 3 lost neighbours (6 for core) gives way on its
-own. That is the chain reaction, and it stops where the losses thin out.
+- **What stands within 0.45 m of the ground stands on it** (`GROUND`): a column's base is
+  on its foundation, broken floor slab or not, and a floor laid on the ground cracks but
+  never breaks away. Breaking the lobby slab once sent every ground-floor column flying.
+
+**Weight** (`sim/structure.js`): a column or core wall has `hp` and a load: **the storeys
+still standing over it**, measured by a ray down its line (`loadOf`), not what stood over
+it when it was built — a podium column carries the tower until the tower has gone. It
+fails when `hp <= hpMax · share / (share + 14)`, where share grows with the supports
+already lost within 7.5 m. When one fails, its neighbours are rechecked a moment later;
+an undamaged one gives way on its own when it has lost `24 / load` neighbours (at least
+two; twice that for core): two under twelve storeys, four under six. That is the chain
+reaction, and it stops where the losses thin out.
+
+**Blasts are shielded** (`blast._shielded`): a slab, wall or column between a charge and a
+piece takes the blast instead — a charge on a column does not bring down the one on the
+storey below, through a floor.
 
 What loses support falls:
 
 - **A few pieces** become rigid bodies. `sim/impacts.js` watches for sudden stops: a
   heavy piece landing faster than 6 m/s smashes (CSG-split fragments), and the slab it hits
   breaks if it absorbs more than its own weight falling 3 m, which drops the next floor.
-- **More than 150** comes down as a **pancake**. The whole mass drops at 0.7 g, and each
-  floor it meets is ground up with it: into the rubble heap (`fx/heap.js`, a heightfield
-  with lumps on it, walkable), dust and a few thrown chunks.
+- **More than 80** comes down as a **pancake**. The whole mass drops at 0.7 g, and each
+  floor it meets breaks up with it: its real pieces spill out and land as rubble. It goes
+  on **only as long as it has the energy**: falling gains its weight times the drop, and
+  every piece of floor it meets takes its own weight falling 3 m to break. A tower's worth
+  reaches the street; three storeys of slab dropping onto a podium roof stop there, and
+  what is still falling lands as rubble on the floor that held. Without that, a hundred
+  pieces of slab ground the whole podium to the ground.
+
+**The rubble is the building** (`sim/rubble.js`). There is no generic rubble: every slab,
+column, wall and chair of a collapse keeps its shape, flies on from how it was moving,
+and lands on whatever is under it — found by rays down nine columns of its footprint,
+dropping it until its own underside touches, and settling into loose rubble until three
+columns touch (never into the street). Big pieces landing hard break into chunks where
+they land (CSG, in the workers), which land again propped at angles; that is what makes
+a pile of voids and not a crust. Each piece remembers what it rests on and falls again
+when that goes; a sweep every half second catches anything whose support moved. It rests
+only on pieces, the street and the city — never the lift car, and never a collider
+removed this frame, which Rapier's queries still find until it steps; new colliders are
+invisible to queries until then too, so this frame's landings are tested by hand.
+`dev.bench`'s `floaters()` checks physically that nothing lies on air.
 
 Every heavy landing throws a **dust cloud** (`cloud()` in `main.js`), big and dark enough
 to hide in.
@@ -252,44 +316,50 @@ to hide in.
 ### Toppling: a tower cut on one side goes over, not down
 
 `sim/topple.js`. When a column or core wall fails, `structure.failed()` asks
-`topple.check(floor)` first. If the weight above that storey is no longer over what is
-left standing (its centre of mass is outside the rectangle round the surviving supports,
-or those supports hold under 30% of the storey's strength and are well off-centre),
-**everything above tips as one rigid body** toward the broken side. Cut every support on a
-storey evenly and nothing is off-centre, so it drops straight down as the pancake. Only
-the part above the cut goes; what is below stays standing.
+`topple.check(floor, building)` first. It tips when the weight above is off what is left:
+its centre of mass outside the rectangle round the surviving supports, or **a third of the
+storey's strength gone** with the weight more than 3 m off the centre of what is left —
+and only if what is above is **tall for its base** (at least 0.8 of the remaining width
+along the fall): a podium with a corner crushed does not tip, its broken part comes down
+alone. Struck hard in the last 12 s (`blows`), a building tips the way the blow drove it,
+away from what hit it, not back onto it. Cut every support on a storey evenly and nothing
+is off-centre: it drops straight down as the pancake.
 
-- **One Rapier body, a cuboid per slab and per storey of core.** The ~4,000 pieces ride on
-  it: each keeps its matrix at the start, and every frame it is drawn at body × start. They
-  lose their own colliders while tipping and get them back if it comes to rest.
-- **The hinge is a revolute joint, not the surviving columns.** It is pinned along the
-  fall-side edge of what is left, at the underside of the mass. The columns were tried
-  first, and the structure pass fails them next: the block rocked back from 13° and sank
-  flat into its own footprint. The joint lets go at 26°, or on touching the street.
-- **It crushes what it leans on, but only on the fall side.** Everything left in the broken
-  storey is ground up the moment it tips (the stairs and spandrels held it at 2.5°
-  otherwise). After that, up to 16 pieces a frame of whatever the mass touches past the
-  pivot, standing or loose, are destroyed. **Loose ones too**: the columns knocked out
-  first are rigid bodies lying in the gap, a rigid body cannot be crushed, and the tower
-  rested on them. **Crushing both sides** let it sink evenly instead of swinging.
-- **Its rubble is piled only once it has landed.** Piled at once, the heap rose under the
-  fall side and the tower bounced back off its own debris.
-- **Only the street and the neighbours break it** (`physics.ground` holds the ground tile
-  handles; city blocks are owned by `CITY`). At 5 m/s at the contact it comes apart: the 90
-  biggest structural pieces go on as bodies carrying 80% of the swing, 2% of the rest fly,
-  and everything else becomes heap and dust. Its own lower floors and the heap only break
-  it at 14 m/s. Counting them as ground broke it at 4° in mid-air, which reads as a drop.
-  If it comes to rest gently, against a neighbour say, it stays there leaning, as static
-  pieces again.
+- **One Rapier body, a box per floor of slabs and per storey of core.** The pieces ride on
+  it, drawn at body × where they stood. Anything already loose inside it rides too.
+- **The hinge is a revolute joint behind the weight.** It is pinned along the fall-side
+  edge of what is left — but never in front of the centre of mass: supports in front of
+  the weight are what the off-centre load crushes, so the pivot moves back until the
+  weight is past it. A hinge in front of the weight stood the tower back up.
+- **While hinged it meets only the city** (`G_MASS_HINGED`). Anything in its own footprint
+  — the lift car, a stair, the core fallen down its shaft — it passes through. Colliding
+  with those, the solver threw it off them at 40 m/s and it seemed to burst in mid-air.
+  Whatever of it swings below what is really under it (a height map taken as it starts:
+  the podium roof, the yard, the building next door) is **ground off** as rubble. So a
+  tower on a wide podium crushes its low side and goes on over, not stopping at 5°.
+- **At 26° the hinge goes** and its boxes are rebuilt from what is left. Now it meets its
+  own building (it lands on its podium roof and slides off; it may crush only the storey
+  it stood on — crushing further, it sank through the podium to the street), the street
+  and the city (`massGroups`). **Another building it ploughs into**: what it sweeps through
+  there is smashed out of the way (`_smash`), losing it momentum per tonne, and supports
+  smashed count as lost. Colliding with the office block, it bounced off it upright.
+- **At 5 m/s on the street or the city it breaks**; come to rest — leaning on a
+  neighbour, say — it overloads the supports under where it leans and breaks anyway: a
+  dozen storeys of rubble that has lost its footing is not a building that can lean.
+  Breaking adds nothing: every piece carries on as the mass carried it at that point,
+  turning as it turned. Scattered at random, with an explosion's sound, it looked as if
+  it had blown up in mid-air.
+- **The shock** (`topple.fx.quake`) knocks over furniture, brings down lamps and bursts
+  windows in what still stands nearby. The structure stands; its contents do not.
 - **Wreckage is not structure.** Stubs, rebar, shards and fragments made after the building
-  was linked have no support links, so `unsupported()` saw 138 of them as floating and set
-  off a pancake alongside the topple. They are skipped by role (`WRECKAGE` in
-  `building/support.js`).
+  was linked have no support links (`WRECKAGE` in `building/support.js`); they remember
+  what they sit on (`rubble.anchor`) and fall with it.
 
-Measured on the reference cut (every core wall on storey 1 and the columns with x < 4):
-it tips west, reaches about 20° and hits the street 7–8 s later, and breaks in one 80 ms
-frame. Frames during the tip are 25–45 ms with `gl.finish`, most of it rendering the dust.
-That cost is the spectacle and is not to be cut; see *Keeping it smooth* for what is.
+**The reference demolition** (`REFERENCE` in `dev/bench.js`): the detonator's twelve
+charges on storey 6 — the whole north column line, the ends of the next, the core's north
+and side walls. Ten do not fell it. It tips north, crushes the storey it stood on, goes
+over the podium's north edge and into the office block, which comes down floor by floor
+under it. The podium stands, its furniture thrown about.
 
 ### Fire
 
@@ -333,9 +403,34 @@ things, in this order of size:
 
 `render/quality.js` has four levels (resolution, bloom, AO, shadow size); the
 menu's Graphics button picks one or Auto, which drops a level when frames run
-over 22 ms and climbs back when they run under 13 ms. To measure, force the GPU
-to finish: `gl.finish()` around `dev.step(1/60, 20)`, since the test tab is
-hidden and has no real frame loop.
+over 22 ms and climbs back when they run under 13 ms.
+
+What a collapse costs, and what was done about each, in order of size:
+
+- **Rigid bodies**: six hundred at once took 150 ms a frame. At most 50 now; the rest
+  fall as rubble, two solver iterations, no CCD on debris, Rapier's SIMD build.
+- **CSG**: breaking a column was 26 ms on the main thread. It runs in Web Workers now
+  (`damage/csg.js`); lumps take the piece's place a frame or two later.
+- **Draw calls**: rubble goes back into batches (above); small debris casts no shadow.
+- **Shader compiles**: the first blast compiled a dozen programs in one 125 ms frame.
+  `render/warmup.js` draws one of everything, every way, on the loading screen.
+- **Pieces in the air** are spheres until close to landing; landings are paced at a few
+  ms a frame; pieces waiting to land do not look again.
+- **The dust is an occluder** (`fx/particles.js`, the veil): a coarse grid of dust
+  density; a piece hidden in the cloud is not redrawn, and the fog closes in with the
+  dust in the air, so the city beyond a collapse fades out. Concrete landing throws up
+  dust.
+
+**The collapse bench** (`dev/bench.js`): `await dev.bench({ quality: 1, profile: true })`
+loads the job, puts the reference charges on, holds the camera over the avenue where it
+sees both buildings, fires, and times every frame until everything has stopped. It
+reports half-second frame rates, the worst frame, each system's CPU per frame, what became
+of every piece, the pile, and `floaters` — and passes only on screen, at 30 fps or more
+throughout, with nothing hanging. **Run it in a tab that is on screen**: a hidden tab has no
+`requestAnimationFrame`, and there the bench times frames by CPU and GPU (timer queries) —
+Chrome runs hidden pages at low priority, 3–10× slower, so that is only a sketch.
+`trial(dev, charges)` runs a demolition without drawing, for choosing charges. Neither
+survives a file edit: Vite reloads the page.
 
 ## Things already learned here
 
