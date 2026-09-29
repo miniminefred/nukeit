@@ -448,7 +448,14 @@ animate();
 if (import.meta.env.DEV && new URLSearchParams(location.search).has('bench')) {
   const q = new URLSearchParams(location.search);
   const opts = { quality: +(q.get('quality') ?? 1), secs: +(q.get('secs') ?? 60), profile: q.has('profile') };
-  window.dev.bench(opts).then((r) => {
+  // Only on screen: a hidden tab is throttled, and a bench started there ran
+  // slowly on even after it was brought forward. So it waits to be seen.
+  const note = document.createElement('div');
+  note.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:99;padding:8px 12px;background:#000c;color:#fff;font:13px system-ui;border-radius:6px';
+  document.body.appendChild(note);
+  const visible = () => new Promise((ok) => { if (!document.hidden) return ok(); note.textContent = 'Collapse bench: waiting for this tab to be on screen…'; const f = () => { if (!document.hidden) { removeEventListener('visibilitychange', f); ok(); } }; addEventListener('visibilitychange', f); });
+  visible().then(() => { note.textContent = 'Collapse bench running — keep this tab in front (about a minute)…'; return window.dev.bench(opts); }).then((r) => {
+    note.textContent = `Collapse bench done: ${r.pass ? 'PASS' : 'FAIL'} · lowest ${r.minFps} fps · average ${r.avgFps} fps — written to bench/latest.json`;
     const { frames, ...rest } = r;
     const slim = frames.map((f) => ({ t: +f.t.toFixed(3), ms: +(f.dt * 1000).toFixed(1), flying: f.flying, bodies: f.bodies, cpu: f.cpu }));
     return fetch('/__bench', { method: 'POST', body: JSON.stringify({ ...rest, frames: slim, when: new Date().toISOString() }) });
