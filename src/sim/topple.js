@@ -260,13 +260,17 @@ export class Topple {
     const M = this.mass, b = M.body, fx = this.fx, { world, owner } = this.physics;
     const lv = b.linvel(), av = b.angvel(), com = b.translation();
     const hit = new Set();
+    const other = (o) => o?.parts && o.state === 'static' && o.building !== M.building;
     for (let n = 0; n < b.numColliders(); n++) {
       const c = b.collider(n);
+      // What it overlaps, and — once it is off its hinge and colliding — what
+      // it is pressing against.
       world.intersectionsWithShape(c.translation(), c.rotation(), c.shape, (k) => {
         const o = owner.get(k.handle);
-        if (o?.parts && o.state === 'static' && o.building !== M.building) hit.add(o);
+        if (other(o)) hit.add(o);
         return hit.size < 60;
       }, undefined, G_LAND);
+      if (!M.joint) world.contactPairsWith(c, (k) => { const o = owner.get(k.handle); if (other(o) && hit.size < 60) hit.add(o); });
       if (hit.size >= 60) break;
     }
     if (!hit.size) return 0;

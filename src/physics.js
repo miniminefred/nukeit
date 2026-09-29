@@ -21,7 +21,7 @@ export const GROUP_MASS = 0x0010;
 export const GROUP_GROUND = 0x0020;
 export const GROUP_CITY = 0x0040;
 const groups = (member, filter) => (member << 16) | filter;
-export const G_WORLD = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER);
+export const G_WORLD = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER | GROUP_MASS);
 // The street and the city: the world, and also what a tipping mass lands on.
 export const G_GROUND = groups(GROUP_WORLD | GROUP_GROUND, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER | GROUP_MASS);
 export const G_DEBRIS = groups(GROUP_DEBRIS, GROUP_WORLD | GROUP_DEBRIS | GROUP_RUBBLE);
@@ -33,13 +33,15 @@ export const G_PLAYER = groups(GROUP_PLAYER, GROUP_WORLD | GROUP_RUBBLE);
 // whose filter accepts the query's own group, and without it the rays rubble
 // lands by, and the sledge's, went straight through every piece of rubble.
 export const G_RUBBLE = groups(GROUP_RUBBLE, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER);
-// A tipping mass meets the street and the city, nothing else. Its hinge is a
-// joint, not the stumps it stands on; anything left in its own footprint —
-// the lift car, a stair, the core fallen down its shaft — it passes through.
-// Colliding with those, the solver threw four thousand tonnes off them at
-// forty metres a second, and the tower seemed to burst in mid-air. And it is
-// its own group, so nothing comes to rest on it: it is about to be gone.
-export const G_MASS = groups(GROUP_MASS, GROUP_GROUND);
+// A tipping mass, once its hinge has gone, meets the street, the city and
+// what stands — it comes down on a podium roof and slides off it into the
+// building next door. While it swings on its hinge it meets only the city
+// (G_MASS_HINGED): what is left in its own footprint — the lift car, a stair,
+// the core fallen down its shaft — it passes through and grinds up. Colliding
+// with those, the solver threw four thousand tonnes off them at forty metres a
+// second, and the tower seemed to burst in mid-air. And it is its own group,
+// so nothing comes to rest on it: it is about to be gone.
+export const G_MASS = groups(GROUP_MASS, GROUP_GROUND | GROUP_WORLD);
 // While it still swings on its hinge, only the neighbours: the storeys on its
 // low side are crushed into the street (sim/topple.js), not stood on.
 export const G_MASS_HINGED = groups(GROUP_MASS, GROUP_CITY);
