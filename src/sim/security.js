@@ -187,6 +187,7 @@ export class Security {
     }
     if (this.police) { this._lights(dt); this._drive(dt); this._search(dt); }
     const eye = this.fx.camera.position;
+    this.seesYou = false;
     for (const a of this.agents) {
       if (a.hidden) { this._stairs(a, dt); continue; }
       a.cool -= dt;
@@ -199,6 +200,7 @@ export class Security {
       }
       // Just thrown out: they let you go for a few seconds.
       const sees = this.time > this.grace && this._sees(a, eye);
+      if (sees && a.mode !== 'rest') this.seesYou = true;
       // Seen at it — by a guard or an officer — and everyone knows who to look for.
       if (sees && this.time - this.lastBlow < 1.5) this.spotted = this.time;
       // An officer seeing someone who looks like they belong has seen nobody.

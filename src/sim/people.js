@@ -284,6 +284,16 @@ export class People {
     return null;
   }
 
+  // Is anyone near enough to `at` to see what you are doing? Up and about,
+  // on the same level, within r — through glass is fine.
+  witnesses(at, r = 12) {
+    for (const p of this.list) {
+      if (p.agent || p.hidden || p.state === 'gone' || p.state === 'down' || p.state === 'knocked') continue;
+      if (Math.abs(p.pos.y - at.y) < 3 && Math.hypot(p.pos.x - at.x, p.pos.z - at.z) < r) return true;
+    }
+    return false;
+  }
+
   // Something went bang at `at`: everyone within earshot runs.
   alarm(at, r = HEAR) { this._alarm.push({ at: at.clone(), r }); }
 

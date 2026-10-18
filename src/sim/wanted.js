@@ -10,6 +10,12 @@
 //   7  bringing it down: a collapse, a tower going over,     SWAT, a helicopter, and the
 //      a good part of the structure gone                     guards run out with the crowd
 //
+// Nothing counts unless someone sees it. A guard, an officer, or anyone
+// standing near you has to see you at it; out of sight, you are just someone
+// who was about when things broke. Charges are yours if somebody saw you plant
+// one — or if they already know you as the vandal; otherwise a building
+// coming down is a mystery, and the paper says so.
+//
 // Level 1 is only while you carry the tool: put it away and a few seconds
 // later you are clean. The rest stay, and ebb a level at a time while nobody
 // is after you — quicker on Easy, never on Insane. In the hi-vis vest and the
@@ -68,6 +74,7 @@ export class Wanted {
     this.broken = [];           // levels on the charge sheet, in the order broken
     this.worst = 0;
     this.burst = false;
+    this.chargesSeen = false;
     this._shown = '';
     this.show(this.on);
   }
@@ -75,17 +82,28 @@ export class Wanted {
   // What you are now.
   get now() { return this.on ? Math.max(this.base, this.armedT > 0 ? 1 : 0) : 0; }
 
-  // You did something at level n, at `at`.
-  offend(n, at) {
+  // You did something at level n, at `at`; `sure`: whoever it was done to saw you.
+  offend(n, at, sure = false) {
     if (!this.on) return;
     const { player } = this.fx;
     if (n <= 3 && player?.disguised) return;
+    // Explosives and a building down are yours if they saw you with the charges
+    // or know you already; anything else, if somebody sees you now.
+    if (n >= 6) { if (!this.chargesSeen && this.base < 3) return; }
+    else if (!sure && !this.fx.seen?.()) return;
     this.quiet = 0;
     if (n === 1) { this.armedT = ARMED_CLEAR; this._sheet(1); return; }
     if (n <= this.base) { this._react(n, at, false); return; }
     this.base = n;
     this._sheet(n);
     this._react(n, at, true);
+  }
+
+  // A charge stuck on: seen doing it, every bang after is yours.
+  placed() {
+    if (!this.on || this.chargesSeen || !this.fx.seen?.()) return;
+    this.chargesSeen = true;
+    this.fx.hud?.flash('Someone saw you plant that!', 2);
   }
 
   // A sledge blow landed on piece p: breaking a wall, a slab or a column

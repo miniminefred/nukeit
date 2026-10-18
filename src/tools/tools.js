@@ -231,6 +231,7 @@ export class Charges {
         this.placed.push({ mesh: c, at: hit.point.clone() });
         this.left--;
         ctx.audio?.click();
+        ctx.wanted?.placed(hit.point);
       }
     }
     if (input.pressed('Mouse2') && this.placed.length && !this._chain.length) {
