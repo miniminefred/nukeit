@@ -1,13 +1,14 @@
-// What you are wanted for: seven offences, one above the other, and the
+// What you are wanted for: eight offences, one above the other, and the
 // highest you have reached is your level. The owner's ladder:
 //
 //   1  walking about with the sledgehammer or the charges   watched, asked to put it away
 //   2  chasing people with the sledgehammer                  they keep away from you
-//   3  breaking things                                       the guards come
-//   4  breaking something structural                         the guards come, all of them
-//   5  knocking people over                                  the police are called
-//   6  setting off explosives                                the police are called
-//   7  bringing it down: a collapse, a tower going over,     SWAT, a helicopter, and the
+//   3  tagging: spray paint on the place                     the guards come to look
+//   4  breaking things                                       the guards come
+//   5  breaking something structural                         the guards come, all of them
+//   6  knocking people over                                  the police are called
+//   7  setting off explosives                                the police are called
+//   8  bringing it down: a collapse, a tower going over,     SWAT, a helicopter, and the
 //      a good part of the structure gone                     guards run out with the crowd
 //
 // Nothing counts unless someone sees it. A guard, an officer, or anyone
@@ -19,12 +20,14 @@
 // Level 1 is only while you carry the tool: put it away and a few seconds
 // later you are clean. The rest stay, and ebb a level at a time while nobody
 // is after you — quicker on Easy, never on Insane. In the hi-vis vest and the
-// hard hat, levels 1–3 do not count: a workman with a hammer belongs, and a
-// bit of breaking looks like work. Die and you start again fresh, but they
+// hard hat, carrying, menacing and a bit of breaking do not count: a workman
+// with a hammer belongs, and it looks like work. So does a mark sprayed on a
+// column or a wall, marking out what comes down — but paint on the furniture,
+// the glass, the marble, or spraying on and on, is tagging, vest or no vest. Die and you start again fresh, but they
 // remember a level or two.
 //
 // On screen: a thermometer on the right edge that fills with the level and
-// bursts at 7, and the charge sheet under it — every law you have broken, a
+// bursts at 8, and the charge sheet under it — every law you have broken, a
 // new line each time. Both can be switched off in Settings. Creative has
 // neither, nor does Super easy, which has nobody to break the law in front of.
 
@@ -32,6 +35,7 @@ export const LAWS = [
   null,
   { law: 'Carrying demolition tools in a public place', short: 'Carrying a sledgehammer', comic: ['Brought a sledgehammer on a shopping trip.', 'Said the hammer was "for a friend".', 'Walked into a jeweller with a detonator, "just looking".'] },
   { law: 'Menacing shoppers with a sledgehammer', short: 'Menacing shoppers', comic: ['Chased a man holding a latte for no reason at all.', 'Ran at a queue. The queue left.', 'Made a tourist drop a souvenir snow globe.'] },
+  { law: 'Tagging', short: 'Tagging', comic: ['Signed the lobby. In red.', 'Improved the marble with a smiley face.', 'Left a review on a column, in paint.'] },
   { law: 'Vandalism', short: 'Vandalism', comic: ['Was very rude to a column.', 'Rearranged the furniture with a hammer.', 'Gave a desk "a bit of character".'] },
   { law: 'Heavy vandalism', short: 'Heavy vandalism', comic: ['Removed a load-bearing wall without asking.', 'Took a wall home in several pieces.', 'Turned an office into an open-plan office.'] },
   { law: 'Public menace', short: 'Public menace', comic: ['Knocked over a tourist mid-selfie.', 'Bowled over shoppers like skittles.', 'Interrupted a business lunch, sideways.'] },
@@ -44,17 +48,20 @@ export const LAWS = [
 const HEADLINES = {
   unseen: [['WHO DID THIS?', 'Police baffled as Fifth Avenue landmark comes apart'], ['MYSTERY ON FIFTH AVENUE', 'Nobody saw a thing, say shoppers'],
     ['INSPECTOR BLAMES "OLD CONCRETE"', "Officials insist it was nobody's fault"], ['PIGEONS QUESTIONED, RELEASED', 'Tower damage remains unexplained']],
-  3: [['VANDAL IN THE TOWER', 'Lobby left "a bit of a mess", say staff'], ['HAMMER TIME ON FIFTH AVE', 'Guards chase mystery smasher']],
-  4: [['WALLS? WHAT WALLS?', 'Vandal knocks through landmark, one blow at a time'], ['OPEN PLAN, WHETHER YOU LIKE IT OR NOT', 'Tower offices "remodelled" without permission']],
-  5: [['SHOPPERS BOWLED OVER', 'Literally, say witnesses'], ['MIDTOWN MENACE!', 'Tourists knocked flat by hammer-wielding stranger']],
-  6: [['BANG! FIFTH AVENUE SHAKEN', 'Explosions rattle windows for blocks'], ['KA-BOOM IN MIDTOWN', 'Police: "Those were not fireworks"']],
-  7: [['SKYLINE ONE TOWER SHORTER', 'SWAT, a helicopter and half of Midtown could not stop it'], ['TOWER DOWN!', 'Suspect still at large — city in shock'],
+  3: [['ART CRITICS DIVIDED', 'Mystery tagger "improves" Fifth Avenue lobby'], ['WHO PAINTED THE MARBLE?', 'Cleaners called in for the week']],
+  4: [['VANDAL IN THE TOWER', 'Lobby left "a bit of a mess", say staff'], ['HAMMER TIME ON FIFTH AVE', 'Guards chase mystery smasher']],
+  5: [['WALLS? WHAT WALLS?', 'Vandal knocks through landmark, one blow at a time'], ['OPEN PLAN, WHETHER YOU LIKE IT OR NOT', 'Tower offices "remodelled" without permission']],
+  6: [['SHOPPERS BOWLED OVER', 'Literally, say witnesses'], ['MIDTOWN MENACE!', 'Tourists knocked flat by hammer-wielding stranger']],
+  7: [['BANG! FIFTH AVENUE SHAKEN', 'Explosions rattle windows for blocks'], ['KA-BOOM IN MIDTOWN', 'Police: "Those were not fireworks"']],
+  8: [['SKYLINE ONE TOWER SHORTER', 'SWAT, a helicopter and half of Midtown could not stop it'], ['TOWER DOWN!', 'Suspect still at large — city in shock'],
     ['THREAT TO NEW YORK CITY', 'Mayor: "We will rebuild. Bigger."']],
 };
 
 // How long a level takes to ebb away, by difficulty; Insane never forgets.
 const COOL = { easy: 35, normal: 60, hard: 80, insane: Infinity };
 const ARMED_CLEAR = 4;          // s after putting the tool away
+// The building itself, not what is in it (furniture is marked structural too).
+const BIG = new Set(['column', 'wall', 'core', 'slab']);
 
 export class Wanted {
   constructor(fx) {
@@ -75,6 +82,7 @@ export class Wanted {
     this.worst = 0;
     this.burst = false;
     this.chargesSeen = false;
+    this.marking = 0;
     this._shown = '';
     this.show(this.on);
   }
@@ -86,10 +94,10 @@ export class Wanted {
   offend(n, at, sure = false) {
     if (!this.on) return;
     const { player } = this.fx;
-    if (n <= 3 && player?.disguised) return;
+    if ((n <= 2 || n === 4) && player?.disguised) return;
     // Explosives and a building down are yours if they saw you with the charges
     // or know you already; anything else, if somebody sees you now.
-    if (n >= 6) { if (!this.chargesSeen && this.base < 3) return; }
+    if (n >= 7) { if (!this.chargesSeen && this.base < 3) return; }
     else if (!sure && !this.fx.seen?.()) return;
     this.quiet = 0;
     if (n === 1) { this.armedT = ARMED_CLEAR; this._sheet(1); return; }
@@ -109,8 +117,17 @@ export class Wanted {
   // A sledge blow landed on piece p: breaking a wall, a slab or a column
   // through is heavy vandalism.
   struck(p, at) {
-    const big = p.structural || p.role === 'slab' || p.role === 'wall' || p.role === 'core' || p.role === 'column';
-    if (big && (p.hp <= 0 || p.state !== 'static')) this.offend(4, at);
+    const big = BIG.has(p.role);
+    if (big && (p.hp <= 0 || p.state !== 'static')) this.offend(5, at);
+  }
+
+  // Spray paint landed on piece p. In the vest, a mark on the structure is
+  // marking out the work — until it goes on too long.
+  tagged(p, at, dt) {
+    if (!this.on) return;
+    const structure = BIG.has(p.role);
+    if (this.fx.player?.disguised && structure && (this.marking = (this.marking ?? 0) + dt) < 6) return;
+    this.offend(3, at);
   }
 
   _sheet(n) {
@@ -122,9 +139,9 @@ export class Wanted {
   _react(n, at, fresh) {
     const S = this.fx.security;
     if (!S) return;
-    if (n >= 3 && n < 7) S.summon?.(at ?? this.fx.player.pos, n >= 4);
-    if (n === 5 || n === 6) S.call?.(n === 5 ? 'People knocked over — someone is calling the police' : 'Explosions! The police are on their way');
-    if (n === 7 && fresh) S.swat?.();
+    if (n >= 3 && n < 8) S.summon?.(at ?? this.fx.player.pos, n >= 5);
+    if (n === 6 || n === 7) S.call?.(n === 6 ? 'People knocked over — someone is calling the police' : 'Explosions! The police are on their way');
+    if (n === 8 && fresh) S.swat?.();
   }
 
   // Each frame. `armed`: carrying the sledge or the charges.
@@ -151,7 +168,7 @@ export class Wanted {
       wantedFor: this.worst ? LAWS[this.worst].law : 'Nothing at all',
       clean: this.on && this.worst <= 2,
       lines: [...this.broken].sort((a, b) => b - a).map((n) => pick(LAWS[n].comic)),
-      headline: pick(this.worst <= 2 ? HEADLINES.unseen : HEADLINES[Math.min(7, this.worst)]),
+      headline: pick(this.worst <= 2 ? HEADLINES.unseen : HEADLINES[Math.min(8, this.worst)]),
     };
   }
 
@@ -189,19 +206,19 @@ export class Wanted {
     const s = this.fx.settings;
     const n = this.now;
     const key = `${n}|${this.broken.join()}|${s?.crimeMeter !== false}|${s?.lawsList !== false}`;
-    if (key === this._shown) { if (n >= 7) this._boil(); return; }
+    if (key === this._shown) { if (n >= 8) this._boil(); return; }
     this._shown = key;
     this.el.thermo.style.display = s?.crimeMeter === false ? 'none' : '';
     this.el.sheet.style.display = s?.lawsList === false || !this.broken.length ? 'none' : '';
-    this.el.fill.style.height = `${Math.round((n / 7) * 100)}%`;
+    this.el.fill.style.height = `${Math.round((n / 8) * 100)}%`;
     this.el.n.textContent = n;
     // The charge sheet, the worst at the top.
     this.el.sheet.innerHTML = '<li style="font-size:10px;letter-spacing:.14em;text-transform:uppercase;opacity:.75;margin-bottom:4px">Laws broken</li>'
       + [...this.broken].sort((a, b) => b - a).map((k) => `<li style="margin:2px 0;opacity:${k <= this.base || (k === 1 && n >= 1) ? 1 : 0.55};animation:lawin .5s"><b style="color:#ff9a70">§ ${k}</b> ${LAWS[k].law}</li>`).join('');
-    if (n < 7) { this.el.steam.style.opacity = 0; this.el.bulb.style.transform = ''; }
+    if (n < 8) { this.el.steam.style.opacity = 0; this.el.bulb.style.transform = ''; }
   }
 
-  // Level 7: the top pops off in a puff of steam and it flashes red.
+  // Level 8: the top pops off in a puff of steam and it flashes red.
   _boil() {
     const on = Math.floor(performance.now() / 250) % 2;
     this.el.steam.style.opacity = 1;

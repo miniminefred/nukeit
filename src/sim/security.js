@@ -91,7 +91,7 @@ export class Security {
       this.lastBlow = this.time;
       this.fx.people.witness(at);
       this.fx.fear?.scare(at, 3);
-      this.fx.onOffence?.(3, at);
+      this.fx.onOffence?.(4, at);
     }
     if (this.level.police !== null && this.eta === null && !this.police && this.heat > HEAVY) {
       this.eta = this.level.police * Math.pow(0.6, this.calls ?? 0);

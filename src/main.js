@@ -175,7 +175,7 @@ damage.fx.onFailed = (p) => {
   const c = p.box.getCenter(new THREE.Vector3());
   people.alarm(c, 18); security.noise(c, 3, false); fear.scare(c, 6, 0.5);
   // A support you were just hitting: heavy vandalism.
-  if (security.time - security.lastBlow < 3 && c.distanceTo(player.pos) < 15) wanted.offend(4, c);
+  if (security.time - security.lastBlow < 3 && c.distanceTo(player.pos) < 15) wanted.offend(5, c);
   return gave(p);
 };
 // Guards and the police (sim/security.js). Caught by an officer, the job is
@@ -203,7 +203,7 @@ const wanted = new Wanted({
   seen: () => !player.dead && (security.seesYou || people.witnesses(player.pos)),
 });
 security.fx.onOffence = (n, at) => wanted.offend(n, at);
-security.fx.onKnock = (at) => wanted.offend(5, at, true);
+security.fx.onKnock = (at) => wanted.offend(6, at, true);
 // The police know you by sight — or by the sledgehammer in your hands.
 security.fx.armed = () => tools[current]?.id === 'sledge' && !player.disguised;
 people.camera = camera;
@@ -214,7 +214,7 @@ const traffic = new Traffic(scene, { physics, player, audio });
 const landed = rubble.fx.onLand;
 rubble.fx.onLand = (q, blows, at, by) => { if (by) traffic.landed(at, by.volume * by.kind.density * 0.6); return landed(q, blows, at, by); };
 const bang2 = blast.explode;
-blast.explode = (at, r, power) => { if (state === 'play') wanted.offend(6, at); security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); fear.scare(at, 25 * (power ?? 1), 0.8); return bang2(at, r, power); };
+blast.explode = (at, r, power) => { if (state === 'play') wanted.offend(7, at); security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); fear.scare(at, 25 * (power ?? 1), 0.8); return bang2(at, r, power); };
 let liftTip = null;
 let rig = null;           // dev: { at, look } to hold the camera there
 let toppling = false;
@@ -489,7 +489,7 @@ function frame(dt) {
     if (state === 'play') {
       security.update(dt); fear.update(dt);
       // Bringing it down — a collapse, a tower going over, a fifth of it gone — is a threat to the city.
-      if (topple.active || structure.collapsing || fear.wreck > 0.2) wanted.offend(7, camera.position);
+      if (topple.active || structure.collapsing || fear.wreck > 0.2) wanted.offend(8, camera.position);
       if (fear.fx.chasing()) wanted.offend(2, player.pos, true);
       // Carrying the sledgehammer, people on your floor keep their distance.
       people.wary = tools[current]?.id === 'sledge' && !player.disguised && !difficulty.creative ? player.pos : null;
