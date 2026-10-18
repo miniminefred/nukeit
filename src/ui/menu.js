@@ -2,6 +2,7 @@ import { JOBS, TOOLS, MAX_DEMOLITION, job as jobById } from '../data/catalog.js'
 import { progress } from '../data/progress.js';
 import { LEVELS, level as levelById } from '../data/difficulty.js';
 import { openSettings } from './settings.js';
+import { openAchievements } from './achievements.js';
 
 // The menu you arrive in. Three pages:
 //
@@ -61,7 +62,10 @@ export class Menu {
     const st = el('button', 'quality', 'Settings');
     st.style.marginLeft = '8px';
     st.onclick = () => { this.onClick?.(); openSettings(this.onClick); };
-    head.append(st);
+    const ac = el('button', 'quality', 'Achievements');
+    ac.style.marginLeft = '8px';
+    ac.onclick = () => { this.onClick?.(); openAchievements(this.onClick); };
+    head.append(ac, st);
     frame.append(head);
     frame.append(this.page === 'mode' ? this._mode() : this.page === 'jobs' ? this._jobs() : this._tools());
     this.root.append(frame);

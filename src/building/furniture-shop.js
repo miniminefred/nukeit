@@ -452,7 +452,7 @@ export function iceFreezer(P, x, y, z, yaw, len = 2) {
     { kind: 'wood', round: 0.02, boxes: [[-len / 2, 0, -0.32, len / 2, 0.86, 0.32]], tint: T('body', 0xf2eee6) },
     { kind: 'clearglass', boxes: [[-len / 2, 0.86, 0.3, len / 2, 1.2, 0.32], [-len / 2, 1.18, -0.32, len / 2, 1.2, 0.32]], tint: 0xe6f0ee },
     { kind: 'leather', boxes: [{ cone: [len / 2 + 0.15, 1.0, 0], r: 0.04, h: 0.3, seg: 8 }, { cone: [len / 2 + 0.15, 1.1, 0], r: 0.04, h: 0.3, seg: 8 }], tint: 0xd8a860 },
-  ], 'furniture', { colliders: [[-len / 2, 0, -0.32, len / 2, 1.2, 0.32]] });
+  ], 'furniture', { tag: 'freezer', colliders: [[-len / 2, 0, -0.32, len / 2, 1.2, 0.32]] });
 }
 
 // A stall's front counter: the till, a stack of trays, napkins.

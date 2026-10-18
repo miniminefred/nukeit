@@ -237,6 +237,7 @@ export class Charges {
     }
     if (input.pressed('Mouse2') && this.placed.length && !this._chain.length) {
       ctx.audio?.click();
+      ctx.achieve?.event('detonate');
       this._chain = this.placed.splice(0);
       this._t = 0.25;
     }

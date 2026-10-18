@@ -163,6 +163,7 @@ export class Wanted {
   // For the end of the job.
   report() {
     const pick = (a) => a[(Math.random() * a.length) | 0];
+    this.lastUnseen = this.worst <= 2;
     return {
       worst: this.worst,
       wantedFor: this.worst ? LAWS[this.worst].law : 'Nothing at all',

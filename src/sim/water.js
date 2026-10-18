@@ -112,6 +112,7 @@ export class Water {
   burst(p) {
     if (p.role !== 'pipe' || p.burst) return;
     p.burst = true;
+    this.fx.onMain?.();
     this.dry.add(p.floor);
     const b = p.box;
     const along = b.max.x - b.min.x > b.max.z - b.min.z;

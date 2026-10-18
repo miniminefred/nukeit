@@ -23,6 +23,7 @@ import { Security } from './sim/security.js';
 import { Traffic } from './sim/traffic.js';
 import { Fear } from './sim/fear.js';
 import { Wanted } from './sim/wanted.js';
+import { Achieve } from './sim/achieve.js';
 import { settings } from './data/settings.js';
 import { signs, places } from './building/shops.js';
 import { Topple } from './sim/topple.js';
@@ -174,6 +175,7 @@ const gave = damage.fx.onFailed;
 damage.fx.onFailed = (p) => {
   const c = p.box.getCenter(new THREE.Vector3());
   people.alarm(c, 18); security.noise(c, 3, false); fear.scare(c, 6, 0.5);
+  achieve.event('failed');
   // A support you were just hitting: heavy vandalism.
   if (security.time - security.lastBlow < 3 && c.distanceTo(player.pos) < 15) wanted.offend(5, c);
   return gave(p);
@@ -183,7 +185,7 @@ damage.fx.onFailed = (p) => {
 const security = new Security({
   people, physics, player, audio, hud, particles, smoke, veil: particles.veil, camera, shake, scene,
   onBusted: () => failed('Arrested'),
-  onThrownOut: () => { if (thrownT <= 0) thrownT = 1.4; },
+  onThrownOut: () => { if (thrownT <= 0) thrownT = 1.4; achieve.event('thrown'); },
 });
 let thrownT = -1;
 // How scared the people in the tower are (sim/fear.js).
@@ -203,6 +205,16 @@ const wanted = new Wanted({
   seen: () => !player.dead && (security.seesYou || people.witnesses(player.pos)),
 });
 security.fx.onOffence = (n, at) => wanted.offend(n, at);
+// The achievements (sim/achieve.js), told what happens.
+const achieve = new Achieve({
+  player, security, wanted, fire, water, lift, topple, structure, pieces, audio, camera, smoke, veil: particles.veil,
+  spraying: () => tools[current]?.id === 'extinguisher' && input.mouse.left && input.mouse.locked,
+});
+security.fx.onLost = (a) => achieve.event('lost', a);
+security.fx.onZapped = () => achieve.event('zapped');
+security.fx.onGaveUp = () => achieve.event('gaveup');
+water.fx.onMain = () => achieve.event('main');
+damage.fx.onShatter = () => achieve.event('glass');
 security.fx.onKnock = (at) => wanted.offend(6, at, true);
 // The police know you by sight — or by the sledgehammer in your hands.
 security.fx.armed = () => tools[current]?.id === 'sledge' && !player.disguised;
@@ -210,17 +222,17 @@ people.camera = camera;
 people.particles = particles;
 // The avenue's traffic (sim/traffic.js): it stops for the light, for you and
 // for rubble; heavy things landing on cars crush them.
-const traffic = new Traffic(scene, { physics, player, audio });
+const traffic = new Traffic(scene, { physics, player, audio, onCrush: () => achieve.event('car') });
 const landed = rubble.fx.onLand;
 rubble.fx.onLand = (q, blows, at, by) => { if (by) traffic.landed(at, by.volume * by.kind.density * 0.6); return landed(q, blows, at, by); };
 const bang2 = blast.explode;
-blast.explode = (at, r, power) => { if (state === 'play') wanted.offend(7, at); security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); fear.scare(at, 25 * (power ?? 1), 0.8); return bang2(at, r, power); };
+blast.explode = (at, r, power) => { if (state === 'play') { wanted.offend(7, at); achieve.event('blast', power ?? 1); } security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); fear.scare(at, 25 * (power ?? 1), 0.8); return bang2(at, r, power); };
 let liftTip = null;
 let rig = null;           // dev: { at, look } to hold the camera there
 let toppling = false;
 let waterfall = null;     // the sheet of water down the atrium wall, while it stands
 
-const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene, world, powder, security, wanted };
+const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene, world, powder, security, wanted, achieve };
 
 // ---------------------------------------------------------------- state
 
@@ -275,6 +287,7 @@ async function start(jobId, toolIds, levelId = 'normal') {
   security.start(difficulty);
   fear.reset();
   wanted.reset(difficulty);
+  achieve.reset(difficulty, job.id);
   traffic.attach(pieces);
   waterfall = pieces.list.find((p) => p.tag === 'waterfall') ?? null;
   screens.loading('Wiring the gas and the lights', 0.85);
@@ -346,6 +359,7 @@ player.onDamage = (amount) => { hud.hurt(amount); audio.hurt(); };
 player.onDeath = (cause) => {
   screens.down(cause);
   wanted.died();
+  achieve.event('died');
   downT = 3;
 };
 
@@ -392,6 +406,8 @@ function failed(why) {
     extra: wanted.reportHtml(),
     onBack: () => { unloadJob(); openMenu(); },
   });
+  if (why === 'Arrested') achieve.event('busted');
+  achieve.finish(false);
 }
 
 function finish() {
@@ -415,6 +431,7 @@ function finish() {
     extra: wanted.reportHtml(),
     onBack: () => { unloadJob(); openMenu(); },
   });
+  achieve.finish(true);
 }
 
 // ---------------------------------------------------------------- loop
@@ -493,6 +510,7 @@ function frame(dt) {
       if (fear.fx.chasing()) wanted.offend(2, player.pos, true);
       // Carrying the sledgehammer, people on your floor keep their distance.
       people.wary = tools[current]?.id === 'sledge' && !player.disguised && !difficulty.creative ? player.pos : null;
+      achieve.update(dt);
       wanted.update(dt, {
         armed: (tools[current]?.id === 'sledge' || tools[current]?.id === 'bomb') && !player.dead,
         chased: security.agents.some((a) => a.mode === 'chase'),
@@ -522,6 +540,7 @@ function frame(dt) {
     }
   }
   chips.update(dt);
+  achieve.badges(dt);
   // Water down the atrium wall, as long as the wall and the sheet are there.
   if (waterfall && waterfall.state === 'static') {
     const b = waterfall.box;

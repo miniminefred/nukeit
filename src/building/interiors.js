@@ -182,7 +182,7 @@ function lowerLevel(P, y) {
   thick(-12.5, -11.6, -12, -7.6);
   thick(-12.5, -5.6, -12, -4.6);
   thick(-19.6, -5.1, -12, -4.6);
-  W.vaultDoor(P, -11.6, y, -6.6, HALF);
+  tagged(W.vaultDoor(P, -11.6, y, -6.6, HALF), 'vault');
   W.depositBoxes(P, -16, y, -11.55, 0, 6);
   W.goldStack(P, -16.5, y, -8.2, 0);
   W.goldStack(P, -14.3, y, -8.2, 0);
@@ -467,7 +467,7 @@ function headquarters(P, f, y) {
   F.plant(P, -7, y, -7.6, true);
   F.chandelier(P, -10.2, U(f), 0);
   // The boardroom.
-  W.boardTable(P, 7.7, y, -1, HALF, 6);
+  tagged(W.boardTable(P, 7.7, y, -1, HALF, 6), 'boardroom');
   for (let n = 0; n < 6; n++) {
     const z = -3.6 + n * 1.05;
     H.diningChair(P, 6.8, y, z, -HALF, 0x1a1a1a);
@@ -529,7 +529,7 @@ function living(P, f, y) {
   F.sofa(P, -9, y, 1.7, 0, 0xe8dcc0);
   F.sofa(P, -9, y, -1.7, Math.PI, 0xe8dcc0);
   H.armchair(P, -12.3, y, 0, -HALF, 0xc9a043);
-  H.piano(P, -11.2, y, -6.2, 0.4);
+  tagged(H.piano(P, -11.2, y, -6.2, 0.4), 'penthousepiano');
   H.tv(P, -11.5, y, 5.9, Math.PI);
   F.plant(P, -13.1, y, 3.6, true);
   // Dining.
@@ -605,3 +605,6 @@ function lights(P, f) {
   for (const x of [-2.5, 2.5]) for (const z of [-5.5, 5]) if (tower || z < podiumFront(f) - 1) F.ceilingLight(P, x, top, z);
 }
 
+
+// Name a piece for what it is, for the achievements (data/achievements.js).
+function tagged(p, tag) { if (p) p.tag = tag; return p; }

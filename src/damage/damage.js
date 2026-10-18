@@ -304,6 +304,7 @@ export class Damage {
     this.fx.audio?.hit('glass', point.x, point.y, point.z, 1.4);
     this.fx.chips.burst('glass', point, dir, 30, 3, 0.02);
     shatter(this.pieces, p, local, dir, { chip });
+    this.fx.onShatter?.(p);
     return p.kind;
   }
 

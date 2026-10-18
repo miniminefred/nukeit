@@ -134,6 +134,7 @@ export class Traffic {
     for (const c of this.cars) {
       if (c.crushed || Math.abs(at.z - LANES[c.lane]) > c.k.w / 2 + 0.3 || Math.abs(at.x - c.x) > c.k.len / 2 + 0.3) continue;
       c.crushed = 1; c.v = 0;
+      this.fx.onCrush?.();
       this.fx.audio?.thud?.(c.x, 1, LANES[c.lane]);
       c.alarm = 25;
     }

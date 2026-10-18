@@ -220,11 +220,11 @@ export class Security {
       // asked to put it down; otherwise you are just someone in a building.
       const witnessed = this.time - this.spotted < 60;
       if (noticed && witnessed) {
-        if (a.mode !== 'chase') { a.mode = 'chase'; this._call(a); }
+        if (a.mode !== 'chase') { a.mode = 'chase'; a.minD = 99; this._call(a); }
       } else if (noticed && this.fx.armed?.() && a.mode !== 'chase') a.mode = 'watch';
-      if (a.mode === 'chase' && !witnessed) a.mode = a.kind === 'cop' ? 'search' : 'look';
+      if (a.mode === 'chase' && !witnessed) { a.mode = a.kind === 'cop' ? 'search' : 'look'; this.fx.onLost?.(a); }
       if (a.mode === 'watch' && (!this.fx.armed?.() || this.time - a.seen > 8)) a.mode = a.kind === 'cop' ? 'search' : 'patrol';
-      if (a.mode === 'chase' && this.time - a.seen > (a.kind === 'cop' ? 10 : 7)) a.mode = 'look';
+      if (a.mode === 'chase' && this.time - a.seen > (a.kind === 'cop' ? 10 : 7)) { a.mode = 'look'; this.fx.onLost?.(a); }
       if (a.mode === 'look' && a.last && a.pos.distanceTo(a.last) < 1) { a.mode = a.kind === 'cop' ? 'search' : 'patrol'; a.last = null; }
       // Off on another floor: the police follow by the stairs; a guard stays and radios.
       if (a.mode === 'chase' && Math.abs(player.pos.y - a.pos.y) > 2.5) {
@@ -293,6 +293,7 @@ export class Security {
     const { player, particles, audio, hud } = this.fx;
     const run = a.kind === 'cop' ? COP_RUN : GUARD_RUN * (1 + 0.15 * Math.min(2, a.angry));
     a.state = 'running';
+    a.minD = Math.min(a.minD ?? 99, dist);
     if (a.kind === 'cop') {
       if (dist < CATCH && this.busted === undefined) this._bust(a);
       else this._go(a, player.pos, run);
@@ -310,7 +311,7 @@ export class Security {
           a.cool = 6; this._face(a, player.pos); a.target = null;
           audio?.thwip?.(a.pos.x, a.pos.y, a.pos.z);
           this._trail(a, 0xd8d8c8, 14);
-          if (Math.random() < 0.7) { player.tangle?.(3.5); hud?.flash('Caught in a net!', 1.5); }
+          if (Math.random() < 0.7) { player.tangle?.(3.5); hud?.flash('Caught in a net!', 1.5); this.fx.onZapped?.(); }
           break;
         }
         this._tackleOr(a, dist, run);
@@ -320,7 +321,7 @@ export class Security {
           a.cool = 5; this._face(a, player.pos); a.target = null; a.armUp = 1;
           audio?.buzz?.(a.pos.x, a.pos.y, a.pos.z);
           this._trail(a, 0x9fd8ff, 18);
-          if (Math.random() < 0.75) { player.stun?.(2.2); this.fx.shake?.add(0.35); hud?.flash('Tasered!', 1.5); }
+          if (Math.random() < 0.75) { player.stun?.(2.2); this.fx.shake?.add(0.35); hud?.flash('Tasered!', 1.5); this.fx.onZapped?.(); }
           break;
         }
         this._tackleOr(a, dist, run);
@@ -515,6 +516,7 @@ export class Security {
   _leave() {
     const { hud, audio } = this.fx;
     hud?.flash('Police: "He is not here." They are leaving.', 3.5);
+    this.fx.onGaveUp?.();
     for (const a of this.agents) if (a.kind === 'cop') { a.state = 'gone'; a.hidden = true; }
     this.agents = this.agents.filter((a) => a.kind !== 'cop');
     for (const c of this.cars) c.car.removeFromParent();
