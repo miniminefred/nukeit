@@ -110,12 +110,12 @@ export const screens = {
   },
   hideDown() { $('down').classList.remove('open'); },
 
-  results({ title, rows, unlocked, onBack, heading = 'Job complete' }) {
+  results({ title, rows, unlocked, onBack, heading = 'Job complete', extra = '' }) {
     const s = $('results');
     s.querySelector('small').textContent = heading;
     $('r-title').textContent = title;
     $('r-rows').innerHTML = rows.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
-    $('r-unlock').innerHTML = unlocked ? `<b>Unlocked:</b> ${unlocked}` : '';
+    $('r-unlock').innerHTML = (unlocked ? `<b>Unlocked:</b> ${unlocked}` : '') + extra;
     s.classList.add('open');
     $('r-back').onclick = () => { s.classList.remove('open'); onBack(); };
   },

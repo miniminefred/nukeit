@@ -33,6 +33,19 @@ export const LAWS = [
   { law: 'Threat to New York City', short: 'Threat to New York City', comic: ['Made the skyline shorter.', 'Was chased by SWAT, a helicopter and half of Midtown.', 'Gave Fifth Avenue a new view.'] },
 ];
 
+// The next morning's paper, by the worst you were wanted for. Never seen at
+// it (level 2 or less): either nobody knows who, or nobody thinks anyone did.
+const HEADLINES = {
+  unseen: [['WHO DID THIS?', 'Police baffled as Fifth Avenue landmark comes apart'], ['MYSTERY ON FIFTH AVENUE', 'Nobody saw a thing, say shoppers'],
+    ['INSPECTOR BLAMES "OLD CONCRETE"', "Officials insist it was nobody's fault"], ['PIGEONS QUESTIONED, RELEASED', 'Tower damage remains unexplained']],
+  3: [['VANDAL IN THE TOWER', 'Lobby left "a bit of a mess", say staff'], ['HAMMER TIME ON FIFTH AVE', 'Guards chase mystery smasher']],
+  4: [['WALLS? WHAT WALLS?', 'Vandal knocks through landmark, one blow at a time'], ['OPEN PLAN, WHETHER YOU LIKE IT OR NOT', 'Tower offices "remodelled" without permission']],
+  5: [['SHOPPERS BOWLED OVER', 'Literally, say witnesses'], ['MIDTOWN MENACE!', 'Tourists knocked flat by hammer-wielding stranger']],
+  6: [['BANG! FIFTH AVENUE SHAKEN', 'Explosions rattle windows for blocks'], ['KA-BOOM IN MIDTOWN', 'Police: "Those were not fireworks"']],
+  7: [['SKYLINE ONE TOWER SHORTER', 'SWAT, a helicopter and half of Midtown could not stop it'], ['TOWER DOWN!', 'Suspect still at large — city in shock'],
+    ['THREAT TO NEW YORK CITY', 'Mayor: "We will rebuild. Bigger."']],
+};
+
 // How long a level takes to ebb away, by difficulty; Insane never forgets.
 const COOL = { easy: 35, normal: 60, hard: 80, insane: Infinity };
 const ARMED_CLEAR = 4;          // s after putting the tool away
@@ -119,8 +132,22 @@ export class Wanted {
       worst: this.worst,
       wantedFor: this.worst ? LAWS[this.worst].law : 'Nothing at all',
       clean: this.on && this.worst <= 2,
-      lines: this.broken.map((n) => pick(LAWS[n].comic)),
+      lines: [...this.broken].sort((a, b) => b - a).map((n) => pick(LAWS[n].comic)),
+      headline: pick(this.worst <= 2 ? HEADLINES.unseen : HEADLINES[Math.min(7, this.worst)]),
     };
+  }
+
+  // The report's extra part, as HTML: the clipping, the charges, the medal.
+  reportHtml() {
+    if (!this.on) return '';
+    const r = this.report();
+    const [head, sub] = r.headline;
+    const paper = `<div style="margin:14px auto 10px;max-width:420px;padding:12px 16px 14px;background:#efe8d6;color:#1d1a15;transform:rotate(-1.4deg);box-shadow:0 4px 14px #0008;font-family:Georgia,'Times New Roman',serif;text-align:left">`
+      + `<div style="display:flex;justify-content:space-between;font-size:10px;letter-spacing:.12em;border-bottom:2px solid #1d1a15;padding-bottom:3px">THE MIDTOWN HERALD<span>MORNING EDITION</span></div>`
+      + `<div style="font-size:24px;font-weight:900;line-height:1.05;margin:8px 0 4px">${head}</div><div style="font-size:13px;font-style:italic">${sub}</div></div>`;
+    const sheet = r.lines.length ? `<div style="text-align:left;margin:6px 0;font-size:13px"><span style="opacity:.6">Charge sheet</span>${r.lines.map((l) => `<div style="margin:3px 0">— ${l}</div>`).join('')}</div>` : '';
+    const medal = r.clean ? '<div style="margin:8px 0;font-weight:700;color:#e8c95a">&#127941; Clean job — nobody ever saw you at it</div>' : '';
+    return paper + sheet + medal;
   }
 
   // ---------------------------------------------------------------- on screen

@@ -383,7 +383,9 @@ function failed(why) {
       ['Standing', `${height.toFixed(1)} m (target ${job.target} m)`],
       ['Time on site', `${Math.floor(secs / 60)} min ${secs % 60} s`],
       ['Difficulty', difficulty.name],
+      ...(wanted.on ? [['Wanted for', wanted.report().wantedFor]] : []),
     ],
+    extra: wanted.reportHtml(),
     onBack: () => { unloadJob(); openMenu(); },
   });
 }
@@ -403,8 +405,10 @@ function finish() {
       ['Time on site', `${Math.floor(secs / 60)} min ${secs % 60} s`],
       ['Explosions', `${blast.count}`],
       ['Still burning', `${fire.count}`],
+      ...(wanted.on ? [['Wanted for', wanted.report().wantedFor]] : []),
     ],
     unlocked: unlockedTool,
+    extra: wanted.reportHtml(),
     onBack: () => { unloadJob(); openMenu(); },
   });
 }
