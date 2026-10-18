@@ -101,7 +101,11 @@ export class Impacts {
         if (o && o.parts && o !== p && o.state !== 'dead') hit.add(o);
       });
     }
-    for (const q of hit) this._take(q, blows / hit.size, at, p);
+    // Structure judges it as it judges rubble landing — against its own weight
+    // falling three metres — not by sledge blows, of which a tonne of debris
+    // is hundreds: judged by those, every lump that bounced off the podium
+    // roof broke a bay of it, and the podium went floor by floor.
+    for (const q of hit) this.absorb(q, blows / hit.size, at, p);
     // And it smashes itself, if it came down hard enough.
     if (v > 6 && p.state === 'dynamic') {
       p.hp -= blows * 0.35;
@@ -131,13 +135,19 @@ export class Impacts {
   }
 
   // Rubble landing on something still standing. A floor is built to carry its
-  // load and then some: it breaks when what lands on it has put more into it,
-  // all told, than its own weight falling three metres. Until then it cracks —
-  // the more, the nearer it is to going. A column or wall the same.
+  // load and then some: it breaks when what lands on it puts more into it than
+  // its own weight falling three metres — at once, or in quick succession.
+  // What it has taken fades, half of it in a second and a half: a floor
+  // rings and settles between blows. Summed over a whole collapse instead,
+  // twenty seconds of grit drizzling onto the podium roof added up to a
+  // tonne dropped three metres, and the podium went storey by storey.
+  // Until it goes it cracks, the more the nearer it is. A column or wall the same.
   absorb(q, blows, from, by) {
     if (!(q.structural || q.role === 'slab')) return this._take(q, blows, from, by);
     const J = blows * BLOW;
     const cap = q.volume * q.kind.density * 9.81 * 3;
+    if (q.shockT !== undefined) q.shock *= Math.exp(-(this.time - q.shockT) / 2);
+    q.shockT = this.time;
     q.shock = (q.shock ?? 0) + J;
     const point = q.box.clampPoint(from, new THREE.Vector3());
     point.y = Math.min(q.box.max.y, by.box.min.y + 0.01);
@@ -154,8 +164,11 @@ export class Impacts {
     for (const p of small) this.fading.set(p, 0);
   }
 
+  // Anything loose that has come to rest — a fragment, or a whole column or
+  // mullion knocked down in one piece — leaves the simulation. (Only fragments
+  // did once: a column lying in the rubble rocked at a centimetre a second for
+  // ever and kept every step of the world being paid for.)
   _freeze(p) {
-    if (p.role !== 'fragment' && p.role !== 'shard') return;
     // Glass that has come down does not lie there in panes: it breaks up, and
     // goes like the other small bits.
     if (p.kind.glass) { this.fading.set(p, 0); return; }

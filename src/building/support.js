@@ -31,6 +31,7 @@ import { groundAt } from './plan.js';
 const TOL = 0.06;
 const MIN_OVERLAP = 0.005;   // a 2 cm glass rail on a slab edge still counts
 const CELL = 2;
+const CELL_Y = 2;
 const MAX_DEPTH = 3;
 const WRECKAGE = new Set(['stub', 'rebar', 'shard', 'fragment']);
 const SMALL_BAY = 12;
@@ -39,18 +40,23 @@ const GROUND = 0.45;        // m: anything whose foot is this near the ground st
 const WEAK = 0.25;          // below this fraction of its durability a support carries nothing       // m^2: a bay this small can cantilever
 
 export function link(pieces) {
+  // Cells in three dimensions: in two, every cell of a forty-storey block held
+  // all forty storeys, and comparing each piece with all the others in its
+  // cell took a quarter of a second. A piece is filed a touching distance
+  // beyond its box, so neighbours across a cell boundary still meet.
   const grid = new Map();
-  const key = (i, k) => i * 73856093 ^ k * 19349663;
+  const key = (i, j, k) => (i * 73856093) ^ (j * 83492791) ^ (k * 19349663);
   for (const p of pieces) {
     p.rests = []; p.carries = []; p.sides = [];
     const b = p.box;
-    for (let i = Math.floor(b.min.x / CELL); i <= Math.floor(b.max.x / CELL); i++)
-      for (let k = Math.floor(b.min.z / CELL); k <= Math.floor(b.max.z / CELL); k++) {
-        const kk = key(i, k);
-        let cell = grid.get(kk);
-        if (!cell) grid.set(kk, (cell = []));
-        cell.push(p);
-      }
+    for (let i = Math.floor((b.min.x - TOL) / CELL); i <= Math.floor((b.max.x + TOL) / CELL); i++)
+      for (let j = Math.floor((b.min.y - TOL) / CELL_Y); j <= Math.floor((b.max.y + TOL) / CELL_Y); j++)
+        for (let k = Math.floor((b.min.z - TOL) / CELL); k <= Math.floor((b.max.z + TOL) / CELL); k++) {
+          const kk = key(i, j, k);
+          let cell = grid.get(kk);
+          if (!cell) grid.set(kk, (cell = []));
+          cell.push(p);
+        }
   }
   const seen = new Set();
   for (const cell of grid.values()) {
