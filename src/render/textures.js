@@ -121,6 +121,27 @@ const SURFACES = {
     const t = cloud * 0.6 + mottle * 0.25;
     set(o, 222 + t * 18 - fine * 55, 182 + t * 16 - fine * 55, 164 + t * 14 - fine * 50, -fine * 0.1, 0.16 + fine * 0.15);
   },
+  darkmarble: (u, v, n, o) => {    // the lobby's dark stone: near-black brown, a net of white and gold veins
+    const w = fbm(n, u, v, 3, 4), cloud = fbm(n, u, v, 6, 3);
+    const r1 = Math.abs(fbm(n, u + w * 0.25, v - w * 0.2, 4, 5));
+    const r2 = Math.abs(fbm(n, u - w * 0.1, v + 5.1, 8, 4));
+    const vein = Math.max(0, 1 - r1 * 16) ** 2 + Math.max(0, 1 - r2 * 28) ** 2 * 0.55;
+    const clast = Math.max(0, fbm(n, u + 9, v, 7, 3) - 0.38) * 3;      // pale fragments in the breccia
+    const t = Math.min(1, vein + clast);
+    const br = 40 + cloud * 10, bg = 29 + cloud * 8, bb = 22 + cloud * 6;
+    set(o, br + (232 - br) * t, bg + (214 - bg) * t, bb + (184 - bb) * t, -t * 0.05, 0.1 + t * 0.06);
+  },
+  creammarble: (u, v, n, o) => {   // the floors: warm cream, soft wandering veins, polished
+    const w = fbm(n, u, v, 2, 4), cloud = fbm(n, u, v, 5, 4), mottle = fbm(n, u + 3, v, 20, 2);
+    const r = Math.abs(fbm(n, u + w * 0.4, v + w * 0.3, 3, 5));
+    const vein = Math.max(0, 1 - r * 9) ** 2;
+    const t = cloud * 10 + mottle * 5;
+    set(o, 234 + t - vein * 42, 218 + t - vein * 50, 192 + t - vein * 56, -vein * 0.05, 0.1 + vein * 0.08);
+  },
+  mirror: (u, v, n, o) => {        // polished metal: no grain, almost no roughness
+    const f = fbm(n, u, v, 8, 2);
+    set(o, 236 + f * 4, 232 + f * 4, 226 + f * 4, 0, 0.05);
+  },
   wood: (u, v, n, o) => {          // veneer, grain along u
     const w = fbm(n, u, v, 2, 4);
     const ring = Math.sin((v * 24 + w * 5 + fbm(n, u, v, 8, 2) * 0.8) * Math.PI);

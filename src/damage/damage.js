@@ -434,7 +434,7 @@ const LOOSE = new Set(['furniture', 'tank', 'fragment', 'shard', 'rebar', 'stub'
 function chipKind(kind) {
   const n = kind.name;
   if (n === 'rawwood' || n === 'wood') return 'wood';
-  if (n === 'marble') return 'marble';
+  if (n === 'marble' || n === 'darkmarble' || n === 'creammarble') return n;
   if (n === 'concrete' || n === 'roofing' || n === 'stub') return 'concrete';
   if (n === 'plaster' || n === 'paper') return 'plaster';
   return n;

@@ -23,6 +23,9 @@ import { surface } from './textures.js';
 const KINDS = {
   concrete:    { surf: 'concrete', repeat: 2.5, density: 2400, toughness: 22, structural: true, inside: 'broken', sound: 'concrete' },
   marble:      { surf: 'marble', repeat: 3, density: 2700, toughness: 18, structural: true, inside: 'broken', sound: 'marble', metal: 0, rough: 1 },
+  darkmarble:  { surf: 'darkmarble', repeat: 2.2, density: 2700, toughness: 18, structural: true, inside: 'broken', sound: 'marble', metal: 0, rough: 1 },
+  creammarble: { surf: 'creammarble', repeat: 3.5, density: 2700, toughness: 18, structural: true, inside: 'broken', sound: 'marble', metal: 0, rough: 1 },
+  mirror:      { surf: 'mirror', repeat: 1, density: 2500, toughness: 0.4, metal: 1, rough: 1, tint: 0xf0dcc0, sound: 'glass' },
   glass:       { density: 2500, toughness: 0.4, sound: 'glass' },
   bronze:      { surf: 'bronze', repeat: 1, density: 2700, toughness: 40, metal: 0.6, sound: 'mullion' },
   steel:       { surf: 'metal', repeat: 1, density: 7800, toughness: 60, structural: true, metal: 0.8, sound: 'steel' },
@@ -54,7 +57,7 @@ const KINDS = {
 // size: a column takes about five, a plaster wall two, a desk one or two, a
 // steel beam a dozen. See damage/damage.js.
 const HITS = {
-  concrete: 3, marble: 3, roofing: 2.5, steel: 9, bronze: 6, brass: 6, gold: 6, metal: 3,
+  concrete: 3, marble: 3, darkmarble: 3, creammarble: 3, mirror: 0.6, roofing: 2.5, steel: 9, bronze: 6, brass: 6, gold: 6, metal: 3,
   wood: 1.5, plaster: 1.2, carpet: 1, fabric: 0.8, leather: 1, plastic: 1, paper: 0.8,
   soil: 1, leaves: 0.5, ceramic: 1.2, lacquer: 1.5, linen: 0.6, gastank: 2, transformer: 5,
   screen: 0.8, lamp: 0.3, glass: 1,

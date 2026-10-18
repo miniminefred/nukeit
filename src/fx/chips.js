@@ -14,7 +14,7 @@ import { groundAt } from '../building/plan.js';
 
 const MAX = 1000;
 const COLOURS = {
-  wood: 0xc79a62, concrete: 0x9b958c, marble: 0xcf9f92, plaster: 0xeeeae2, carpet: 0x55505a,
+  wood: 0xc79a62, concrete: 0x9b958c, marble: 0xcf9f92, darkmarble: 0x3a2c22, creammarble: 0xe6d6bc, plaster: 0xeeeae2, carpet: 0x55505a,
   fabric: 0x3a4250, plastic: 0x2a2a2c, metal: 0x8a8d90, bronze: 0x5a4a38, roofing: 0x555555,
   soil: 0x5a4430, leaves: 0x3f6a2f, brass: 0xc9a043, paper: 0xe8e0d0, leather: 0x3a2a20,
 };
