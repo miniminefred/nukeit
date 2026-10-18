@@ -22,6 +22,8 @@ import { Powder } from './fx/powder.js';
 import { Security } from './sim/security.js';
 import { Traffic } from './sim/traffic.js';
 import { Fear } from './sim/fear.js';
+import { Wanted } from './sim/wanted.js';
+import { settings } from './data/settings.js';
 import { signs, places } from './building/shops.js';
 import { Topple } from './sim/topple.js';
 import { Rubble } from './sim/rubble.js';
@@ -169,7 +171,13 @@ blast.explode = (at, r, power) => {
   return bang(at, r, power);
 };
 const gave = damage.fx.onFailed;
-damage.fx.onFailed = (p) => { const c = p.box.getCenter(new THREE.Vector3()); people.alarm(c, 18); security.noise(c, 3, false); fear.scare(c, 6, 0.5); return gave(p); };
+damage.fx.onFailed = (p) => {
+  const c = p.box.getCenter(new THREE.Vector3());
+  people.alarm(c, 18); security.noise(c, 3, false); fear.scare(c, 6, 0.5);
+  // A support you were just hitting: heavy vandalism.
+  if (security.time - security.lastBlow < 3 && c.distanceTo(player.pos) < 15) wanted.offend(4, c);
+  return gave(p);
+};
 // Guards and the police (sim/security.js). Caught by an officer, the job is
 // over; tackled by a guard, you are put out of the front door and carry on.
 const security = new Security({
@@ -187,6 +195,11 @@ const fear = new Fear({
   lounge: () => lounging,
 });
 security.fx.fear = fear;
+// What you are wanted for (sim/wanted.js): the crime ladder, the thermometer,
+// the charge sheet.
+const wanted = new Wanted({ security, people, player, hud, audio, settings });
+security.fx.onOffence = (n, at) => wanted.offend(n, at);
+security.fx.onKnock = (at) => wanted.offend(5, at);
 // The police know you by sight — or by the sledgehammer in your hands.
 security.fx.armed = () => tools[current]?.id === 'sledge' && !player.disguised;
 people.camera = camera;
@@ -196,13 +209,13 @@ const traffic = new Traffic(scene, { physics, player, audio });
 const landed = rubble.fx.onLand;
 rubble.fx.onLand = (q, blows, at, by) => { if (by) traffic.landed(at, by.volume * by.kind.density * 0.6); return landed(q, blows, at, by); };
 const bang2 = blast.explode;
-blast.explode = (at, r, power) => { security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); fear.scare(at, 25 * (power ?? 1), 0.8); return bang2(at, r, power); };
+blast.explode = (at, r, power) => { if (state === 'play') wanted.offend(6, at); security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); fear.scare(at, 25 * (power ?? 1), 0.8); return bang2(at, r, power); };
 let liftTip = null;
 let rig = null;           // dev: { at, look } to hold the camera there
 let toppling = false;
 let waterfall = null;     // the sheet of water down the atrium wall, while it stands
 
-const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene, world, powder, security };
+const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene, world, powder, security, wanted };
 
 // ---------------------------------------------------------------- state
 
@@ -256,6 +269,7 @@ async function start(jobId, toolIds, levelId = 'normal') {
   people.populate(pieces);
   security.start(difficulty);
   fear.reset();
+  wanted.reset(difficulty);
   traffic.attach(pieces);
   waterfall = pieces.list.find((p) => p.tag === 'waterfall') ?? null;
   screens.loading('Wiring the gas and the lights', 0.85);
@@ -326,6 +340,7 @@ input.onLockChange((locked) => {
 player.onDamage = (amount) => { hud.hurt(amount); audio.hurt(); };
 player.onDeath = (cause) => {
   screens.down(cause);
+  wanted.died();
   downT = 3;
 };
 
@@ -462,7 +477,16 @@ function frame(dt) {
     smoke.update(dt);
     water.update(dt);
     powder.update();
-    if (state === 'play') { security.update(dt); fear.update(dt); }
+    if (state === 'play') {
+      security.update(dt); fear.update(dt);
+      // Bringing it down — a collapse, a tower going over, a fifth of it gone — is a threat to the city.
+      if (topple.active || structure.collapsing || fear.wreck > 0.2) wanted.offend(7, camera.position);
+      if (fear.fx.chasing()) wanted.offend(2, player.pos);
+      wanted.update(dt, {
+        armed: (tools[current]?.id === 'sledge' || tools[current]?.id === 'bomb') && !player.dead,
+        chased: security.agents.some((a) => a.mode === 'chase'),
+      });
+    }
     if (topple.active && !toppling) fear.scare(new THREE.Vector3(0, 30, 0), 45, 1);
     if (structure.collapsing) fear.scare(new THREE.Vector3(0, 20, 0), dt * 4, 1);
     traffic.update(dt);
@@ -579,7 +603,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.

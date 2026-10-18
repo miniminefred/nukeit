@@ -81,6 +81,7 @@ export class Sledge {
     const kind = ctx.damage.hit(hit.owner, hit.point, hit.normal, dir, 1);
     this.lastHit = kind?.name ?? null;
     ctx.security?.noise(hit.point, 1, true);
+    ctx.wanted?.struck(hit.owner, hit.point);
     ctx.shake?.add(0.12);
   }
 }

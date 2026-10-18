@@ -91,6 +91,7 @@ export class Security {
       this.lastBlow = this.time;
       this.fx.people.witness(at);
       this.fx.fear?.scare(at, 3);
+      this.fx.onOffence?.(3, at);
     }
     if (this.level.police !== null && this.eta === null && !this.police && this.heat > HEAVY) {
       this.eta = this.level.police * Math.pow(0.6, this.calls ?? 0);
@@ -101,6 +102,41 @@ export class Security {
       if (a.state === 'down' || a.hidden || a.mode === 'chase') continue;
       if (Math.abs(a.pos.y - at.y) < 2.5 && a.pos.distanceTo(at) < HEAR * (loud > 5 ? 2 : 1)) { a.mode = 'look'; a.last = at.clone(); }
     }
+  }
+
+  // The crime ladder (sim/wanted.js) says the guards come: those on the floor
+  // within earshot, or — for something structural — every guard on it.
+  summon(at, wide) {
+    if (!this.level) return;
+    for (const a of this.agents) {
+      if (a.kind !== 'guard' || a.state === 'down' || a.hidden || a.mode === 'chase' || a.mode === 'rest' || a.mode === 'flee') continue;
+      if (Math.abs(a.pos.y - at.y) > 2.5) continue;
+      if (!wide && a.pos.distanceTo(at) > 30) continue;
+      a.mode = 'look'; a.last = at.clone();
+    }
+  }
+
+  // Someone calls the police (if they are not on their way already).
+  call(why) {
+    if (!this.level || this.level.police === null) return;
+    if (this.eta === null && !this.police) { this.eta = this.level.police * Math.pow(0.6, this.calls ?? 0); this.fx.hud?.flash(why); }
+    else if (this.eta !== null) this.eta = Math.min(this.eta, this.level.police * 0.5);
+  }
+
+  // A threat to the city: the guards drop everything and get out with the
+  // crowd, and SWAT are called.
+  swat() {
+    if (!this.level || this.level.police === null || this.swatCalled) return;
+    this.swatCalled = true;
+    this.fx.hud?.flash('SWAT have been called! The guards are running', 3.5);
+    for (const a of this.agents) {
+      if (a.kind !== 'guard') continue;
+      // Out of uniform, as it were: one of the crowd making for the doors.
+      a.agent = false; a.sitting = false; a.panic = 'exit'; a.state = 'running'; a.target = null; a.wait = Math.random() * 0.6;
+      a.f = Math.round((a.pos.y - T(0)) / FLOOR_H); a.post = null;
+    }
+    this.agents = this.agents.filter((a) => a.kind !== 'guard');
+    this.call('SWAT are on their way');
   }
 
   // A swing or a jet that might land on a guard or an officer: knocked down,
@@ -116,6 +152,7 @@ export class Security {
       a.state = 'down'; a.daze = kind === 'spray' ? 2.5 : 4.5; a.target = null; a.armUp = 0;
       a.angry++;
       this.fx.fear?.scare(a.pos, 8);
+      if (kind === 'sledge') this.fx.onKnock?.(a.pos);
       this.fx.audio?.boing?.(a.pos.x, a.pos.y, a.pos.z);
       if (this.eta !== null) this.eta *= 0.8;
       else if (this.level?.police !== null) { this.heat += 20; this.noise(a.pos, 0, false); }
@@ -514,6 +551,7 @@ export class Security {
     this.eta = null;
     this.police = false;
     this.busted = undefined;
+    this.swatCalled = false;
     this.level = null;
     this.fx.audio?.siren?.(false);
   }
