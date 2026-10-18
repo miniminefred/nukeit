@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { subtract, chunkOff } from './cutter.js';
+import { subtract, chunkOff, split } from './cutter.js';
 import { fractureAsync, subtractAsync, forgetJobs } from './csg.js';
 import { addSplinters } from './splinters.js';
 import { crack as crackGlass, shatter } from './glass.js';
 import { crack } from './cracks.js';
-import { insideMaterial } from '../render/materials.js';
+import { insideMaterial, KIND } from '../render/materials.js';
 import { box, worldUVs } from '../render/geometry.js';
 import { birdcage, bentBars, wallBars } from './rebar.js';
 
@@ -316,7 +316,7 @@ export class Damage {
   //    are left bowed outward between the stubs, a birdcage;
   //  * it **shears**: it splits along a steep diagonal, and the top slides off
   //    down the slope of the break while the bottom stands with its sloping face.
-  fail(p, point, dir, { soon = false } = {}) {
+  fail(p, point, dir, { soon = false, mode = null } = {}) {
     const { particles, audio } = this.fx;
     const b = p.box.clone();
     const size = b.getSize(new THREE.Vector3());
@@ -326,12 +326,15 @@ export class Damage {
     const kindName = p.kind.name;
     const P = this.pieces;
     const column = p.role === 'column';
+    // What it carried, then the column itself gone — before anything made of
+    // it is put in its place, or that settles on the column it came from.
+    const above = (p.carries ?? []).find((q) => q.state === 'static' && q.role === 'slab');
+    P.destroy(p);
     // The stub at its foot.
     const sc = new THREE.Vector3((b.min.x + b.max.x) / 2, b.min.y + stubH / 2, (b.min.z + b.max.z) / 2);
     P.spawn({ parts: [{ kind: kindName, geometry: box(size.x, stubH, size.z, sc) }], pos: sc, role: 'stub', floor: p.floor, structural: false });
     // And under what it carried, if that is still there: a short length of it
     // left hanging on to the slab, bars pointing down out of it.
-    const above = (p.carries ?? []).find((q) => q.state === 'static' && q.role === 'slab');
     const topH = above ? Math.min(0.35, size.y * 0.1) : 0;
     if (above) {
       const tc = new THREE.Vector3(sc.x, b.max.y - topH / 2, sc.z);
@@ -347,7 +350,7 @@ export class Damage {
       if (hang) { P._addFixedCollider(r); this.fx.hang?.(r, above); }
       return r;
     };
-    const burst = column && Math.random() < 0.5;
+    const burst = column && (mode ? mode === 'burst' : Math.random() < 0.5);
     if (column && burst) {
       // The cage, bowed, from stub to stub.
       steel(birdcage(size.x, size.z, lo - mc.y, hi - mc.y), mc, false);
@@ -361,7 +364,6 @@ export class Damage {
       if (g && !along) g.rotateY(Math.PI / 2);
       steel(g, new THREE.Vector3(sc.x, lo, sc.z), false);
     }
-    P.destroy(p);
     const h = hi - lo - 0.02;
     if (column && !burst && h > 0.8) {
       // Shear: two wedges along a break at 50-65 degrees across the wider face.
@@ -383,12 +385,26 @@ export class Damage {
         worldUVs(g, at);
         return { g, at };
       };
-      const lower = wedge([[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, yc - rise / 2], [-w / 2, yc + rise / 2]]);
-      const upper = wedge([[-w / 2, yc + rise / 2], [w / 2, yc - rise / 2], [w / 2, h / 2], [-w / 2, h / 2]]);
-      P.spawn({ parts: [{ kind: kindName, geometry: lower.g }], pos: lower.at, role: 'fragment', floor: p.floor, structural: false });
+      // The break itself is rough and shows the stone inside: the column is cut
+      // along the slope by the same rough plane any break uses. (Extruded
+      // wedges, if the cut fails.)
+      let halves = null;
+      try {
+        const n = wide ? new THREE.Vector3(rise / w, 1, 0) : new THREE.Vector3(0, 1, -rise / w);
+        const cut = split(box(size.x * 0.97, h, size.z * 0.97, mc), [KIND[kindName].material], insideMaterial(kindName), new THREE.Vector3(0, yc, 0), n.normalize(), Math.max(size.x, size.z), 6);
+        if (cut.every((c) => c.geometry.attributes.position.count > 0)) halves = cut.map((c) => {
+          c.geometry.computeBoundingBox();
+          const at = c.geometry.boundingBox.getCenter(new THREE.Vector3());
+          c.geometry.translate(-at.x, -at.y, -at.z);
+          return { g: c.geometry, materials: c.materials, at: at.add(mc) };
+        }).sort((a, b) => a.at.y - b.at.y);
+      } catch (e) { halves = null; }
+      const [lower, upper] = halves ?? [wedge([[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, yc - rise / 2], [-w / 2, yc + rise / 2]]),
+        wedge([[-w / 2, yc + rise / 2], [w / 2, yc - rise / 2], [w / 2, h / 2], [-w / 2, h / 2]])];
+      P.spawn({ parts: [{ kind: kindName, geometry: lower.g, materials: lower.materials }], pos: lower.at, role: 'fragment', floor: p.floor, structural: false, hull: true });
       // Down the slope of the break.
       const downhill = new THREE.Vector3(wide ? -Math.sign(rise) : 0, 0, wide ? 0 : Math.sign(rise));
-      P.spawn({ parts: [{ kind: kindName, geometry: upper.g }], pos: upper.at, role: 'fragment', floor: p.floor, structural: false, hull: true },
+      P.spawn({ parts: [{ kind: kindName, geometry: upper.g, materials: upper.materials }], pos: upper.at, role: 'fragment', floor: p.floor, structural: false, hull: true },
         { dynamic: true, vel: downhill.multiplyScalar(1.5).add(new THREE.Vector3(0, -1, 0)), spin: { x: (Math.random() - 0.5), y: 0, z: (Math.random() - 0.5) }, debris: true });
     } else {
       // Burst (or a wall): the concrete comes out in irregular lumps, never blocks.

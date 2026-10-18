@@ -72,10 +72,29 @@ export function subtract(geometry, materials, inside, centre, axis, radius, dept
 // Break a lump off: returns both the piece that comes away (the part of
 // `geometry` inside a jagged blob at `centre`) and what is left behind.
 // { chunk: { geometry, materials }, rest: { geometry, materials } }
+// What a blow knocks out of concrete: a shallow cone, wide where it leaves
+// the face and narrowing inward — the shape a spall really has — its broken
+// face jagged, its rim irregular. Points along +z (into the piece), base at
+// z = -0.5, tip at +0.5, unit radius.
+function spall(seed) {
+  const g = new THREE.ConeGeometry(1, 1, 11, 4, false);
+  g.rotateX(Math.PI / 2);                       // tip from +y to +z
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const a = Math.atan2(y, x);
+    // A function of position only, so the seam's twin vertices stay together.
+    const k = 1 + Math.sin(a * 3 + seed) * 0.18 + Math.sin(a * 7 + seed * 1.7 + z * 4) * 0.12 + Math.sin(x * 13 + y * 11 + z * 9 + seed) * 0.06;
+    p.setXYZ(i, x * k, y * k, z + Math.sin(a * 5 + seed * 2.3) * 0.08 * (0.5 - z));
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
 export function chunkOff(geometry, materials, inside, centre, axis, radius, depth) {
   const a = new Brush(geometry, materials);
   a.updateMatrixWorld();
-  const cut = blob(Math.random() * 1000, 0.28, 2);
+  const cut = spall(Math.random() * 1000);
   projectUVs(cut, 1);
   const b = new Brush(cut, inside);
   b.position.copy(centre);
