@@ -285,6 +285,24 @@ export class Audio {
     }
   }
 
+  // A car horn: two reedy notes together.
+  horn(x, y, z) {
+    if (!this.ctx) return;
+    const { gain, pan } = this._place(x, y, z, 50);
+    const out = this._out(gain * 0.22, pan);
+    for (const f of [415, 494]) this._tone(out, { f, len: 0.45, gain: 0.5, type: 'square', drop: 1 });
+  }
+  // A car alarm's whoop.
+  carAlarm(x, y, z) {
+    if (!this.ctx) return;
+    const { gain, pan } = this._place(x, y, z, 40);
+    const out = this._out(gain * 0.12, pan);
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain(), t = this.ctx.currentTime;
+    o.type = 'square'; o.frequency.setValueAtTime(700, t); o.frequency.linearRampToValueAtTime(1400, t + 0.4);
+    g.gain.setValueAtTime(0.4, t); g.gain.linearRampToValueAtTime(0, t + 0.45);
+    o.connect(g).connect(out); o.start(t); o.stop(t + 0.5);
+  }
+
   // Gas escaping from a punctured tank.
   hiss(x, y, z) {
     if (!this.ctx) return;

@@ -23,6 +23,8 @@ const LOOK = 0.25;                // s between looks at what is under someone
 const G = 9.81;
 const HEAR = 26;                  // m: a blast this close sends people running
 const STEPS = 4;                  // m: how far ahead they check the way is clear
+const STREET = 26;                // people on the avenue's pavements
+const PAVEMENTS = [21.5, 46.5];   // z down the middle of our pavement and the far one
 
 const SKIN = [0xf1d3bd, 0xe2b594, 0xc98f6a, 0x9c6a4a, 0x6e4a33];
 const HAIR = [0x1d1612, 0x3b2a1e, 0x6e4b2e, 0xb08a52, 0xd9c7a2, 0x8a8a8a];
@@ -33,7 +35,7 @@ const SHIRT = [0xf2f0ea, 0xdfe6ee, 0xe8dcc8];
 // Where people are, by floor: how many, and whether they dress for it.
 const CROWD = { [-1]: 4, 0: 16, 1: 12, 2: 10, 3: 14, 4: 12, 5: 6, 6: 5, 7: 5, 8: 5, 9: 5, 10: 2, 11: 2, 12: 2, 13: 2, 14: 2, 15: 2, 16: 2 };
 
-const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _s = new THREE.Vector3(1, 1, 1), _c = new THREE.Color();
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _w = new THREE.Vector3(), _s = new THREE.Vector3(1, 1, 1), _c = new THREE.Color();
 
 // A part, in the figure's frame: which bone it hangs from, where, and its shape.
 function parts() {
@@ -85,13 +87,16 @@ export class People {
     // are placed by looking at the floors.
     this.physics.world.step(this.physics.events);
     for (const [f, n] of Object.entries(CROWD)) for (let i = 0; i < n; i++) this._spawn(+f);
+    // And people on the pavements of the avenue, both sides, walking by.
+    for (let i = 0; i < STREET; i++) this._spawn(0, true);
     const n = this.list.length;
     for (const k in this.mesh) this.mesh[k].count = n * (k === 'leg' || k === 'arm' ? 2 : 1);
     this._draw(0);
   }
 
-  _spawn(f) {
-    const at = this._spot(f);
+  _spawn(f, street = false) {
+    const side = Math.random() < 0.5 ? 0 : 1;
+    const at = street ? new THREE.Vector3(-110 + Math.random() * 220, 0.003, PAVEMENTS[side] + (Math.random() - 0.5) * 4) : this._spot(f);
     if (!at) return;
     const woman = Math.random() < 0.5;
     const pick = (a) => a[(Math.random() * a.length) | 0];
@@ -106,6 +111,7 @@ export class People {
         arm: woman ? skin : pick(SUIT), head: skin, hair: pick(HAIR),
       },
       shirt: pick(SHIRT), woman,
+      street, dir: Math.random() < 0.5 ? 1 : -1, side,
     };
     // Suits have a white shirt at the collar: the body's colour is the jacket.
     const i = this.list.length;
@@ -217,6 +223,7 @@ export class People {
         }
       }
       if (p.agent) { this._fall(p, dt); continue; }
+      if (p.street) { this._pavement(p, dt); continue; }
       if (p.state === 'down') { if (p.t > 6) p.state = 'gone'; continue; }
       // Watching you break things: face it, maybe film it, step back if close.
       const fo = this._focus;
@@ -275,6 +282,33 @@ export class People {
     }
     if (this._focus && (this._focus.t -= dt) <= 0) this._focus = null;
     this._draw(dt);
+  }
+
+  // Walking along the pavement and back; running from a bang; stopping to stare
+  // up, and film, when a building is coming down.
+  _pavement(p, dt) {
+    if (p.state === 'down') { if (p.t > 6) p.state = 'gone'; return; }
+    const running = p.state === 'running';
+    if (running && p.t > 12) p.state = 'calm';
+    if (running && p.from) p.dir = p.pos.x > p.from.x ? 1 : -1;
+    // Something big happening up there: stop, look, hold the phone up.
+    if (!running && this.spectacle && p.pos.distanceTo(this.spectacle) < 140) {
+      p.yaw = Math.atan2(this.spectacle.x - p.pos.x, this.spectacle.z - p.pos.z);
+      p.target = null;
+      p.filming ??= Math.random() < 0.5;
+      p.armUp = p.filming ? Math.min(1, (p.armUp ?? 0) + dt * 2) : 0;
+      return;
+    }
+    p.armUp = Math.max(0, (p.armUp ?? 0) - dt * 2);
+    const speed = running ? RUN : p.speed;
+    const z = PAVEMENTS[p.side] + Math.sin(p.phase * 0.05 + p.side) * 1.2;
+    p.target = _w.set(p.pos.x + p.dir * 10, p.pos.y, z);
+    const to = _v.copy(p.target).sub(p.pos).setY(0), d = to.length();
+    to.divideScalar(d);
+    p.yaw += Math.atan2(Math.sin(Math.atan2(to.x, to.z) - p.yaw), Math.cos(Math.atan2(to.x, to.z) - p.yaw)) * Math.min(1, dt * 6);
+    p.pos.addScaledVector(to, speed * dt);
+    p.phase += dt * speed * 3.1;
+    if (Math.abs(p.pos.x) > 115) { p.pos.x = -Math.sign(p.pos.x) * 112; p.state = 'calm'; }
   }
 
   // An agent stands on what is under it and falls when that goes; it walks

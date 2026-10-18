@@ -20,6 +20,7 @@ import { Water } from './sim/water.js';
 import { Smoke } from './sim/smoke.js';
 import { Powder } from './fx/powder.js';
 import { Security } from './sim/security.js';
+import { Traffic } from './sim/traffic.js';
 import { Topple } from './sim/topple.js';
 import { Rubble } from './sim/rubble.js';
 import { People } from './sim/people.js';
@@ -166,8 +167,13 @@ const security = new Security({
   onThrownOut: () => { if (thrownT <= 0) thrownT = 1.4; },
 });
 let thrownT = -1;
+// The avenue's traffic (sim/traffic.js): it stops for the light, for you and
+// for rubble; heavy things landing on cars crush them.
+const traffic = new Traffic(scene, { physics, player, audio });
+const landed = rubble.fx.onLand;
+rubble.fx.onLand = (q, blows, at, by) => { if (by) traffic.landed(at, by.volume * by.kind.density * 0.6); return landed(q, blows, at, by); };
 const bang2 = blast.explode;
-blast.explode = (at, r, power) => { security.noise(at, 12 * (power ?? 1), false); return bang2(at, r, power); };
+blast.explode = (at, r, power) => { security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); return bang2(at, r, power); };
 let liftTip = null;
 let rig = null;           // dev: { at, look } to hold the camera there
 let toppling = false;
@@ -222,6 +228,7 @@ async function start(jobId, toolIds, levelId = 'normal') {
   smoke.attach();
   people.populate(pieces);
   security.start(difficulty);
+  traffic.attach(pieces);
   waterfall = pieces.list.find((p) => p.tag === 'waterfall') ?? null;
   screens.loading('Wiring the gas and the lights', 0.85);
   await frames(2);
@@ -265,6 +272,7 @@ function unloadJob() {
   chips.clear();
   rubble.clear();
   security.clear();
+  traffic.clear();
   people.clear();
   particles.clear();
   world.unload();
@@ -414,6 +422,8 @@ function frame(dt) {
     topple.update(dt);
     rubble.update(dt);
     if (topple.active && !toppling) people.alarm(camera.position.clone().set(0, 20, 0), 90);
+    // A building coming down is something people stop to watch from the street.
+    people.spectacle = topple.active || structure.collapsing ? _spectacle : null;
     toppling = topple.active;
     people.update(dt);
     structure.update(dt);
@@ -425,6 +435,7 @@ function frame(dt) {
     water.update(dt);
     powder.update();
     if (state === 'play') security.update(dt);
+    traffic.update(dt);
     if (thrownT > 0 && (thrownT -= dt) <= 0) { player.teleport(job.entry.x, 0.05, job.entry.z, job.entry.yaw); }
     player.wet = water.wetAt(player.pos);
     blast.update(dt);
@@ -514,6 +525,7 @@ function spareTip() {
   return ext.charge < 0.98 ? 'E — take the extinguisher' : 'A spare extinguisher (yours is still full)';
 }
 const _look = new THREE.Vector3();
+const _spectacle = new THREE.Vector3(0, 30, -4);
 
 function tipFor(t) {
   if (!t) return '';
@@ -535,7 +547,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.
