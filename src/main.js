@@ -203,6 +203,7 @@ security.fx.onKnock = (at) => wanted.offend(5, at);
 // The police know you by sight — or by the sledgehammer in your hands.
 security.fx.armed = () => tools[current]?.id === 'sledge' && !player.disguised;
 people.camera = camera;
+people.particles = particles;
 // The avenue's traffic (sim/traffic.js): it stops for the light, for you and
 // for rubble; heavy things landing on cars crush them.
 const traffic = new Traffic(scene, { physics, player, audio });
@@ -482,6 +483,8 @@ function frame(dt) {
       // Bringing it down — a collapse, a tower going over, a fifth of it gone — is a threat to the city.
       if (topple.active || structure.collapsing || fear.wreck > 0.2) wanted.offend(7, camera.position);
       if (fear.fx.chasing()) wanted.offend(2, player.pos);
+      // Carrying the sledgehammer, people on your floor keep their distance.
+      people.wary = tools[current]?.id === 'sledge' && !player.disguised && !difficulty.creative ? player.pos : null;
       wanted.update(dt, {
         armed: (tools[current]?.id === 'sledge' || tools[current]?.id === 'bomb') && !player.dead,
         chased: security.agents.some((a) => a.mode === 'chase'),

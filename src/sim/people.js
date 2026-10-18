@@ -267,6 +267,23 @@ export class People {
     return Math.min(1, n / 8);
   }
 
+  // A sledgehammer swung along `dir` from `origin`: the first person in its
+  // way is knocked over — a cartoon fall, stars, then up and running.
+  strike(origin, dir, range) {
+    for (const p of this.list) {
+      if (p.agent || p.hidden || p.state === 'gone' || p.state === 'down' || p.state === 'knocked') continue;
+      const c = _v.copy(p.pos).setY(p.pos.y + 1.0 * p.height);
+      const along = _w.copy(c).sub(origin).dot(dir);
+      if (along < 0 || along > range + 0.4) continue;
+      if (_w.copy(c).sub(origin).addScaledVector(dir, -along).length() > 0.55) continue;
+      p.state = 'knocked'; p.t = 0; p.target = null; p.sitting = false; p.handsUp = false; p.armUp = 0;
+      p.from = origin.clone(); p.yaw = Math.atan2(-dir.x, -dir.z);
+      p.pos.addScaledVector(_w.set(dir.x, 0, dir.z).normalize(), 0.6);
+      return p;
+    }
+    return null;
+  }
+
   // Something went bang at `at`: everyone within earshot runs.
   alarm(at, r = HEAR) { this._alarm.push({ at: at.clone(), r }); }
 
@@ -284,12 +301,28 @@ export class People {
       }
       for (const a of alarms) {
         const d = p.pos.distanceTo(a.at);
-        if (d < a.r && p.state !== 'down') {
+        if (d < a.r && p.state !== 'down' && p.state !== 'knocked') {
           p.state = 'running';
           p.t = 0;
           p.from = a.at;
           p.target = null;
           p.wait = Math.random() * 0.4;      // a moment's freeze, then run
+        }
+      }
+      if (p.state === 'knocked') {
+        if (Math.random() < dt * 6) this.particles?.spawn('spark', p.pos.x + (Math.random() - 0.5) * 0.4, p.pos.y + 0.4, p.pos.z + (Math.random() - 0.5) * 0.4, 0, 0.6, 0, 0xfff27a);
+        if (p.t > 2.5) { p.state = 'running'; p.t = 0; p.wait = 0; }
+        continue;
+      }
+      // Someone with a sledgehammer on their floor: they keep six metres off.
+      const w = this.wary;
+      if (w && p.state === 'calm' && !p.street && !p.agent && Math.abs(p.pos.y - w.y) < 2.5 && (p.shyT = (p.shyT ?? 0) - dt) <= 0) {
+        const d = Math.hypot(p.pos.x - w.x, p.pos.z - w.z);
+        if (d < 6) {
+          p.shyT = 0.6;
+          const away = _w.copy(p.pos).sub(w).setY(0).normalize().multiplyScalar(7 - d).add(p.pos);
+          const t = this._spot(p.f, away, 1.5);
+          if (t) { p.target = t; p.wait = 0; p.sitting = false; p.yaw = Math.atan2(w.x - p.pos.x, w.z - p.pos.z); }
         }
       }
       if (p.agent && p.post && this.fear > 82 && Math.random() < dt * 0.5) { p.agent = false; p.sitting = false; p.state = 'calm'; p.f = Math.round((p.pos.y - 0.3) / 4); }
@@ -484,10 +517,10 @@ export class People {
         continue;
       }
       const s = p.height;
-      const moving = !!p.target && p.wait <= 0 && p.state !== 'down';
+      const moving = !!p.target && p.wait <= 0 && p.state !== 'down' && p.state !== 'knocked';
       const swing = moving ? Math.sin(p.phase) * (p.state === 'running' ? 0.75 : 0.4) : 0;
       // Lying: the whole figure turned onto its back.
-      const lying = p.state === 'down';
+      const lying = p.state === 'down' || p.state === 'knocked';
       // Hiding: crouched down small behind whatever is nearest.
       const root = new THREE.Matrix4().compose(p.pos, _q.setFromEuler(_e.set(lying ? -Math.PI / 2 : 0, p.yaw, 0, 'YXZ')), _s.set(s, p.hide ? s * 0.6 : s, s));
       // A "!" over the head of anyone frightened: cartoon fright, not real.

@@ -158,6 +158,17 @@ export class Security {
       else if (this.level?.police !== null) { this.heat += 20; this.noise(a.pos, 0, false); }
       return true;
     }
+    // Or one of the shoppers: over they go, comic, and then run.
+    if (kind === 'sledge') {
+      const p = this.fx.people.strike(origin, dir, range);
+      if (p) {
+        this.fx.audio?.boing?.(p.pos.x, p.pos.y, p.pos.z);
+        this.fx.people.alarm(p.pos, 10);
+        this.fx.fear?.scare(p.pos, 10);
+        this.fx.onKnock?.(p.pos);
+        return true;
+      }
+    }
     return false;
   }
 
