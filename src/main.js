@@ -21,6 +21,7 @@ import { Smoke } from './sim/smoke.js';
 import { Powder } from './fx/powder.js';
 import { Security } from './sim/security.js';
 import { Traffic } from './sim/traffic.js';
+import { signs } from './building/shops.js';
 import { Topple } from './sim/topple.js';
 import { Rubble } from './sim/rubble.js';
 import { People } from './sim/people.js';
@@ -221,7 +222,9 @@ async function start(jobId, toolIds, levelId = 'normal') {
   unloadJob();
   screens.loading(`Building ${job.title}`, 0.3);
   await frames(2);
+  signs.clear();
   world.load(job.build);
+  signs.build(scene);
   lift.attach(pieces);
   doors.attach(pieces);
   water.attach();
@@ -436,6 +439,7 @@ function frame(dt) {
     powder.update();
     if (state === 'play') security.update(dt);
     traffic.update(dt);
+    signs.update();
     if (thrownT > 0 && (thrownT -= dt) <= 0) { player.teleport(job.entry.x, 0.05, job.entry.z, job.entry.yaw); }
     player.wet = water.wetAt(player.pos);
     blast.update(dt);

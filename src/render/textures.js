@@ -159,6 +159,16 @@ const SURFACES = {
     const f = 1 + fbm(n, u, v, 32, 2) * 0.04 + weave;
     set(o, r * f, g * f, b * f, weave, 0.9);
   },
+  tiles: (u, v, n, o) => {        // patterned cement tiles, as on the café's wall: a diamond and quarter circles
+    const a = (u * 4) % 1, b = (v * 4) % 1;
+    const grout = a < 0.02 || b < 0.02;
+    const diamond = Math.abs(a - 0.5) + Math.abs(b - 0.5) < 0.3;
+    const corner = Math.min(Math.hypot(a, b), Math.hypot(1 - a, b), Math.hypot(a, 1 - b), Math.hypot(1 - a, 1 - b)) < 0.22;
+    const dark = (diamond || corner) && !grout;
+    const f = fbm(n, u, v, 32, 2) * 6;
+    const t = grout ? 150 : dark ? 38 + f : 232 + f;
+    set(o, t, t - (dark ? 0 : 3), t - (dark ? 0 : 8), grout ? -0.3 : 0, grout ? 0.9 : 0.35);
+  },
   mirror: (u, v, n, o) => {        // polished metal: no grain, almost no roughness
     const f = fbm(n, u, v, 8, 2);
     set(o, 236 + f * 4, 232 + f * 4, 226 + f * 4, 0, 0.05);

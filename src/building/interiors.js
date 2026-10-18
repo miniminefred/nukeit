@@ -5,6 +5,7 @@ import * as H from './furniture-home.js';
 import * as E from './furniture-food.js';
 import * as W from './furniture-work.js';
 import * as L from './furniture-lobby.js';
+import * as SH from './shops.js';
 import {
   PODIUM_FLOORS, PENTHOUSE, RESIDENCES, HQ, LOWER, T, U, ATRIUM, podiumFront, inCore, inAtrium,
   TOWER_COLUMNS, PODIUM_COLUMNS, clearOf, floorUse,
@@ -254,8 +255,9 @@ function lobby(P, y) {
     E.bistroChair(P, x - 0.62, y, z, HALF, 0x1a1a1a);
     E.bistroChair(P, x + 0.62, y, z, -HALF, 0xe8e4dc);
   }
-  E.bar(P, 17.5, y, 4.5, -HALF, 3.2);
-  for (const [x, z] of [[16.5, 9.5], [18.4, 7.5], [8.5, -9.5], [6.5, -9.8]]) {
+  // The café-bakery, its counter facing the atrium where its tables are.
+  SH.cafe(P, 17.35, y, 7.2, -HALF, 7.6, 3.4, { name: 'BAKER & BEAN', seats: false, h: U(0) - y, walls: [true, true, true] });
+  for (const [x, z] of [[8.5, -9.5], [6.5, -9.8]]) {
     L.marbleTable(P, x, y, z);
     E.bistroChair(P, x - 0.6, y, z, HALF, 0x1a1a1a);
     E.bistroChair(P, x + 0.6, y, z, -HALF, 0x1a1a1a);
