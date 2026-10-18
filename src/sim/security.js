@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { T, FLOOR_H, CORE, PODIUM_FLOORS, TOP_FLOOR, LOWER, HQ } from '../building/plan.js';
 import { BREAK_ROOM } from '../building/interiors.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 // Guards, and the police.
 //
@@ -136,7 +137,7 @@ export class Security {
       this.eta -= dt;
       if (this.eta <= 0) this._arrive();
     }
-    if (this.police) { this._lights(dt); this._search(dt); }
+    if (this.police) { this._lights(dt); this._drive(dt); this._search(dt); }
     const eye = this.fx.camera.position;
     for (const a of this.agents) {
       if (a.hidden) { this._stairs(a, dt); continue; }
@@ -185,6 +186,15 @@ export class Security {
       switch (a.mode) {
         case 'patrol': this._wander(a, a.post, WALK, dt); break;
         case 'search': this._wander(a, null, WALK * 1.3, dt); break;
+        case 'enter': {
+          // From the car across the pavement and in at the front doors; then
+          // the first two search the lobby and the rest go up, a floor each.
+          const door = _w.set(a.id % 2 ? 1.4 : -1.4, T(0), 10.2);
+          a.state = 'running';
+          if (a.pos.distanceTo(door) > 1.2) this._go(a, door, COP_RUN * 0.8);
+          else { a.mode = 'search'; a.target = null; if (a.id > 1) this._toFloor(a, Math.min(TOP_FLOOR, a.id - 1)); }
+          break;
+        }
         case 'look': if (a.last) this._go(a, a.last, GUARD_RUN * 0.7); break;
         case 'chase': this._chase(a, dist, sees, dt); break;
         case 'watch':
@@ -367,39 +377,63 @@ export class Security {
 
   _door(f) { return new THREE.Vector3(-3.3, T(f), CORE.z1 + 0.8); }
 
-  // Sirens on the avenue, and officers through the front door.
+  // Sirens on the avenue: the cars come down Fifth Avenue with their lights
+  // going, pull in at the kerb in front of the tower, and the officers get out,
+  // two to a car, and walk in through the front doors.
   _arrive() {
     this.police = true;
     this.eta = null;
-    const { people, scene, audio, hud } = this.fx;
-    hud?.flash('Police! They are coming in', 3);
+    const { scene, audio, hud } = this.fx;
+    hud?.flash('Sirens! The police are here', 3);
     this.fx.fear?.calm(10);
     audio?.siren?.(true);
     const n = { supereasy: 0, easy: 3, normal: 4, hard: 6, insane: 10 }[this.level.id] ?? 4;
-    for (let i = 0; i < n; i++) {
-      const at = people._spot(0, new THREE.Vector3((i - n / 2) * 1.2, T(0), 10.5), 1) ?? people._spot(0);
-      if (!at) continue;
-      const a = people.agent(0, at, { ...COP, head: SKIN[(Math.random() * SKIN.length) | 0] }, 1 + Math.random() * 0.06);
-      Object.assign(a, { kind: 'cop', arm: 'catch', mode: 'search', cool: 0, seen: -99, last: null, daze: 0, angry: 0, id: i });
-      // Some go up straight away, a floor each.
-      if (i > 1) this._toFloor(a, Math.min(TOP_FLOOR, i - 1));
-      this.agents.push(a);
-    }
-    // Two cars across the avenue, lights going.
-    for (const x of [-7, 7]) {
+    const cars = Math.ceil(n / 2);
+    let crew = n;
+    for (let k = 0; k < cars; k++) {
       const car = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.75, 4.6), new THREE.MeshStandardMaterial({ color: 0x15161a, roughness: 0.4, metalness: 0.5 }));
-      body.position.y = 0.6;
-      const top = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.55, 2.3), new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.3 }));
-      top.position.set(0, 1.25, -0.2);
+      const paint = new THREE.MeshStandardMaterial({ color: 0x15161a, roughness: 0.4, metalness: 0.5 });
+      const white = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.35 });
+      const body = new THREE.Mesh(new RoundedBoxGeometry(1.9, 0.75, 4.8, 3, 0.15), paint);
+      body.position.y = 0.62;
+      const door = new THREE.Mesh(new RoundedBoxGeometry(1.92, 0.42, 1.9, 2, 0.08), white);
+      door.position.set(0, 0.62, 0.1);
+      const cabin = new THREE.Mesh(new RoundedBoxGeometry(1.7, 0.55, 2.4, 3, 0.15), new THREE.MeshStandardMaterial({ color: 0x1a2028, roughness: 0.05, metalness: 0.6 }));
+      cabin.position.set(0, 1.22, -0.2);
       const red = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.14, 0.25), new THREE.MeshStandardMaterial({ color: 0x300000, emissive: 0xff1010, emissiveIntensity: 0 }));
       const blue = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.14, 0.25), new THREE.MeshStandardMaterial({ color: 0x000030, emissive: 0x2050ff, emissiveIntensity: 0 }));
-      red.position.set(-0.3, 1.6, -0.2); blue.position.set(0.3, 1.6, -0.2);
-      car.add(body, top, red, blue);
-      car.position.set(x, 0, 22);
-      car.rotation.y = x < 0 ? 0.3 : -0.3;
+      red.position.set(-0.3, 1.58, -0.2); blue.position.set(0.3, 1.58, -0.2);
+      car.add(body, door, cabin, red, blue);
+      for (const m of car.children) m.castShadow = true;
+      // In from up the avenue, one behind the other, nose first (traffic goes −x).
+      const c = { car, red, blue, x: 140 + k * 16, tx: -10 + k * 6.5, z: 27.8, v: 16, crew: Math.min(2, crew), parked: false };
+      crew -= c.crew;
+      car.position.set(c.x, 0, c.z);
+      car.rotation.y = -Math.PI / 2;
       scene.add(car);
-      this.cars.push({ car, red, blue });
+      this.cars.push(c);
+    }
+  }
+
+  // The cars driving in and pulling up; the officers out, and in.
+  _drive(dt) {
+    for (const c of this.cars) {
+      if (c.parked) continue;
+      const left = c.x - c.tx;
+      c.v = Math.min(16, Math.max(2, left * 0.9));
+      c.x -= Math.min(left, c.v * dt);
+      c.car.position.x = c.x;
+      if (left < 0.05) {
+        c.parked = true;
+        this.fx.audio?.thud?.(c.x, 0.5, c.z);
+        for (let i = 0; i < c.crew; i++) {
+          const at = new THREE.Vector3(c.x + (i ? 1.0 : -1.0), 0.02, 25.6);
+          const a = this.fx.people.agent(0, at, { ...COP, head: SKIN[(Math.random() * SKIN.length) | 0] }, 1 + Math.random() * 0.06);
+          const id = this.agents.filter((b) => b.kind === 'cop').length;
+          Object.assign(a, { kind: 'cop', arm: 'catch', mode: 'enter', cool: 0, seen: -99, last: null, daze: 0, angry: 0, id, yaw: Math.PI });
+          this.agents.push(a);
+        }
+      }
     }
   }
 

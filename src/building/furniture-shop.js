@@ -375,3 +375,165 @@ export function watchTower(P, x, y, z, yaw) {
     { kind: 'lamp', boxes: [[-0.18, 1.88, -0.18, 0.18, 1.9, 0.18]] },
   ], 'furniture', { colliders: [[-0.25, 0, -0.25, 0.25, 1.9, 0.25]] });
 }
+
+// ---------------------------------------------------------------- food court stalls
+
+// A griddle: a steel cabinet with a hot black plate on it, patties sizzling.
+export function griddle(P, x, y, z, yaw, len = 1.2) {
+  const patties = [];
+  for (let gx = -len / 2 + 0.2; gx < len / 2 - 0.1; gx += 0.22) patties.push({ cyl: [gx, 0.935, 0.05], r: 0.07, h: 0.02, seg: 12 });
+  return assembly(P, x, y, z, yaw, [
+    { kind: 'steel', round: 0.02, boxes: [[-len / 2, 0, -0.35, len / 2, 0.9, 0.35]], tint: 0xc8ccd0 },
+    { kind: 'steel', boxes: [[-len / 2 + 0.03, 0.9, -0.32, len / 2 - 0.03, 0.925, 0.32]], tint: 0x1a1a1a },
+    { kind: 'leather', boxes: patties, tint: 0x5a3220, tag: 'food' },
+  ], 'furniture', { colliders: [[-len / 2, 0, -0.35, len / 2, 0.95, 0.35]] });
+}
+
+// A deep fryer: a steel box of hot oil with two baskets hanging in it. Hit it,
+// and burning oil goes everywhere (main.js: tag 'fryer').
+export function fryer(P, x, y, z, yaw) {
+  return assembly(P, x, y, z, yaw, [
+    { kind: 'steel', round: 0.02, boxes: [[-0.3, 0, -0.35, 0.3, 0.9, 0.35]], tint: 0xc8ccd0 },
+    { kind: 'plastic', boxes: [[-0.26, 0.86, -0.3, 0.26, 0.89, 0.3]], tint: 0xc89a30 },
+    { kind: 'steel', boxes: [[-0.24, 0.9, -0.15, -0.02, 1.02, 0.15], [0.02, 0.9, -0.15, 0.24, 1.02, 0.15], [-0.15, 1.02, -0.4, -0.11, 1.05, -0.15], [0.11, 1.02, -0.4, 0.15, 1.05, -0.15]], tint: 0x9aa0a6 },
+  ], 'furniture', { tag: 'fryer', colliders: [[-0.3, 0, -0.35, 0.3, 1.05, 0.35]] });
+}
+
+// An extractor hood over the cooking, hung from the ceiling at `yTop`.
+export function hood(P, x, yTop, z, yaw, len = 2.4) {
+  return assembly(P, x, yTop, z, yaw, [
+    { kind: 'steel', round: 0.02, boxes: [[-len / 2, -0.75, -0.45, len / 2, -0.35, 0.45], [-0.25, -0.35, -0.2, 0.25, 0, 0.2]], tint: 0xb8bcc0 },
+  ], 'lamp', { hang: true });
+}
+
+// A lit menu board: a light box over the counter (its words and prices are a decal).
+export function menuBox(P, x, y, z, yaw, len = 2.4, tint = 0xc8261d) {
+  return assembly(P, x, y, z, yaw, [
+    { kind: 'wood', boxes: [[-len / 2, 0, -0.12, len / 2, 0.7, 0]], tint },
+    { kind: 'lamp', boxes: [[-len / 2 + 0.05, 0.05, 0, len / 2 - 0.05, 0.65, 0.01]] },
+  ], 'cladding', { structural: false });
+}
+
+// A wood-fired pizza oven: a dome on a base, its mouth glowing (tag 'oven':
+// things left too close to it can catch).
+export function pizzaOven(P, x, y, z, yaw) {
+  return assembly(P, x, y, z, yaw, [
+    { kind: 'concrete', round: 0.03, boxes: [[-0.75, 0, -0.75, 0.75, 0.95, 0.75]], tint: 0x6a5a4a },
+    { kind: 'ceramic', boxes: [{ ball: [0, 0.95, 0], s: [0.72, 0.6, 0.72], rough: 0.05 }], tint: 0xa8583a },
+    { kind: 'lamp', boxes: [[-0.25, 0.97, 0.66, 0.25, 1.25, 0.7]] },
+    { kind: 'steel', boxes: [{ cyl: [0, 1.75, -0.3], r: 0.12, h: 0.7, seg: 10 }], tint: 0x2a2a2a },
+  ], 'furniture', { tag: 'oven', colliders: [[-0.75, 0, -0.75, 0.75, 1.55, 0.75]] });
+}
+
+// Pizzas under a heat lamp on the counter, whole and by the slice (food: they splat).
+export function pizzaDisplay(P, x, y, z, yaw, len = 1.6) {
+  const pies = [], tops = [];
+  for (let px = -len / 2 + 0.3; px < len / 2 - 0.2; px += 0.42) { pies.push({ cyl: [px, 0.93, 0], r: 0.19, h: 0.02, seg: 18 }); tops.push({ cyl: [px, 0.945, 0], r: 0.16, h: 0.01, seg: 18 }); }
+  assembly(P, x, y, z, yaw, [
+    { kind: 'leather', boxes: pies, tint: 0xd8a050 },
+    { kind: 'fabric', boxes: tops, tint: 0xb8301e },
+  ], 'furniture', { tag: 'food' });
+  return assembly(P, x, y, z, yaw, [
+    { kind: 'steel', boxes: [[-len / 2, 1.35, -0.2, len / 2, 1.4, 0.2], [-len / 2, 0.92, -0.18, -len / 2 + 0.03, 1.35, -0.15], [len / 2 - 0.03, 0.92, -0.18, len / 2, 1.35, -0.15]], tint: 0xb8bcc0 },
+    { kind: 'lamp', boxes: [[-len / 2 + 0.05, 1.33, -0.15, len / 2 - 0.05, 1.35, 0.15]] },
+  ], 'furniture', {});
+}
+
+// An ice-cream freezer: a glass-topped cabinet of colourful tubs, cones stacked beside.
+export function iceFreezer(P, x, y, z, yaw, len = 2) {
+  const tubs = new Map(), colours = [0xf4e8d0, 0x6a3a22, 0xf0a0b0, 0x8ad08a, 0xf0d060, 0xb070c0, 0xf08040, 0xe8e0d8];
+  let i = 0;
+  for (let tx = -len / 2 + 0.2; tx < len / 2 - 0.15; tx += 0.24) for (const tz of [-0.12, 0.14]) {
+    const c = colours[i++ % colours.length];
+    (tubs.get(c) ?? tubs.set(c, []).get(c)).push({ ball: [tx, 0.92, tz], s: [0.1, 0.05, 0.1], rough: 0.25 });
+  }
+  assembly(P, x, y, z, yaw, [...tubs].map(([tint, boxes]) => ({ kind: 'plaster', boxes, tint })), 'furniture', { tag: 'food' });
+  return assembly(P, x, y, z, yaw, [
+    { kind: 'wood', round: 0.02, boxes: [[-len / 2, 0, -0.32, len / 2, 0.86, 0.32]], tint: T('body', 0xf2eee6) },
+    { kind: 'clearglass', boxes: [[-len / 2, 0.86, 0.3, len / 2, 1.2, 0.32], [-len / 2, 1.18, -0.32, len / 2, 1.2, 0.32]], tint: 0xe6f0ee },
+    { kind: 'leather', boxes: [{ cone: [len / 2 + 0.15, 1.0, 0], r: 0.04, h: 0.3, seg: 8 }, { cone: [len / 2 + 0.15, 1.1, 0], r: 0.04, h: 0.3, seg: 8 }], tint: 0xd8a860 },
+  ], 'furniture', { colliders: [[-len / 2, 0, -0.32, len / 2, 1.2, 0.32]] });
+}
+
+// A stall's front counter: the till, a stack of trays, napkins.
+export function stallCounter(P, x, y, z, yaw, len = 3, tint = 0xc8261d) {
+  const trays = [];
+  for (let k = 0; k < 6; k++) trays.push([len / 2 - 0.55, 0.95 + k * 0.02, -0.18, len / 2 - 0.1, 0.965 + k * 0.02, 0.18]);
+  return assembly(P, x, y, z, yaw, [
+    { kind: 'wood', round: 0.02, boxes: [[-len / 2, 0, -0.3, len / 2, 0.92, 0.3]], tint },
+    { kind: 'steel', boxes: [[-len / 2 - 0.02, 0.92, -0.32, len / 2 + 0.02, 0.95, 0.34]], tint: 0xc8ccd0 },
+    { kind: 'plastic', round: 0.01, boxes: [[-len / 2 + 0.2, 0.95, -0.15, -len / 2 + 0.5, 1.03, 0.1], [-len / 2 + 0.22, 1.03, -0.12, -len / 2 + 0.48, 1.25, -0.1], ...trays], tint: 0x1a1a1a },
+  ], 'furniture', { colliders: [[-len / 2, 0, -0.32, len / 2, 1.25, 0.34]] });
+}
+
+// A tray of food on a table: a burger and fries, a pizza slice, or an ice-cream
+// sundae, a drink. Food: it splats when hit.
+export function tray(P, x, y, z, yaw, what = 'burger', top = 0.75) {
+  const food = what === 'pizza'
+    ? [{ kind: 'leather', boxes: [{ cyl: [-0.05, top + 0.035, 0], r: 0.12, h: 0.015, seg: 3 }], tint: 0xd8a050 }]
+    : what === 'ice'
+      ? [{ kind: 'plaster', boxes: [{ ball: [-0.05, top + 0.08, 0], s: [0.06, 0.05, 0.06], rough: 0.2 }, { ball: [-0.05, top + 0.13, 0], s: [0.05, 0.045, 0.05], rough: 0.2 }], tint: 0xf0b0c0 }]
+      : [{ kind: 'leather', boxes: [{ ball: [-0.06, top + 0.06, 0], s: [0.07, 0.04, 0.07], rough: 0.1 }], tint: 0xc88a40 }, { kind: 'plaster', boxes: [[0.0, top + 0.03, -0.05, 0.06, top + 0.1, 0.0]], tint: 0xe8c040 }];
+  return assembly(P, x, y, z, yaw, [
+    { kind: 'plastic', round: 0.01, boxes: [[-0.2, top, -0.14, 0.2, top + 0.02, 0.14]], tint: 0xb8301e },
+    { kind: 'plastic', boxes: [{ cyl: [0.12, top + 0.09, 0.05], r: 0.035, h: 0.15, seg: 10 }], tint: 0xf2f0ea },
+    ...food,
+  ], 'furniture', { tag: 'food' });
+}
+
+// ---------------------------------------------------------------- the steakhouse
+
+// A booth: two leather benches facing across a table with a white cloth.
+export function booth(P, x, y, z, yaw) {
+  return assembly(P, x, y, z, yaw, [
+    { kind: 'wood', round: 0.02, boxes: [[-0.7, 0, -1.0, 0.7, 0.45, -0.55], [-0.7, 0, 0.55, 0.7, 0.45, 1.0], [-0.7, 0.45, -1.0, 0.7, 1.25, -0.88], [-0.7, 0.45, 0.88, 0.7, 1.25, 1.0]], tint: T('wood', 0x3a2214) },
+    { kind: 'leather', round: 0.05, boxes: [[-0.68, 0.45, -0.88, 0.68, 0.52, -0.56], [-0.68, 0.45, 0.56, 0.68, 0.52, 0.88], [-0.68, 0.55, -0.88, 0.68, 1.15, -0.8], [-0.68, 0.55, 0.8, 0.68, 1.15, 0.88]], tint: T('seat', 0x5a1a12) },
+    { kind: 'linen', round: 0.01, boxes: [[-0.62, 0.72, -0.4, 0.62, 0.76, 0.4]] },
+    { kind: 'wood', boxes: [{ cyl: [0, 0.36, 0], r: 0.05, h: 0.72, seg: 8 }], tint: 0x1a1a1a },
+  ], 'furniture', { colliders: [[-0.7, 0, -1.0, 0.7, 1.25, 1.0]] });
+}
+
+// A wine wall: glass-fronted racks of bottles, lit from above.
+export function wineWall(P, x, y, z, yaw, len = 2.4) {
+  const bottles = [];
+  for (let row = 0; row < 6; row++) for (let bx = -len / 2 + 0.12; bx < len / 2 - 0.08; bx += 0.12) bottles.push({ cylZ: [bx, 0.35 + row * 0.3, -0.18], r: 0.04, h: 0.3, seg: 8 });
+  return assembly(P, x, y, z, yaw, [
+    { kind: 'wood', boxes: [[-len / 2, 0, -0.4, len / 2, 2.3, -0.36], [-len / 2, 0, -0.4, -len / 2 + 0.05, 2.3, 0], [len / 2 - 0.05, 0, -0.4, len / 2, 2.3, 0], [-len / 2, 2.2, -0.4, len / 2, 2.3, 0]], tint: T('wood', 0x2a1810) },
+    { kind: 'clearglass', boxes: bottles.filter((_, i) => i % 3 !== 0), tint: 0x2a3a1a },
+    { kind: 'clearglass', boxes: bottles.filter((_, i) => i % 3 === 0), tint: 0x5a1020 },
+    { kind: 'clearglass', boxes: [[-len / 2, 0.1, -0.01, len / 2, 2.2, 0]] },
+    { kind: 'lamp', boxes: [[-len / 2 + 0.05, 2.17, -0.35, len / 2 - 0.05, 2.19, -0.05]] },
+  ], 'furniture', { colliders: [[-len / 2, 0, -0.4, len / 2, 2.3, 0]] });
+}
+
+// The maître d's stand: a tall lectern with a lamp and the reservations book.
+export function maitreStand(P, x, y, z, yaw) {
+  return assembly(P, x, y, z, yaw, [
+    { kind: 'wood', round: 0.02, boxes: [[-0.3, 0, -0.22, 0.3, 1.1, 0.22]], tint: T('wood', 0x3a2214) },
+    { kind: 'paper', boxes: [[-0.18, 1.1, -0.12, 0.18, 1.13, 0.12]], tint: 0xf4f0e6 },
+    { kind: 'brass', boxes: [{ cyl: [0.22, 1.25, -0.1], r: 0.01, h: 0.3, seg: 6 }, { cone: [0.22, 1.42, -0.1], r: 0.07, h: 0.08, seg: 10 }] },
+  ], 'furniture', { colliders: [[-0.3, 0, -0.22, 0.3, 1.45, 0.22]] });
+}
+
+// The kitchen pass: a steel shelf under heat lamps where plates wait to go out.
+export function kitchenPass(P, x, y, z, yaw, len = 2.2) {
+  const plates = [], steaks = [];
+  for (let px = -len / 2 + 0.3; px < len / 2 - 0.2; px += 0.45) { plates.push({ cyl: [px, 1.06, 0], r: 0.14, h: 0.015, seg: 16 }); steaks.push({ ball: [px, 1.085, 0], s: [0.08, 0.02, 0.055], rough: 0.2 }); }
+  assembly(P, x, y, z, yaw, [{ kind: 'leather', boxes: steaks, tint: 0x5a2a18 }], 'furniture', { tag: 'food' });
+  return assembly(P, x, y, z, yaw, [
+    { kind: 'steel', round: 0.01, boxes: [[-len / 2, 0, -0.3, len / 2, 1.05, 0.3], [-len / 2, 1.5, -0.25, len / 2, 1.55, 0.25], [-len / 2, 1.05, -0.25, -len / 2 + 0.04, 1.5, -0.21], [len / 2 - 0.04, 1.05, -0.25, len / 2, 1.5, -0.21]], tint: 0xc8ccd0 },
+    { kind: 'ceramic', boxes: plates, tint: 0xf8f6f0 },
+    { kind: 'lamp', boxes: [[-len / 2 + 0.05, 1.48, -0.2, len / 2 - 0.05, 1.5, 0.2]] },
+  ], 'furniture', { colliders: [[-len / 2, 0, -0.3, len / 2, 1.55, 0.3]] });
+}
+
+// Plates, glasses and cutlery for a laid table.
+export function placeSetting(P, x, y, z, yaw, top = 0.76, steak = false) {
+  const parts = [
+    { kind: 'ceramic', boxes: [{ cyl: [0, top + 0.008, 0.1], r: 0.13, h: 0.015, seg: 16 }], tint: 0xf8f6f0 },
+    { kind: 'clearglass', boxes: [{ cyl: [0.16, top + 0.09, -0.02], r: 0.035, r2: 0.025, h: 0.12, seg: 10 }, { cyl: [0.16, top + 0.015, -0.02], r: 0.03, h: 0.02, seg: 8 }] },
+    { kind: 'steel', boxes: [[-0.17, top, 0.02, -0.15, top + 0.006, 0.2], [0.15, top, 0.04, 0.17, top + 0.006, 0.2]], tint: 0xd8dade },
+  ];
+  if (steak) parts.push({ kind: 'leather', boxes: [{ ball: [0, top + 0.03, 0.1], s: [0.08, 0.02, 0.055], rough: 0.2 }], tint: 0x5a2a18 });
+  return assembly(P, x, y, z, yaw, parts, 'furniture', steak ? { tag: 'food' } : {});
+}
