@@ -73,6 +73,14 @@ export function shape(item, at = ORIGIN, round = 0) {
     if (item.cylX) g.rotateZ(Math.PI / 2);
     if (item.cylZ) g.rotateX(Math.PI / 2);
     [cx, cy, cz] = c;
+  } else if (item.shear) {
+    // A box sheared along x: its y bounds are where it crosses its middle, and
+    // it climbs `k` metres per metre of x. An escalator's sides and handrails.
+    const [x0, y0, z0, x1, y1, z1] = item.shear;
+    g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
+    g.applyMatrix4(new THREE.Matrix4().makeShear(item.k, 0, 0, 0, 0, 0));
+    g.computeVertexNormals();
+    cx = (x0 + x1) / 2; cy = (y0 + y1) / 2; cz = (z0 + z1) / 2;
   } else if (item.cone) {
     g = new THREE.ConeGeometry(item.r, item.h, item.seg ?? 10);
     [cx, cy, cz] = item.cone;

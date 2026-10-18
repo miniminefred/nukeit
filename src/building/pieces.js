@@ -325,6 +325,17 @@ export class Pieces {
     this._addFixedCollider(p);
   }
 
+  // Turn a standing piece about its own centre — a revolving door's wings.
+  // Its colliders stay as they are; give such a piece only colliders that do
+  // not care which way it faces.
+  turn(p, quat) {
+    if (p.state !== 'static') return;
+    p.quat.copy(quat);
+    this._updateBox(p);
+    if (p.object) p.object.quaternion.copy(quat);
+    else this.drawAt(p, _m.compose(p.pos, p.quat, _one));
+  }
+
   // A piece of debris that has stopped moving: out of the simulation, but
   // still there, still solid, still something you can hit.
   freeze(p) {

@@ -125,18 +125,39 @@ const SURFACES = {
     const w = fbm(n, u, v, 3, 4), cloud = fbm(n, u, v, 6, 3);
     const r1 = Math.abs(fbm(n, u + w * 0.25, v - w * 0.2, 4, 5));
     const r2 = Math.abs(fbm(n, u - w * 0.1, v + 5.1, 8, 4));
-    const vein = Math.max(0, 1 - r1 * 16) ** 2 + Math.max(0, 1 - r2 * 28) ** 2 * 0.55;
-    const clast = Math.max(0, fbm(n, u + 9, v, 7, 3) - 0.38) * 3;      // pale fragments in the breccia
+    const vein = Math.max(0, 1 - r1 * 22) ** 2 + Math.max(0, 1 - r2 * 36) ** 2 * 0.45;
+    const clast = Math.max(0, fbm(n, u + 9, v, 7, 3) - 0.45) * 2.2;    // pale fragments in the breccia
+    const gold = Math.max(0, fbm(n, u + 4, v + 2, 5, 3) - 0.1) * 1.4;   // warm brown clouds through it
     const t = Math.min(1, vein + clast);
-    const br = 40 + cloud * 10, bg = 29 + cloud * 8, bb = 22 + cloud * 6;
-    set(o, br + (232 - br) * t, bg + (214 - bg) * t, bb + (184 - bb) * t, -t * 0.05, 0.1 + t * 0.06);
+    const br = 36 + cloud * 8 + gold * 40, bg = 26 + cloud * 6 + gold * 24, bb = 20 + cloud * 5 + gold * 10;
+    set(o, br + (226 - br) * t, bg + (204 - bg) * t, bb + (166 - bb) * t, -t * 0.05, 0.1 + t * 0.06);
   },
   creammarble: (u, v, n, o) => {   // the floors: warm cream, soft wandering veins, polished
     const w = fbm(n, u, v, 2, 4), cloud = fbm(n, u, v, 5, 4), mottle = fbm(n, u + 3, v, 20, 2);
     const r = Math.abs(fbm(n, u + w * 0.4, v + w * 0.3, 3, 5));
-    const vein = Math.max(0, 1 - r * 9) ** 2;
+    const vein = Math.max(0, 1 - r * 14) ** 2;
     const t = cloud * 10 + mottle * 5;
-    set(o, 234 + t - vein * 42, 218 + t - vein * 50, 192 + t - vein * 56, -vein * 0.05, 0.1 + vein * 0.08);
+    set(o, 236 + t - vein * 24, 220 + t - vein * 30, 194 + t - vein * 36, -vein * 0.05, 0.1 + vein * 0.08);
+  },
+  flag: (u, v, n, o) => {          // mapped once across the flag: v = 0 is the top
+    const weave = (Math.sin(u * SIZE * 1.4) + Math.sin(v * SIZE * 1.4)) * 0.02;
+    let r, g, b;
+    if (u < 0.4 && v < 7 / 13) {
+      r = 40; g = 52; b = 104;
+      // Fifty stars, rows of six and five; distances in hoists so they come out round.
+      for (let i = 0; i < 9; i++) {
+        const cy = ((i + 1) / 10) * (7 / 13), six = i % 2 === 0;
+        for (let j = 0; j < (six ? 6 : 5); j++) {
+          const cx = ((six ? 2 * j + 1 : 2 * j + 2) / 12) * 0.4;
+          const dx = (u - cx) * 1.9, dy = v - cy, d = Math.hypot(dx, dy);
+          if (d > 0.032) continue;
+          const a = Math.atan2(dx, -dy);
+          if (d < 0.031 * (0.42 + 0.58 * Math.abs(Math.cos(2.5 * a)) ** 4)) { r = 238; g = 236; b = 230; }
+        }
+      }
+    } else if (Math.floor(v * 13) % 2 === 0) { r = 180; g = 32; b = 50; } else { r = 238; g = 236; b = 230; }
+    const f = 1 + fbm(n, u, v, 32, 2) * 0.04 + weave;
+    set(o, r * f, g * f, b * f, weave, 0.9);
   },
   mirror: (u, v, n, o) => {        // polished metal: no grain, almost no roughness
     const f = fbm(n, u, v, 8, 2);

@@ -64,17 +64,16 @@ function slabs(P, f) {
   // below), and on the office floors carpet over it.
   // What you walk on: marble in the shops and the penthouse, tiles in the food
   // court, oak in the restaurant and the café, carpet in the offices.
-  const FINISH = { 1: 'marble', 2: 'marble', 3: 'ceramic', 4: 'wood', 5: 'carpet' };
-  const finish = f === ROOF ? null : f >= PENTHOUSE ? 'marble' : f >= PODIUM_FLOORS ? 'carpet' : FINISH[f] ?? null;
+  const FINISH = { 1: 'creammarble', 2: 'creammarble', 3: 'ceramic', 4: 'wood', 5: 'carpet' };
+  const finish = f === ROOF ? null : f >= PENTHOUSE ? 'creammarble' : f >= PODIUM_FLOORS ? 'carpet' : FINISH[f] ?? null;
   // The public floors and the penthouse are warm: cream marble, warm plaster
   // overhead. The offices stay the cool grey of offices.
   const rich = (g) => (g >= 0 && g < 5) || g >= HQ;
   const ceilingTint = rich(f - 1) ? 0xf6e9d2 : 0xf2efe8;
-  const marbleTint = 0xf1e3cc;
   const add = (x0, z0, x1, z1, kind, outdoors = false) => {
-    const s = block(P, kind, x0, y0, z0, x1, y1, z1, 'slab', { floor: f, lateral: true, tint: kind === 'marble' ? marbleTint : undefined });
+    const s = block(P, kind, x0, y0, z0, x1, y1, z1, 'slab', { floor: f, lateral: true });
     if (f > LOWER) block(P, 'plaster', x0, y0 - 0.03, z0, x1, y0, z1, 'ceiling', { floor: f - 1, hang: true, tint: f === 0 ? 0xdcd6ca : ceilingTint });
-    if (finish && !outdoors) block(P, finish, x0, y1, z0, x1, y1 + 0.02, z1, 'carpet', { floor: f, structural: false, tint: finish === 'wood' ? 0xf2dcbc : finish === 'ceramic' ? 0xe8e2d8 : finish === 'marble' ? marbleTint : undefined });
+    if (finish && !outdoors) block(P, finish, x0, y1, z0, x1, y1 + 0.02, z1, 'carpet', { floor: f, structural: false, tint: finish === 'wood' ? 0xf2dcbc : finish === 'ceramic' ? 0xe8e2d8 : undefined });
     return s;
   };
   const addPlate = (poly, kind) => {
@@ -103,7 +102,7 @@ function slabs(P, f) {
           for (const [a0, b0, a1, b1] of subtract([x0, z0, x1, z1], [-14, -9, 12, 9])) add(a0, b0, a1, b1, 'roofing', true);
           continue;
         }
-        add(x0, z0, x1, z1, f === 0 ? 'marble' : roofHere ? 'roofing' : 'concrete', roofHere);
+        add(x0, z0, x1, z1, f === 0 ? 'creammarble' : roofHere ? 'roofing' : 'concrete', roofHere);
       }
     if (f === PODIUM_FLOORS) notchRoofs(P, y0, y1);
   }
@@ -161,8 +160,10 @@ function columns(P, f) {
       if (inCore(x, z, 0.5)) continue;
       if (f === 0 && Math.abs(x) < 3.2 && z > 11) continue;      // the doorway
       if (!tower && x > ATRIUM.x0 && x < ATRIUM.x1 && z > ATRIUM.z0 && z < ATRIUM.z1) continue;
-      // Marble in the lobby and the penthouse, bare concrete everywhere else.
-      block(P, f === 0 || f >= PENTHOUSE ? 'marble' : 'concrete', x - s, T(f), z - s, x + s, U(f), z + s, 'column', { floor: f, load: ROOF - f });
+      // Pink marble round the atrium on the public floors, dark veined marble in
+      // the rest of the lobby, cream in the penthouse, bare concrete elsewhere.
+      const byAtrium = !tower && f >= 0 && x >= ATRIUM.x0 - 0.5 && x <= ATRIUM.x1 + 0.5 && z >= ATRIUM.z0 - 0.5 && z <= ATRIUM.z1 + 0.5;
+      block(P, byAtrium ? 'marble' : f === 0 ? 'darkmarble' : f >= PENTHOUSE ? 'creammarble' : 'concrete', x - s, T(f), z - s, x + s, U(f), z + s, 'column', { floor: f, load: ROOF - f });
     }
 }
 
@@ -171,7 +172,7 @@ function core(P, f) {
   // Full storey height, through the slab line: there is no slab inside the core
   // for a wall to stand on, so each storey's walls stand on the ones below.
   const y0 = f === LOWER ? T(f) : f * FLOOR_H, y1 = U(f);
-  const kind = f === 0 ? 'marble' : 'concrete';
+  const kind = f === 0 ? 'darkmarble' : 'concrete';
   const wall = (a0, b0, a1, b1, ya = y0, yb = y1) => block(P, kind, a0, ya, b0, a1, yb, b1, 'core', { floor: f, load: ROOF - f });
   wall(x0, z0, x0 + t, z1);
   wall(x1 - t, z0, x1, z1);

@@ -84,6 +84,14 @@ function relate(A, B) {
       B.carries.push(A);
     }
   }
+  // Cladding is fixed to whatever it is pressed against — stone blocks to the
+  // wall behind them, a mirror fascia to a slab edge — and not to other cladding.
+  if (A.role === 'cladding' && B.role !== 'cladding' && Math.min(a.max.y, b.max.y) - Math.max(a.min.y, b.min.y) > 0.05) {
+    const ox = Math.min(a.max.x, b.max.x) - Math.max(a.min.x, b.min.x), oz = Math.min(a.max.z, b.max.z) - Math.max(a.min.z, b.min.z);
+    const faceZ = ox > 0.05 && (Math.abs(a.min.z - b.max.z) < TOL || Math.abs(a.max.z - b.min.z) < TOL);
+    const faceX = oz > 0.05 && (Math.abs(a.min.x - b.max.x) < TOL || Math.abs(a.max.x - b.min.x) < TOL);
+    if ((faceZ || faceX) && !A.rests.includes(B)) { A.rests.push(B); B.carries.push(A); }
+  }
   // Slab bays tied edge to edge.
   if (A.lateral && B.lateral && A.id < B.id && Math.abs(a.min.y - b.min.y) < TOL) {
     const touchX = (Math.abs(a.max.x - b.min.x) < TOL || Math.abs(b.max.x - a.min.x) < TOL) &&

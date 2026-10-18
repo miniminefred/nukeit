@@ -15,6 +15,7 @@ import { Fire } from './sim/fire.js';
 import { Blast } from './sim/blast.js';
 import { Impacts } from './sim/impacts.js';
 import { Lift } from './sim/lift.js';
+import { Doors } from './sim/doors.js';
 import { Topple } from './sim/topple.js';
 import { Rubble } from './sim/rubble.js';
 import { People } from './sim/people.js';
@@ -131,6 +132,7 @@ damage.fx.onPuncture = (p, point, normal) => {
 structure.onCrushPlayer = () => player.damage(500, 'crushed');
 
 const lift = new Lift(scene, physics);
+const doors = new Doors();
 const people = new People(scene, physics);
 // People hear things: a blast, a support giving way, a building going over.
 const bang = blast.explode.bind(blast);
@@ -186,6 +188,7 @@ async function start(jobId, toolIds) {
   await frames(2);
   world.load(job.build);
   lift.attach(pieces);
+  doors.attach(pieces);
   people.populate(pieces);
   waterfall = pieces.list.find((p) => p.tag === 'waterfall') ?? null;
   screens.loading('Wiring the gas and the lights', 0.85);
@@ -320,6 +323,7 @@ function frame(dt) {
       if (tool === t && playing && !player.dead) tool.update(dt, ctx);
       else tool.background?.(dt, ctx);
     }
+    doors.update(dt);
     physics.step(dt);
     pieces.sync();
     topple.update(dt);

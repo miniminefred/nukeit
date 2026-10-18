@@ -22,15 +22,16 @@ import { surface } from './textures.js';
 
 const KINDS = {
   concrete:    { surf: 'concrete', repeat: 2.5, density: 2400, toughness: 22, structural: true, inside: 'broken', sound: 'concrete' },
-  marble:      { surf: 'marble', repeat: 3, density: 2700, toughness: 18, structural: true, inside: 'broken', sound: 'marble', metal: 0, rough: 1 },
-  darkmarble:  { surf: 'darkmarble', repeat: 2.2, density: 2700, toughness: 18, structural: true, inside: 'broken', sound: 'marble', metal: 0, rough: 1 },
-  creammarble: { surf: 'creammarble', repeat: 3.5, density: 2700, toughness: 18, structural: true, inside: 'broken', sound: 'marble', metal: 0, rough: 1 },
-  mirror:      { surf: 'mirror', repeat: 1, density: 2500, toughness: 0.4, metal: 1, rough: 1, tint: 0xf0dcc0, sound: 'glass' },
+  marble:      { indoor: 0.45, surf: 'marble', repeat: 3, density: 2700, toughness: 18, structural: true, inside: 'broken', sound: 'marble', metal: 0, rough: 1 },
+  darkmarble:  { indoor: 0.45, surf: 'darkmarble', repeat: 2.2, density: 2700, toughness: 18, structural: true, inside: 'broken', sound: 'marble', metal: 0, rough: 1 },
+  creammarble: { indoor: 0.45, surf: 'creammarble', repeat: 3.5, density: 2700, toughness: 18, structural: true, inside: 'broken', sound: 'marble', metal: 0, rough: 1 },
+  mirror:      { indoor: 0.6, surf: 'mirror', repeat: 1, density: 2500, toughness: 0.4, metal: 1, rough: 1, tint: 0xf0dcc0, sound: 'glass' },
+  flag:        { surf: 'flag', repeat: 1, density: 300, toughness: 0.4, burns: 6, inside: 'fabric', sound: 'drywall' },
   glass:       { density: 2500, toughness: 0.4, sound: 'glass' },
   bronze:      { surf: 'bronze', repeat: 1, density: 2700, toughness: 40, metal: 0.6, sound: 'mullion' },
   steel:       { surf: 'metal', repeat: 1, density: 7800, toughness: 60, structural: true, metal: 0.8, sound: 'steel' },
   metal:       { surf: 'metal', repeat: 1, density: 1200, toughness: 6, metal: 0.7, sound: 'steel' },
-  brass:       { surf: 'brass', repeat: 1, density: 8500, toughness: 40, metal: 1, sound: 'brass' },
+  brass:       { indoor: 0.5, surf: 'brass', repeat: 1, density: 8500, toughness: 40, metal: 1, sound: 'brass' },
   wood:        { surf: 'wood', repeat: 1.2, density: 700, toughness: 2.2, burns: 30, inside: 'rawwood', splinters: true, sound: 'wood' },
   plaster:     { surf: 'plaster', repeat: 2, density: 900, toughness: 0.9, burns: 60, inside: 'gypsum', sound: 'drywall' },
   carpet:      { surf: 'carpet', repeat: 1.5, density: 400, toughness: 0.6, burns: 12, inside: 'carpet', sound: 'drywall' },
@@ -46,10 +47,10 @@ const KINDS = {
   screen:      { surf: 'plastic', repeat: 0.5, density: 900, toughness: 0.8, burns: 12, inside: 'plastic', sound: 'glass', emissive: 0x1c2a3a },
   lamp:        { density: 300, toughness: 0.5, sound: 'glass', light: true },
   // A home and a restaurant need a few things an office does not.
-  ceramic:     { surf: 'plaster', repeat: 0.8, density: 2300, toughness: 1.6, inside: 'gypsum', metal: 0, rough: 0.25, sound: 'glass' },
-  lacquer:     { surf: 'plastic', repeat: 0.6, density: 700, toughness: 2, burns: 25, inside: 'rawwood', splinters: true, rough: 0.2, tint: 0x0b0b0c, sound: 'wood' },
+  ceramic:     { indoor: 0.35, surf: 'plaster', repeat: 0.8, density: 2300, toughness: 1.6, inside: 'gypsum', metal: 0, rough: 0.25, sound: 'glass' },
+  lacquer:     { indoor: 0.4, surf: 'plastic', repeat: 0.6, density: 700, toughness: 2, burns: 25, inside: 'rawwood', splinters: true, rough: 0.2, tint: 0x0b0b0c, sound: 'wood' },
   linen:       { surf: 'fabric', repeat: 0.5, density: 250, toughness: 0.4, burns: 7, inside: 'fabric', tint: 0xf1ede4, sound: 'drywall' },
-  gold:        { surf: 'brass', repeat: 1, density: 12000, toughness: 40, metal: 1, rough: 0.6, tint: 0xffe08a, sound: 'brass' },
+  gold:        { indoor: 0.5, surf: 'brass', repeat: 1, density: 12000, toughness: 40, metal: 1, rough: 0.6, tint: 0xffe08a, sound: 'brass' },
 };
 
 // How many sledge blows a half-cubic-metre lump of each material takes before
@@ -57,7 +58,7 @@ const KINDS = {
 // size: a column takes about five, a plaster wall two, a desk one or two, a
 // steel beam a dozen. See damage/damage.js.
 const HITS = {
-  concrete: 3, marble: 3, darkmarble: 3, creammarble: 3, mirror: 0.6, roofing: 2.5, steel: 9, bronze: 6, brass: 6, gold: 6, metal: 3,
+  concrete: 3, marble: 3, darkmarble: 3, creammarble: 3, mirror: 0.6, flag: 0.5, roofing: 2.5, steel: 9, bronze: 6, brass: 6, gold: 6, metal: 3,
   wood: 1.5, plaster: 1.2, carpet: 1, fabric: 0.8, leather: 1, plastic: 1, paper: 0.8,
   soil: 1, leaves: 0.5, ceramic: 1.2, lacquer: 1.5, linen: 0.6, gastank: 2, transformer: 5,
   screen: 0.8, lamp: 0.3, glass: 1,
@@ -65,6 +66,14 @@ const HITS = {
 
 export const KIND = {};
 const _mats = new Map();
+
+// The environment polished indoor things reflect (scene.js makes it). Kinds
+// with `indoor` use it, at that strength, instead of the sky.
+let _interior = null;
+export function setInteriorEnvironment(tex) {
+  _interior = tex;
+  for (const [name, m] of _mats) if (KINDS[name]?.indoor) { m.envMap = tex; m.needsUpdate = true; }
+}
 
 function build(name, def, surf) {
   if (name === 'glass') {
@@ -93,6 +102,7 @@ function build(name, def, surf) {
     metalness: def.metal ?? 0,
     color: def.tint ?? 0xffffff,
   });
+  if (def.indoor && _interior) { m.envMap = _interior; m.envMapIntensity = def.indoor; }
   if (def.emissive) { m.emissive = new THREE.Color(def.emissive); m.emissiveIntensity = 1; }
   return m;
 }

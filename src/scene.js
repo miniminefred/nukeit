@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { setInteriorEnvironment } from './render/materials.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
@@ -56,6 +58,12 @@ export function createScene(renderer) {
   const env = pmrem.fromScene(envScene, 0.02).texture;
   scene.environment = env;
   scene.environmentIntensity = 0.14;
+  // Polished things indoors — marble floors, brass, mirror — reflect a room,
+  // not the sky: three's RoomEnvironment, warmed. Faked, but it is what keeps
+  // a cream marble floor cream instead of the grey-blue of the sky outside.
+  const room = new RoomEnvironment();
+  room.traverse((o) => { if (o.material?.color) o.material.color.multiply(new THREE.Color(1.0, 0.9, 0.76)); });
+  setInteriorEnvironment(pmrem.fromScene(room, 0.03).texture);
   scene.fog = new THREE.Fog(0x9fb3c8, 260, 1600);
   return scene;
 }

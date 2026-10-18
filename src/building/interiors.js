@@ -4,6 +4,7 @@ import * as F from './furniture.js';
 import * as H from './furniture-home.js';
 import * as E from './furniture-food.js';
 import * as W from './furniture-work.js';
+import * as L from './furniture-lobby.js';
 import {
   PODIUM_FLOORS, PENTHOUSE, HQ, LOWER, T, U, ATRIUM, podiumFront, inCore, inAtrium,
   TOWER_COLUMNS, PODIUM_COLUMNS, clearOf, floorUse,
@@ -70,24 +71,28 @@ const wall = (P, f, x0, z0, x1, z1) => block(P, 'plaster', x0, T(f), z0, x1, U(f
 const ESCALATORS = [{ f: 0, z0: -1.2, z1: 0 }, { f: 1, z0: 1.0, z1: 2.2 }, { f: 2, z0: -3.4, z1: -2.2 }, { f: 3, z0: 3.2, z1: 4.4 }];
 
 function escalator(P, e, y) {
+  // Dark aluminium treads, twenty risers of 20 cm from x = 16 up to x = 10.
   const steps = [];
   for (let n = 1; n <= 20; n++) {
     const x1 = 16 - (n - 1) * 0.3, x0 = x1 - 0.3, top = n * 0.2;
     steps.push([x0, top - 0.3, e.z0, x1, top, e.z1]);
   }
-  // The balustrades follow the pitch: a gold rail over a glass side each way.
-  const rails = [], sides = [];
-  for (let n = 0; n < 10; n++) {
-    const xa = 16 - n * 0.6, ya = n * 0.4;
-    for (const z of [e.z0 - 0.1, e.z1]) {
-      rails.push([xa - 0.6, ya + 0.9, z, xa, ya + 1.3, z + 0.1]);
-      sides.push([xa - 0.6, ya, z + 0.02, xa, ya + 0.9, z + 0.08]);
-    }
-  }
+  // Everything else runs on the pitch: through (13, 2), climbing 2/3 m per m
+  // towards -x. Brass trusses either side, glass on them, a black handrail on
+  // the glass, and the underside clad in mirror, as in the atrium photographs.
+  // The truss stops short of each end, so it never reaches down through the
+  // floor it stands on.
+  const k = -2 / 3, run = (y0, y1, z0, z1, xa = 10, xb = 16) => ({ shear: [xa, 2 + y0, z0, xb, 2 + y1, z1], k });
+  const za = e.z0 - 0.12, zb = e.z1 + 0.12;
   assembly(P, 0, y, 0, 0, [
-    { kind: 'brass', boxes: steps },
-    { kind: 'brass', boxes: rails },
-    { kind: 'glass', boxes: sides },
+    { kind: 'metal', boxes: steps, tint: 0x3a3b3d },
+    { kind: 'brass', boxes: [run(-0.45, 0.05, za, e.z0 - 0.02, 10.4, 15.6), run(-0.45, 0.05, e.z1 + 0.02, zb, 10.4, 15.6),
+      [16, 0, za, 16.7, 0.03, zb], [9.3, 4, za, 10, 4.03, zb]] },
+    { kind: 'glass', boxes: [run(0.05, 0.98, e.z0 - 0.085, e.z0 - 0.065), run(0.05, 0.98, e.z1 + 0.065, e.z1 + 0.085),
+      [16, 0.05, e.z0 - 0.085, 16.6, 0.98, e.z0 - 0.065], [16, 0.05, e.z1 + 0.065, 16.6, 0.98, e.z1 + 0.085]], tint: 0xdfe9ee },
+    { kind: 'plastic', round: 0.02, boxes: [run(0.98, 1.06, e.z0 - 0.12, e.z0 - 0.03), run(0.98, 1.06, e.z1 + 0.03, e.z1 + 0.12),
+      [16, 0.98, e.z0 - 0.12, 16.6, 1.06, e.z0 - 0.03], [16, 0.98, e.z1 + 0.03, 16.6, 1.06, e.z1 + 0.12]], tint: 0x0d0d0e },
+    { kind: 'mirror', boxes: [run(-0.49, -0.45, za, zb, 10.4, 15.6)] },
   ], 'stair', { floor: e.f, colliders: steps, structural: false });
 }
 
@@ -167,31 +172,78 @@ function lowerLevel(P, y) {
 // ---------------------------------------------------------------- the podium
 
 function lobby(P, y) {
-  F.receptionDesk(P, -9, y, 5.4, 0);
-  F.bench(P, 6, y, 9.5, 0);
-  F.bench(P, -14, y, 9.5, 0);
-  for (const x of [-17, 7.5]) F.plant(P, x, y, 10.8, true);
+  // As in the photographs: a cream marble floor polished to a mirror, the core
+  // and columns in dark veined stone (tower.js), brass round the lift doors, the
+  // monogrammed brass desk and a line of red rope before them, black steel
+  // benches along the glass, the great flags hung inside the front, and
+  // revolving doors under brass canopies.
+  const brass = (x0, y0, z0, x1, y1, z1) => block(P, 'brass', x0, y0, z0, x1, y1, z1, 'furniture', { floor: 0, structural: false });
+  brass(0.72, y, 3.54, 0.9, y + 2.4, 3.62);
+  brass(3.4, y, 3.54, 3.58, y + 2.4, 3.62);
+  brass(0.72, y + 2.4, 3.54, 3.58, y + 2.62, 3.62);
+  L.monogramDesk(P, -1.4, y, 5.0, 0);
+  L.stanchions(P, 2.15, y, 5.6, 0, 3, 1.25);
+  for (const x of [-16.5, -13.5, -10.5]) L.steelBench(P, x, y, 9.6, 0);
+  for (const x of [7.5, 10.5]) L.steelBench(P, x, y, 9.6, 0);
+  for (const x of [-6.2, 6.2]) L.flag(P, x, U(0), 11.7, 3.6, 2.0);
+  for (const x of [-17.5, 13]) F.plant(P, x, y, 10.8, true);
   F.plant(P, -5.8, y, 4.3, true);
   F.plant(P, 5.8, y, 4.3, true);
-  // The waterfall at the back of the atrium: a wall of pink marble eighteen
-  // metres high, the whole height of the public floors, with a sheet of water
-  // down it into a pool with a brass rim. Cladding, not structure: marble
-  // counts as load-bearing, and a decorative wall four storeys tall was
-  // quietly holding the whole podium up.
-  block(P, 'marble', 10.3, y, -6.95, 14.7, 18, -6.6, 'wall', { floor: 0, structural: false, tint: 0xe9b8a6 });
-  assembly(P, 12.5, y, -6.0, 0, [
-    { kind: 'brass', boxes: [[-2.25, 0, -0.6, 2.25, 0.55, -0.5], [-2.25, 0, 0.6, 2.25, 0.55, 0.7], [-2.25, 0, -0.6, -2.15, 0.55, 0.7], [2.15, 0, -0.6, 2.25, 0.55, 0.7]] },
+  // Two revolving doors in the opening, glass either side of them.
+  for (const x of [-1.4, 1.4]) L.revolvingDoor(P, x, y, 11.0);
+  for (const [x0, x1] of [[-0.52, 0.52], [2.28, 2.95], [-2.95, -2.28]])
+    block(P, 'glass', x0, y, 11.97, x1, U(0) - 0.05, 12.0, 'glass', { floor: 0, tint: 0xdfe6ea });
+  F.receptionDesk(P, -10, y, 5.4, 0);
+
+  // The atrium's back wall: rough blocks of pink marble at every depth, the
+  // whole height of the public floors, lit from their ledges, and water
+  // running down the face of them into a pool. Cladding fixed to a backing
+  // wall, not structure: a decorative wall four storeys tall once held the
+  // whole podium up.
+  block(P, 'marble', 10.3, y, -6.95, 14.7, 18, -6.8, 'wall', { floor: 0, structural: false, tint: 0xe2b09e });
+  steppedStone(P, 10.3, 14.7, y + 0.6, 18, -6.8);
+  block(P, 'glass', 10.35, y, -6.8, 14.65, y + 0.45, -5.3, 'furniture', { floor: 0, structural: false, tint: 0x9ec9d8 });
+  assembly(P, 12.5, y, -6.05, 0, [
+    { kind: 'brass', boxes: [[-2.25, 0, 0.65, 2.25, 0.55, 0.75], [-2.25, 0, -0.75, -2.15, 0.55, 0.75], [2.15, 0, -0.75, 2.25, 0.55, 0.75]] },
   ], 'furniture', { floor: 0 });
-  block(P, 'glass', 10.35, y, -6.6, 14.65, y + 0.45, -5.3, 'furniture', { floor: 0, structural: false, tint: 0x9ec9d8 });
-  block(P, 'glass', 10.4, y + 0.45, -6.6, 14.6, 17.9, -6.55, 'furniture', { floor: 0, structural: false, tint: 0xe4f2f8, tag: 'waterfall' });
-  F.chandelier(P, -3, U(0), 8);
-  F.chandelier(P, 3, U(0), 8);
-  // The café by the atrium.
+  block(P, 'glass', 10.6, y + 0.45, -6.33, 14.4, 17.9, -6.3, 'furniture', { floor: 0, structural: false, tint: 0xe4f2f8, tag: 'waterfall' });
+
+  // The café down in the atrium: white marble tables, black and white chairs.
+  for (const [x, z] of [[11.2, 2.3], [13.3, 2.5], [11.2, 4.7], [13.3, 4.9], [11.4, -3.6], [13.4, -3.8]]) {
+    L.marbleTable(P, x, y, z);
+    E.bistroChair(P, x - 0.62, y, z, HALF, 0x1a1a1a);
+    E.bistroChair(P, x + 0.62, y, z, -HALF, 0xe8e4dc);
+  }
   E.bar(P, 17.5, y, 4.5, -HALF, 3.2);
   for (const [x, z] of [[16.5, 9.5], [18.4, 7.5], [8.5, -9.5], [6.5, -9.8]]) {
-    E.cafeTable(P, x, y, z);
-    E.bistroChair(P, x - 0.6, y, z, HALF, 0x6a2a2a);
-    E.bistroChair(P, x + 0.6, y, z, -HALF, 0x6a2a2a);
+    L.marbleTable(P, x, y, z);
+    E.bistroChair(P, x - 0.6, y, z, HALF, 0x1a1a1a);
+    E.bistroChair(P, x + 0.6, y, z, -HALF, 0x1a1a1a);
+  }
+}
+
+// Rough stone blocks over a wall face at z = `face`, standing out of it towards
+// +z by 5 to 40 cm, in courses of uneven height. The same every time: seeded.
+function steppedStone(P, x0, x1, y0, y1, face) {
+  let seed = 41;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  let lamps = 0;
+  for (let y = y0; y < y1 - 0.2;) {
+    const h = Math.min(y1 - y, 0.5 + rnd() * 0.7);
+    for (let x = x0; x < x1 - 0.05;) {
+      const w = Math.min(x1 - x, 0.6 + rnd() * 1.1);
+      const d = 0.05 + rnd() ** 1.6 * 0.37;
+      const t = 0.9 + rnd() * 0.16;
+      const tint = new THREE.Color(0xe9b4a0).multiplyScalar(t).getHex();
+      block(P, 'marble', x + 0.01, y + 0.01, face, x + w - 0.01, y + h - 0.01, face + d, 'cladding', { floor: Math.max(0, Math.floor(y / 4)), structural: false, tint });
+      // A light along the top of the deeper ledges, washing the stone above.
+      if (d > 0.27 && lamps < 18 && w > 0.5) {
+        block(P, 'lamp', x + 0.15, y + h - 0.01, face + d - 0.1, x + w - 0.15, y + h + 0.02, face + d - 0.04, 'lamp', { floor: Math.max(0, Math.floor(y / 4)), structural: false });
+        lamps++;
+      }
+      x += w;
+    }
+    y += h;
   }
 }
 
@@ -291,6 +343,13 @@ function atriumRail(P, f, y) {
   rail([x1, z1], [x0, z1]);
   const up = ESCALATORS.find((e) => e.f === f - 1);
   if (up) { rail([x0, z1], [x0, up.z1 + 0.1]); rail([x0, up.z0 - 0.1], [x0, z0]); } else rail([x0, z1], [x0, z0]);
+  // The slab edges round the void are faced in mirror, as in the photographs.
+  const fy0 = f * 4 - 0.4, fy1 = y - 0.02;
+  block(P, 'mirror', x0, fy0, z1 - 0.02, x1, fy1, z1, 'cladding', { floor: f, structural: false });
+  block(P, 'mirror', x0, fy0, z0 + 0.38, x0 + 0.02, fy1, z1 - 0.02, 'cladding', { floor: f, structural: false });
+  block(P, 'mirror', x1 - 0.02, fy0, z0 + 0.38, x1, fy1, z1 - 0.02, 'cladding', { floor: f, structural: false });
+  // And a trough of tropical plants behind the glass on the south side.
+  if (f <= 3) L.planter(P, (x0 + x1) / 2, y, z1 + 0.32, x1 - x0 - 0.6);
 }
 
 // ---------------------------------------------------------------- offices
