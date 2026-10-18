@@ -189,9 +189,14 @@ export class Security {
         case 'enter': {
           // From the car across the pavement and in at the front doors; then
           // the first two search the lobby and the rest go up, a floor each.
-          const door = _w.set(a.id % 2 ? 1.4 : -1.4, T(0), 10.2);
+          // Straight to the front of a revolving door, then through it — no
+          // stepping round the glass beside it, which left them stuck outside.
+          const dx = a.id % 2 ? 1.4 : -1.4;
           a.state = 'running';
-          if (a.pos.distanceTo(door) > 1.2) this._go(a, door, COP_RUN * 0.8);
+          a.speed = COP_RUN * 0.8;
+          a.target ??= new THREE.Vector3();
+          if (a.pos.z > 13.4) a.target.set(dx, a.pos.y, 12.8);
+          else if (a.pos.z > 10.6) a.target.set(dx, T(0), 9.8);
           else { a.mode = 'search'; a.target = null; if (a.id > 1) this._toFloor(a, Math.min(TOP_FLOOR, a.id - 1)); }
           break;
         }
