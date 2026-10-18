@@ -600,7 +600,12 @@ function animate() {
   fpsMeter(dt);
   // Up to a tenth of a second per frame. It was a twentieth, so below 20 fps the
   // whole game ran in slow motion — falling, walking, collapsing all floated.
-  frame(Math.min(dt, 0.1));
+  // One system throwing must not leave the screen blank: the frame is drawn
+  // anyway, and the error reported once (it was a white screen once).
+  try { frame(Math.min(dt, 0.1)); } catch (e) {
+    if (!animate.failed) { animate.failed = true; console.error(e); }
+    try { post.composer.render(dt); } catch { /* nothing to draw */ }
+  }
 }
 openMenu();
 animate();

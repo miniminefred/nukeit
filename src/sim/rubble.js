@@ -126,8 +126,10 @@ export class Rubble {
     if (had) this.wake(p);
     this.flying.push({
       p,
-      v: vel ? vel.clone() : new THREE.Vector3(),
-      w: spin ? spin.clone() : new THREE.Vector3((Math.random() - 0.5), (Math.random() - 0.5), (Math.random() - 0.5)),
+      // Velocity and spin may come as vectors or as plain { x, y, z } (what a
+      // rigid body takes): copied either way.
+      v: vel ? new THREE.Vector3(vel.x, vel.y, vel.z) : new THREE.Vector3(),
+      w: spin ? new THREE.Vector3(spin.x, spin.y, spin.z) : new THREE.Vector3((Math.random() - 0.5), (Math.random() - 0.5), (Math.random() - 0.5)),
       floor: -Infinity,
       look: 0,
     });
