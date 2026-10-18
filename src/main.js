@@ -45,6 +45,15 @@ import { level as levelById } from './data/difficulty.js';
 //   done    -> the results, then back to the menu
 
 const renderer = createRenderer();
+// The graphics card can run out of memory (another heavy tab, another 3D app),
+// and the browser takes WebGL away. Say so, rather than leave the screen blank.
+renderer.domElement.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  const note = document.createElement('div');
+  note.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:999;background:#111c;color:#f2ece0;font:16px system-ui;text-align:center;padding:24px';
+  note.innerHTML = '<div><b style="font-size:20px">The graphics card ran out of memory</b><br><br>Close other tabs or 3D programs, then close the browser completely and open it again.<br>(Chrome blocks 3D for the page until it restarts.)</div>';
+  document.body.appendChild(note);
+});
 const scene = createScene(renderer);
 const camera = createCamera();
 const lights = createLights(scene);
