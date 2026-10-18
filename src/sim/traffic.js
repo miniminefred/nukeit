@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { BATCH_DEPTH } from '../render/materials.js';
 
 // Traffic on Fifth Avenue. It is one way, as the real one is: four lanes, all
 // heading the same way (−x here), yellow cabs, cars, buses and vans. They keep
@@ -9,8 +10,8 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 // the road — rubble, a fallen tower — stops them; something heavy landing on
 // one crushes it, and its alarm goes off.
 //
-// Each kind of vehicle is three instanced meshes (body, glass, wheels), so the
-// whole avenue is a dozen draw calls. The signals' lamps are drawn here, over
+// Every vehicle is drawn by three batched meshes — bodies, glass, wheels — so
+// the whole avenue is three draw calls. The signals' lamps are drawn here, over
 // the signal heads that building/street.js put on the kerbs.
 
 const LANES = [28.3, 31.8, 35.6, 39.2];
@@ -36,6 +37,13 @@ const YAW = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 
 // roof, the rear window, the boot — pushed out to its width with rounded
 // edges; its glass is the cabin's band of the same profile, a hair wider. Vans
 // and buses are rounded boxes with a band of windows. Never a block.
+function indexed(g) {
+  const n = g.attributes.position.count, idx = new Uint32Array(n);
+  for (let i = 0; i < n; i++) idx[i] = i;
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  return g;
+}
+
 function profile(points, w, bevel) {
   const g = new THREE.ExtrudeGeometry(new THREE.Shape(points.map(([z, y]) => new THREE.Vector2(z, y))), { depth: w - bevel * 2, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 4 });
   g.translate(0, 0, -(w - bevel * 2) / 2);
@@ -66,13 +74,30 @@ export class Traffic {
     this.cars = [];
     this.meshes = {};
     this.t = 0;
-    const paint = new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.5 });
-    const glass = new THREE.MeshStandardMaterial({ color: 0x1a2028, roughness: 0.05, metalness: 0.6 });
-    const rubber = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
-    for (const [name, k] of Object.entries(KINDS)) {
-      const g = shapes(k);
-      const mk = (geo, mat) => { const m = new THREE.InstancedMesh(geo, mat, COUNT); m.count = 0; m.castShadow = true; m.frustumCulled = false; scene.add(m); return m; };
-      this.meshes[name] = { body: mk(g.body, paint), glass: mk(g.glass, glass), wheels: mk(g.wheels, rubber) };
+    const mats = {
+      body: new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.5 }),
+      glass: new THREE.MeshStandardMaterial({ color: 0x1a2028, roughness: 0.05, metalness: 0.6 }),
+      wheels: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 }),
+    };
+    const geos = Object.fromEntries(Object.entries(KINDS).map(([name, k]) => [name, shapes(k)]));
+    this.geo = {};
+    for (const part of ['body', 'glass', 'wheels']) {
+      let v = 0, i = 0;
+      for (const g of Object.values(geos)) { v += g[part].attributes.position.count; i += g[part].index ? g[part].index.count : g[part].attributes.position.count; }
+      const b = new THREE.BatchedMesh(COUNT, v, i, mats[part]);
+      b._initColorsTexture();
+      b.customDepthMaterial = BATCH_DEPTH;
+      b.perObjectFrustumCulled = false;
+      b.sortObjects = false;
+      b.castShadow = true;
+      b.frustumCulled = false;
+      scene.add(b);
+      this.meshes[part] = b;
+      for (const [name, g] of Object.entries(geos)) {
+        const geo = g[part].index ? g[part] : indexed(g[part]);
+        for (const k of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(k)) geo.deleteAttribute(k);
+        (this.geo[name] ??= {})[part] = b.addGeometry(geo);
+      }
     }
     // The signals' lamps: red, amber, green, for the cars; and a walking figure light.
     this.lamp = new THREE.InstancedMesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }), 24);
@@ -90,7 +115,10 @@ export class Traffic {
       const kind = kinds[(Math.random() * kinds.length) | 0], k = KINDS[kind];
       const lane = (Math.random() * LANES.length) | 0;
       if (kind === 'bus' && lane === 0) continue;
-      this.cars.push({ kind, k, lane, x: X1 + Math.random() * (X0 - X1), v: k.speed * 0.8, colour: k.colours[(Math.random() * k.colours.length) | 0], crushed: 0, honk: 0, look: Math.random() });
+      const c = { kind, k, lane, x: X1 + Math.random() * (X0 - X1), v: k.speed * 0.8, colour: k.colours[(Math.random() * k.colours.length) | 0], crushed: 0, honk: 0, look: Math.random(), ids: {} };
+      for (const part of ['body', 'glass', 'wheels']) c.ids[part] = this.meshes[part].addInstance(this.geo[kind][part]);
+      this.meshes.body.setColorAt(c.ids.body, _c.set(c.colour));
+      this.cars.push(c);
     }
     this.cars.sort((a, b) => a.x - b.x);
   }
@@ -166,19 +194,11 @@ export class Traffic {
   }
 
   _draw() {
-    const n = {};
-    for (const name in this.meshes) n[name] = 0;
     for (const c of this.cars) {
-      const M = this.meshes[c.kind], i = n[c.kind]++;
       const squash = c.crushed ? 0.45 : 1;
       _m.compose(_v.set(c.x, 0, LANES[c.lane]), YAW, _s.set(1, squash, 1));
-      M.body.setMatrixAt(i, _m); M.glass.setMatrixAt(i, _m); M.wheels.setMatrixAt(i, _m);
-      M.body.setColorAt(i, _c.set(c.crushed ? 0x3a3530 : c.colour));
-    }
-    for (const name in this.meshes) {
-      const M = this.meshes[name];
-      for (const k of ['body', 'glass', 'wheels']) { M[k].count = n[name]; M[k].instanceMatrix.needsUpdate = true; }
-      if (M.body.instanceColor) M.body.instanceColor.needsUpdate = true;
+      for (const part of ['body', 'glass', 'wheels']) this.meshes[part].setMatrixAt(c.ids[part], _m);
+      if (c.crushed === 1) { c.crushed = 2; this.meshes.body.setColorAt(c.ids.body, _c.set(0x3a3530)); }
     }
     // The lamps of the signals still standing.
     const light = this.light;
@@ -208,8 +228,8 @@ export class Traffic {
   }
 
   clear() {
+    for (const c of this.cars) for (const part of ['body', 'glass', 'wheels']) this.meshes[part].deleteInstance(c.ids[part]);
     this.cars.length = 0;
-    for (const name in this.meshes) for (const k of ['body', 'glass', 'wheels']) this.meshes[name][k].count = 0;
     this.lamp.count = 0;
   }
 }

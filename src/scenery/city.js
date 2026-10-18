@@ -54,9 +54,11 @@ export function buildCity(scene, physics) {
   // with their blinds down, a cornice on top, and along the avenue shops at
   // street level under awnings.
   const styles = facadeStyles();
-  const shops = shopTexture();
   const rand = mulberry(7);
   const blocks = [];
+  const cornices = boxes(group, new THREE.MeshStandardMaterial({ color: 0xcfc6b4, roughness: 0.85 }), 200, true);
+  const awnings = boxes(group, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }), 120, true);
+  const fronts = [0, 1, 2, 3].map((k) => boxes(group, new THREE.MeshStandardMaterial({ map: shopfronts(mulberry(11 + k)), roughness: 0.5 }), 60, false));
   const tower = (x, z, w, d, h, tint, facing = 0) => {
     const st = styles[(rand() * styles.length) | 0];
     const tex = st.map.clone();
@@ -64,30 +66,23 @@ export function buildCity(scene, physics) {
     tex.repeat.set(Math.max(1, Math.round(w / 3)) / 4, Math.max(1, Math.round(h / 3.6)) / 4);
     tex.offset.set(rand(), rand());
     const mat = new THREE.MeshStandardMaterial({ color: st.glass ? 0xffffff : tint, map: tex, roughness: st.rough, metalness: st.metal });
-    const m = new THREE.Group();
-    const box = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    box.position.y = h / 2;
-    box.castShadow = box.receiveShadow = true;
-    m.add(box);
-    // A cornice: a stone band standing out round the top.
-    const cornice = new THREE.Mesh(new THREE.BoxGeometry(w + 0.8, 1.1, d + 0.8), corniceMat);
-    cornice.position.y = h - 0.55;
-    cornice.castShadow = true;
-    m.add(cornice);
-    // Shops along the avenue: a band of shop windows under a striped awning.
-    if (facing) {
-      const sm = new THREE.MeshStandardMaterial({ map: shopsFor(shops, w, rand), roughness: 0.5 });
-      const front = new THREE.Mesh(new THREE.BoxGeometry(w - 0.4, 4.2, 0.3), sm);
-      front.position.set(0, 2.1, facing * (d / 2 + 0.15));
-      const awn = new THREE.Mesh(new THREE.BoxGeometry(w - 1, 0.08, 1.6), new THREE.MeshStandardMaterial({ color: AWNINGS[(rand() * AWNINGS.length) | 0], roughness: 0.9 }));
-      awn.position.set(0, 3.6, facing * (d / 2 + 0.9));
-      awn.rotation.x = facing * 0.25;
-      awn.castShadow = true;
-      m.add(front, awn);
-    }
-    m.position.set(x, 0, z);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, h / 2, z);
+    m.castShadow = m.receiveShadow = true;
     group.add(m);
+    // Its cornice, awning and shopfront are instances in the city's shared
+    // meshes (one draw call each for the whole city), hidden when it wakes.
+    const extras = [];
+    extras.push([cornices, cornices.add(x, h - 0.55, z, w + 0.8, 1.1, d + 0.8)]);
+    if (facing) {
+      extras.push([fronts[(rand() * fronts.length) | 0], null]);
+      const f = extras[1][0];
+      extras[1][1] = f.add(x, 2.1, z + facing * (d / 2 + 0.15), w - 0.4, 4.2, 0.3);
+      extras.push([awnings, awnings.add(x, 3.6, z + facing * (d / 2 + 0.9), w - 1, 0.08, 1.6, facing * 0.25, AWNINGS[(rand() * AWNINGS.length) | 0])]);
+    }
     const block = { role: 'city', id: blocks.length, x, z, w, d, h, tint, mesh: m, collider: null, built: false };
+    // Shown as a box, or not (woken into a building of pieces: world.js).
+    block.show = (on) => { m.visible = on; for (const [set, i] of extras) set.show(i, on); };
     block.solid = () => {
       if (!physics || block.collider) return;
       const c = physics.world.createCollider(
@@ -99,7 +94,6 @@ export function buildCity(scene, physics) {
     block.solid();
     blocks.push(block);
   };
-  const corniceMat = new THREE.MeshStandardMaterial({ color: 0xcfc6b4, roughness: 0.85 });
 
   const tints = [0xb9b2a6, 0x9ea3a8, 0xc7b89c, 0x8f9499, 0xa89586];
   // Along our side of the avenue, left and right of the plot.
@@ -188,11 +182,11 @@ function facadeStyles() {
   ];
 }
 
-// Shopfronts: a sign band over big windows. Made-up shops, no real names.
+// Shopfronts: a sign band over big windows, four shops wide, in four variants.
+// Made-up shops, no real names.
 const SHOPS = ['DELI', 'BOOKS', 'CAFE', 'SHOES', 'FLOWERS', 'BANK', 'PHARMACY', 'BAKERY', 'TAILOR', 'GALLERY', 'NEWS', 'PIZZA'];
-function shopTexture() { return { cache: new Map() }; }
-function shopsFor(shops, w, rand) {
-  const n = Math.max(1, Math.round(w / 7));
+function shopfronts(rand) {
+  const n = 4;
   const c = document.createElement('canvas');
   c.width = 128 * n; c.height = 80;
   const g = c.getContext('2d');
@@ -214,6 +208,34 @@ function shopsFor(shops, w, rand) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
+}
+
+// Unit boxes as instances of one mesh: `add` places one (size, tilt about x,
+// colour) and returns its index, `show` hides or shows it.
+function boxes(group, material, max, shadow) {
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, max);
+  mesh.count = 0;
+  mesh.castShadow = shadow;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+  const mats = [];
+  const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
+  return {
+    add(x, y, z, w, h, d, tilt = 0, colour = null) {
+      const i = mesh.count++;
+      _m.compose(new THREE.Vector3(x, y, z), _q.setFromEuler(_e.set(tilt, 0, 0)), new THREE.Vector3(w, h, d));
+      mats[i] = _m.clone();
+      mesh.setMatrixAt(i, _m);
+      if (colour !== null) mesh.setColorAt(i, new THREE.Color(colour));
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+      return i;
+    },
+    show(i, on) {
+      mesh.setMatrixAt(i, on ? mats[i] : _m.makeScale(0, 0, 0));
+      mesh.instanceMatrix.needsUpdate = true;
+    },
+  };
 }
 
 function mulberry(seed) {

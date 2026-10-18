@@ -24,7 +24,7 @@ export function createWorld(scene, physics) {
     wakeBlock(b) {
       if (b.built) return null;
       b.built = true;
-      b.mesh.visible = false;
+      b.show(false);
       if (b.collider) { physics.removeCollider(b.collider); b.collider = null; }
       const storeys = Math.max(2, Math.round(b.h / 3.6));
       const added = this.addBuilding((P) => buildBlock(P, {
@@ -81,7 +81,7 @@ export function createWorld(scene, physics) {
     unload() {
       pieces.clear();
       // The city stands again, as boxes.
-      for (const b of woken) { b.built = false; b.mesh.visible = true; b.solid(); }
+      for (const b of woken) { b.built = false; b.show(true); b.solid(); }
       woken.length = 0;
     },
   };
