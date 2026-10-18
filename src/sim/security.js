@@ -150,8 +150,8 @@ export class Security {
       }
       // Just thrown out: they let you go for a few seconds.
       const sees = this.time > this.grace && this._sees(a, eye);
-      // Seen at it — by a guard or an officer — and the police know who to look for.
-      if (sees && this.time - this.lastBlow < 4) this.spotted = this.time;
+      // Seen at it — by a guard or an officer — and everyone knows who to look for.
+      if (sees && this.time - this.lastBlow < 1.5) this.spotted = this.time;
       // An officer seeing someone who looks like they belong has seen nobody.
       const noticed = sees && (a.kind !== 'cop' || this.time - this.spotted < 60 || this.fx.armed?.());
       if (noticed) { a.seen = this.time; a.last = player.pos.clone(); }
@@ -164,15 +164,15 @@ export class Security {
       }
       const dist = a.pos.distanceTo(player.pos);
       // Seen breaking things, or come looking and found you: after you.
-      // A guard goes for you if it sees you breaking things, or came looking.
-      // An officer only if you have been seen doing it, or you are walking
-      // about with a sledgehammer: otherwise you are just someone in a building.
-      const suspect = a.kind === 'cop'
-        ? this.time - this.spotted < 60 || this.fx.armed?.()
-        : this.time - this.lastBlow < 4 || a.mode !== 'patrol';
-      if (noticed && suspect) {
+      // Nobody lays a hand on you unless someone has seen you break something.
+      // Walking about with a sledgehammer gets you followed and watched, and
+      // asked to put it down; otherwise you are just someone in a building.
+      const witnessed = this.time - this.spotted < 60;
+      if (noticed && witnessed) {
         if (a.mode !== 'chase') { a.mode = 'chase'; this._call(a); }
-      }
+      } else if (noticed && this.fx.armed?.() && a.mode !== 'chase') a.mode = 'watch';
+      if (a.mode === 'chase' && !witnessed) a.mode = a.kind === 'cop' ? 'search' : 'look';
+      if (a.mode === 'watch' && (!this.fx.armed?.() || this.time - a.seen > 8)) a.mode = a.kind === 'cop' ? 'search' : 'patrol';
       if (a.mode === 'chase' && this.time - a.seen > (a.kind === 'cop' ? 10 : 7)) a.mode = 'look';
       if (a.mode === 'look' && a.last && a.pos.distanceTo(a.last) < 1) { a.mode = a.kind === 'cop' ? 'search' : 'patrol'; a.last = null; }
       // Off on another floor: the police follow by the stairs; a guard stays and radios.
@@ -187,6 +187,12 @@ export class Security {
         case 'search': this._wander(a, null, WALK * 1.3, dt); break;
         case 'look': if (a.last) this._go(a, a.last, GUARD_RUN * 0.7); break;
         case 'chase': this._chase(a, dist, sees, dt); break;
+        case 'watch':
+          // Keeping an eye on you, a few metres off, and asking you nicely.
+          a.state = 'calm';
+          if (dist > 4) this._go(a, player.pos, WALK * 1.6); else { a.target = null; this._face(a, player.pos); }
+          if ((a.shout -= dt) <= 0) { a.shout = 7; this.fx.hud?.flash(a.kind === 'cop' ? 'Police: "Sir, put the hammer down."' : 'Security: "Please put the hammer away."', 2); }
+          break;
       }
     }
     // A heap of officers on you: hold it a moment, then the job is over.

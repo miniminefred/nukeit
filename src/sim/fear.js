@@ -50,6 +50,11 @@ const LINES = [
     'Alarms, running, shouting — {z} is in chaos.', 'Crowds on the pavement stare up at the tower.', 'Nobody is buying anything now.'],
 ];
 
+// When the tower is badly broken, or has emptied.
+const WRECK = ['Half the tower is gone. Nobody stays to watch from inside.', 'Dust hangs where {z} used to be.', 'Sirens all over Midtown. The tower is coming apart.',
+  'People who got out stand on Fifth Avenue, staring up.', 'What is left of {z} creaks and groans.', 'The last stragglers run from {z}.'];
+const EMPTY = ['The tower stands empty.', 'Everyone is out. Only the alarms are left inside.', 'Not a soul left in the building.', 'The crowds watch from across the avenue.'];
+
 export class Fear {
   constructor(fx) {
     this.fx = fx;                // { people, fire, smoke, water, security, audio, player, tools }
@@ -74,7 +79,23 @@ export class Fear {
     this.el = { root: el, band: el.querySelector('[data-band]'), fill: el.querySelector('[data-fill]'), line: el.querySelector('[data-line]') };
   }
 
-  reset() { this.zone.fill(0); this.level = 0; this.quiet = 0; this._lineT = 0; this._pa = 30; this._fires = 0; }
+  reset() {
+    this.zone.fill(0); this.level = 0; this.quiet = 0; this._lineT = 0; this._pa = 30; this._fires = 0;
+    this.whole = null; this.wreck = 0; this._wreckT = 0;
+  }
+
+  // How much of the tower's structure is gone, 0..1, looked at now and then.
+  _wrecked(dt) {
+    if ((this._wreckT -= dt) > 0) return this.wreck;
+    this._wreckT = 2;
+    const P = this.fx.pieces;
+    if (!P) return 0;
+    let n = 0;
+    for (const p of P.inBuilding('tower')) if ((p.structural || p.role === 'slab') && p.state === 'static') n++;
+    this.whole ??= n;
+    this.wreck = this.whole ? 1 - n / this.whole : 0;
+    return this.wreck;
+  }
 
   // Something frightening at `at`: `amount` of fear, more the more people are near.
   scare(at, amount, spread = 0.25) {
@@ -110,9 +131,12 @@ export class Fear {
       this.fx.hud?.flash('"Please remain calm. Everything is under control."', 3.5);
       if (this.quiet > 4) this.calm(8);
     }
-    // The meter is the most frightened part of the tower, and a share of the rest.
+    // The meter is the most frightened part of the tower, and a share of the
+    // rest — and never calm in a tower that is falling to pieces: a tenth of it
+    // gone is nervous, a quarter scared, a third and more panic.
     const max = Math.max(...this.zone), mean = this.zone.reduce((a, b) => a + b, 0) / this.zone.length;
-    this.level = Math.min(100, max * 0.7 + mean * 0.3);
+    const wreck = this._wrecked(dt);
+    this.level = Math.min(100, Math.max(max * 0.7 + mean * 0.3, Math.min(100, wreck * 250)));
     // The line under it, now and then — and at once when the mood changes.
     this._lineT -= dt;
     if (band(this.level) !== this._band) { this._band = band(this.level); this._lineT = 0; }
@@ -120,7 +144,8 @@ export class Fear {
       this._lineT = 6;
       let hi = 0, lo = 0;
       this.zone.forEach((v, i) => { if (v > this.zone[hi]) hi = i; if (v < this.zone[lo]) lo = i; });
-      const list = LINES[band(this.level)];
+      const empty = (this.fx.people?.list ?? []).every((p) => p.state === 'gone' || p.agent || p.street);
+      const list = empty && this.wreck > 0.05 ? EMPTY : this.wreck > 0.3 ? WRECK : LINES[band(this.level)];
       const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
       this.line = list[(Math.random() * list.length) | 0].replace(/\{z\}/g, ZONES[hi].name).replace(/\{q\}/g, cap(ZONES[lo].name)).replace(/^(\w)/, (m) => m.toUpperCase());
     }

@@ -44,7 +44,11 @@ const ADJACENT = 6.2;        // m: a support beside this one — a bay away, not
 // is three lost beside a column; a core wall, stiffer and tied in, five.
 const chainAt = (role) => (role === 'core' ? 5 : 3);
 
-const PANCAKE = 80;          // pieces: more than this falls together, cheaply
+const PANCAKE = 24;          // slabs and supports: more than this falls together, cheaply
+// Counted in structure only. Counted in pieces, a single bay of a fitted shop
+// floor — its walls, shelves, stock and tables — passed the mark, and one
+// failed bay dropped as a pancake through every floor under it.
+const heavy = (list) => { let n = 0; for (const p of list) if (p.structural || p.role === 'slab') n++; return n; };
 const G = 9.81 * 0.72;       // progressive collapse runs at about 0.7 g
 const _c = new THREE.Vector3(), _v2 = new THREE.Vector3();
 const _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
@@ -235,7 +239,8 @@ export class Structure {
       const was = this.all ? null : [...this.which];
       this.all = false;
       this.which.clear();
-      if (loose.length > PANCAKE) this._pancake(loose);
+      const big = heavy(loose) > PANCAKE;
+      if (big) this._pancake(loose);
       else for (const p of loose) {
         // A slab hangs a moment, groaning and shedding dust, before it goes;
         // everything else just falls.
@@ -249,7 +254,7 @@ export class Structure {
         } else this.pieces.makeDynamic(p, undefined, undefined, { quiet: true });
       }
       if (loose.length) this._wakeRubble(loose);
-      if (loose.length && loose.length <= PANCAKE) {                     // what they carried may go next
+      if (loose.length && !big) {                     // what they carried may go next
         if (was) for (const b of was) this.mark(b); else this.mark();
       }
     }

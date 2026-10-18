@@ -172,7 +172,7 @@ let thrownT = -1;
 // How scared the people in the tower are (sim/fear.js).
 let lounging = false;
 const fear = new Fear({
-  people, fire, smoke, water, security, audio, player, hud,
+  people, fire, smoke, water, security, audio, player, hud, pieces,
   // Running at people with the sledgehammer.
   chasing: () => tools[current]?.id === 'sledge' && Math.hypot(player.vel.x, player.vel.z) > 5 && people.crowdAt(player.pos, 5) > 0.1,
   lounge: () => lounging,
