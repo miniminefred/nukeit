@@ -27,7 +27,11 @@ const HEAR = 26;                  // m: a blast this close sends people running
 const STEPS = 4;                  // m: how far ahead they check the way is clear
 const PER = { leg: 2, arm: 2, hand: 2, shoe: 2, shin: 2 };    // of each part a figure has; one of the rest
 const STREET = 26;
-const MAX_PEOPLE = 300;
+const MAX_PEOPLE = 420;           // the instanced meshes are made for this many
+const CIVILIANS = 330;            // at most this many in the building and on the street;
+                                  // the rest of the room is for guards and police. Past what
+                                  // the meshes hold, the overflowing parts are not drawn at
+                                  // all — the figures came apart into floating eyes.
 const MARKS = 120;
 
 // A cartoon "!" in a white bubble.
@@ -128,7 +132,7 @@ export class People {
     // the shelves, sitting at the café tables.
     const want = { staff: 1, queue: 0.6, browse: 0.5, seat: 0.45 };
     for (const pl of places.list) {
-      if (Math.random() > want[pl.kind] || this.list.length >= MAX_PEOPLE) continue;
+      if (Math.random() > want[pl.kind] || this.list.length >= CIVILIANS) continue;
       const p = this._spawn(0, false, new THREE.Vector3(pl.x, pl.y, pl.z));
       if (!p) continue;
       p.agent = true; p.yaw = pl.yaw; p.sitting = pl.kind === 'seat'; p.post = pl.kind;
@@ -183,14 +187,16 @@ export class People {
   // Drawn like everyone else; it falls when its floor goes, and otherwise goes
   // where it is told: `target`, `speed`, `state` ('calm' | 'running' | 'down').
   agent(f, at, colours, height = 1) {
+    // A figure that has gone frees its slot for a new one.
+    let i = this.list.findIndex((q) => q.state === 'gone');
+    if (i < 0 && this.list.length >= MAX_PEOPLE) i = this.list.findIndex((q) => !q.agent);
     const p = {
       f, pos: at.clone(), yaw: 0, target: null, wait: 0, phase: 0, speed: WALK, vy: 0, floorY: at.y,
       look: 0, state: 'calm', t: 0, height, shirt: 0xf2f0ea, woman: false, agent: true, armUp: 0, capped: true,
       colours: { ...colours, hand: colours.head, shoe: 0x0c0c0c, eyes: 0x1c1a18, cap: colours.hair, long: colours.hair, shin: colours.leg },
     };
     colours = p.colours;
-    const i = this.list.length;
-    this.list.push(p);
+    if (i < 0) { i = this.list.length; this.list.push(p); } else this.list[i] = p;
     for (const k in this.mesh) {
       const per = PER[k] ?? 1;
       for (let j = 0; j < per; j++) this.mesh[k].setColorAt(i * per + j, _c.set(colours[k] ?? 0x222222));
@@ -271,6 +277,11 @@ export class People {
     for (const p of this.list) {
       if (p.state === 'gone') continue;
       p.t += dt;
+      if (p.stairT > 0) {
+        p.stairT -= dt;
+        if (p.stairT <= 0) { p.hidden = false; p.f = 0; p.pos.set(-3.3 + Math.random() * 0.6, 0.3, 4.6); p.floorY = 0.3; p.wait = 0; }
+        continue;
+      }
       for (const a of alarms) {
         const d = p.pos.distanceTo(a.at);
         if (d < a.r && p.state !== 'down') {
@@ -288,7 +299,7 @@ export class People {
       // A building in a panic: everyone picks what they do — most make for the
       // exits, some hide, some crowd round the lifts, a few film it.
       if (this.fear > 75 && p.state !== 'down') {
-        if (!p.panic) { const r = Math.random(); p.panic = r < 0.55 ? 'exit' : r < 0.7 ? 'hide' : r < 0.85 ? 'lifts' : 'film'; p.target = null; p.wait = Math.random() * 0.8; }
+        if (!p.panic) { const r = Math.random(); p.panic = r < 0.55 ? 'exit' : r < 0.7 ? 'hide' : r < 0.85 ? 'lifts' : 'film'; p.target = null; p.wait = Math.random() * 6; }
         if (this._panic(p, dt)) continue;
       } else if (p.panic && this.fear < 50) { p.panic = null; p.hide = false; p.handsUp = false; }
       // Watching you break things: face it, maybe film it, step back if close.
@@ -362,7 +373,15 @@ export class People {
     else goal = p.f === 0 ? _w.set((p.phase % 3) - 1.5, y, 13.5) : _w.set(-3.3, y, 4.4);   // the front doors; the stair door
     const to = _v.copy(goal).sub(p.pos).setY(0), d = to.length();
     if (d < 0.5) {
-      if (p.panic === 'exit') { p.state = 'gone'; this.evacuated = (this.evacuated ?? 0) + 1; }
+      if (p.panic === 'exit') {
+        if (p.f !== 0) { p.hidden = true; p.stairT = 2.5 * Math.abs(p.f) + Math.random() * 2; }     // into the stairwell, and down
+        else {
+          // Out of the front doors: across the avenue to watch from the far pavement.
+          p.street = true; p.side = 1; p.watchTower = true; p.panic = null; p.handsUp = false;
+          p.pos.set(p.pos.x, 0.003, 14); p.floorY = 0;
+          this.evacuated = (this.evacuated ?? 0) + 1;
+        }
+      }
       else { p.armUp = Math.sin(p.t * 8) > 0 ? 1 : 0.3; p.target = null; }       // pressing the lift button, again and again
       return true;
     }
@@ -381,6 +400,25 @@ export class People {
   // up, and film, when a building is coming down.
   _pavement(p, dt) {
     if (p.state === 'down') { if (p.t > 6) p.state = 'gone'; return; }
+    if (p.watchTower) {
+      // Got out: across the avenue to a spot on the far pavement, then turn and
+      // watch the tower — some of them filming it.
+      p.spot ??= new THREE.Vector3(-14 + Math.random() * 28, 0.003, 44.5 + Math.random() * 3);
+      const to = _v.copy(p.spot).sub(p.pos).setY(0), d = to.length();
+      if (d > 0.4) {
+        to.divideScalar(d);
+        p.yaw = Math.atan2(to.x, to.z);
+        p.pos.addScaledVector(to, Math.min(d, (d > 6 ? RUN : WALK) * dt));
+        p.phase += dt * 6;
+        p.target = p.spot;
+      } else {
+        p.target = null;
+        p.yaw = Math.atan2(0 - p.pos.x, 0 - p.pos.z);
+        p.filming ??= Math.random() < 0.45;
+        p.armUp = p.filming ? 1 : 0;
+      }
+      return;
+    }
     const running = p.state === 'running';
     if (running && p.t > 12) p.state = 'calm';
     if (running && p.from) p.dir = p.pos.x > p.from.x ? 1 : -1;
