@@ -5,7 +5,8 @@ import { addSplinters } from './splinters.js';
 import { crack as crackGlass, shatter } from './glass.js';
 import { crack } from './cracks.js';
 import { insideMaterial } from '../render/materials.js';
-import { box } from '../render/geometry.js';
+import { box, worldUVs } from '../render/geometry.js';
+import { birdcage, bentBars, wallBars } from './rebar.js';
 
 // What a blow does to the thing it lands on.
 //
@@ -306,41 +307,98 @@ export class Damage {
     return p.kind;
   }
 
-  // A column or a length of core wall gives way. The middle goes to rubble, a
-  // short stub stays standing with its bars sticking out of it, and the slab
-  // above has lost one of the things holding it up.
+  // A column or a length of core wall gives way. A short stub stays standing
+  // at its foot and another hangs on under the slab it carried, both with
+  // their bars sticking out; between them it goes one of the two ways
+  // reinforced concrete goes:
+  //
+  //  * it **bursts**: the concrete falls out of the cage in lumps, and the bars
+  //    are left bowed outward between the stubs, a birdcage;
+  //  * it **shears**: it splits along a steep diagonal, and the top slides off
+  //    down the slope of the break while the bottom stands with its sloping face.
   fail(p, point, dir, { soon = false } = {}) {
     const { particles, audio } = this.fx;
     const b = p.box.clone();
     const size = b.getSize(new THREE.Vector3());
     audio?.impact(point.x, point.y, point.z, 0.8);
+    audio?.snap?.(point.x, point.y, point.z, 1);
     const stubH = Math.min(0.5, size.y * 0.15);
     const kindName = p.kind.name;
     const P = this.pieces;
-    // The stub.
+    const column = p.role === 'column';
+    // The stub at its foot.
     const sc = new THREE.Vector3((b.min.x + b.max.x) / 2, b.min.y + stubH / 2, (b.min.z + b.max.z) / 2);
     P.spawn({ parts: [{ kind: kindName, geometry: box(size.x, stubH, size.z, sc) }], pos: sc, role: 'stub', floor: p.floor, structural: false });
-    // Rebar, bent.
-    if (p.role === 'column') {
-      for (const [ox, oz] of [[-0.28, -0.28], [0.28, -0.28], [-0.28, 0.28], [0.28, 0.28]]) {
-        const len = 0.6 + Math.random() * 0.9;
-        const g = new THREE.CylinderGeometry(0.012, 0.012, len, 5);
-        g.translate(0, len / 2, 0);
-        g.rotateX((Math.random() - 0.5) * 0.7);
-        g.rotateZ((Math.random() - 0.5) * 0.7);
-        const at = new THREE.Vector3(sc.x + ox * size.x / 0.8, b.min.y + stubH, sc.z + oz * size.z / 0.8);
-        P.spawn({ parts: [{ kind: 'steel', geometry: g, tint: 0x5a3a2a }], pos: at, role: 'rebar', floor: p.floor, structural: false });
-      }
+    // And under what it carried, if that is still there: a short length of it
+    // left hanging on to the slab, bars pointing down out of it.
+    const above = (p.carries ?? []).find((q) => q.state === 'static' && q.role === 'slab');
+    const topH = above ? Math.min(0.35, size.y * 0.1) : 0;
+    if (above) {
+      const tc = new THREE.Vector3(sc.x, b.max.y - topH / 2, sc.z);
+      const top = P.spawn({ parts: [{ kind: kindName, geometry: box(size.x * 0.99, topH, size.z * 0.99, tc) }], pos: tc, role: 'stub', floor: p.floor, structural: false }, { free: true });
+      P._addFixedCollider(top);
+      this.fx.hang?.(top, above);
     }
-    // The rest breaks into irregular lumps along rough planes — never blocks.
-    const top = b.min.y + stubH;
-    const mc = new THREE.Vector3(sc.x, (top + b.max.y) / 2, sc.z);
+    const lo = b.min.y + stubH, hi = b.max.y - topH;
+    const mc = new THREE.Vector3(sc.x, (lo + hi) / 2, sc.z);
+    const steel = (g, at, hang) => {
+      if (!g) return null;
+      const r = P.spawn({ parts: [{ kind: 'steel', geometry: g, tint: 0x6a4632 }], pos: at, role: 'rebar', floor: p.floor, structural: false }, hang ? { free: true } : {});
+      if (hang) { P._addFixedCollider(r); this.fx.hang?.(r, above); }
+      return r;
+    };
+    const burst = column && Math.random() < 0.5;
+    if (column && burst) {
+      // The cage, bowed, from stub to stub.
+      steel(birdcage(size.x, size.z, lo - mc.y, hi - mc.y), mc, false);
+    } else if (column) {
+      steel(bentBars(size.x, size.z, 0, 1), new THREE.Vector3(sc.x, lo, sc.z), false);
+      if (above) steel(bentBars(size.x, size.z, 0, -1), new THREE.Vector3(sc.x, hi, sc.z), true);
+    } else {
+      // A wall: its bars along its length, out of the broken edges.
+      const along = size.x >= size.z;
+      const g = wallBars(along ? size.x : size.z, along ? size.z : size.x, 0, 1);
+      if (g && !along) g.rotateY(Math.PI / 2);
+      steel(g, new THREE.Vector3(sc.x, lo, sc.z), false);
+    }
     P.destroy(p);
-    const middle = P.spawn({ parts: [{ kind: kindName, geometry: box(size.x * 0.97, b.max.y - top - 0.02, size.z * 0.97, mc) }], pos: mc, role: 'fragment', floor: p.floor, structural: false });
-    if (soon) this.fractureSoon(middle, point, dir, 2, 3);
-    else this.fracture(middle, point, dir, 2, 3);
-    for (let i = 0; i < 40; i++) particles.spawn('dust', sc.x, top + Math.random() * size.y, sc.z, (Math.random() - 0.5) * 3, Math.random(), (Math.random() - 0.5) * 3, 0xb8b2a8);
-    this.fx.chips.burst('concrete', new THREE.Vector3(sc.x, top + 0.5, sc.z), dir, 60, 3, 0.05);
+    const h = hi - lo - 0.02;
+    if (column && !burst && h > 0.8) {
+      // Shear: two wedges along a break at 50-65 degrees across the wider face.
+      const wide = size.x >= size.z, w = (wide ? size.x : size.z) * 0.97, d = (wide ? size.z : size.x) * 0.97;
+      const rise = Math.min(h * 0.7, w * Math.tan((50 + Math.random() * 15) * Math.PI / 180)) * (Math.random() < 0.5 ? 1 : -1);
+      const yc = (Math.random() - 0.5) * (h - Math.abs(rise)) * 0.6;
+      const wedge = (pts) => {
+        const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(([u, y]) => new THREE.Vector2(u, y))), { depth: d, bevelEnabled: false });
+        g.translate(0, 0, -d / 2);
+        if (!wide) g.rotateY(Math.PI / 2);
+        g.computeBoundingBox();
+        const c = g.boundingBox.getCenter(new THREE.Vector3());
+        g.translate(-c.x, -c.y, -c.z);
+        g.computeVertexNormals();
+        const n = g.attributes.position.count, idx = new Uint32Array(n);
+        for (let i = 0; i < n; i++) idx[i] = i;
+        if (!g.index) g.setIndex(new THREE.BufferAttribute(idx, 1));
+        const at = c.add(mc);
+        worldUVs(g, at);
+        return { g, at };
+      };
+      const lower = wedge([[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, yc - rise / 2], [-w / 2, yc + rise / 2]]);
+      const upper = wedge([[-w / 2, yc + rise / 2], [w / 2, yc - rise / 2], [w / 2, h / 2], [-w / 2, h / 2]]);
+      P.spawn({ parts: [{ kind: kindName, geometry: lower.g }], pos: lower.at, role: 'fragment', floor: p.floor, structural: false });
+      // Down the slope of the break.
+      const downhill = new THREE.Vector3(wide ? -Math.sign(rise) : 0, 0, wide ? 0 : Math.sign(rise));
+      P.spawn({ parts: [{ kind: kindName, geometry: upper.g }], pos: upper.at, role: 'fragment', floor: p.floor, structural: false, hull: true },
+        { dynamic: true, vel: downhill.multiplyScalar(1.5).add(new THREE.Vector3(0, -1, 0)), spin: { x: (Math.random() - 0.5), y: 0, z: (Math.random() - 0.5) }, debris: true });
+    } else {
+      // Burst (or a wall): the concrete comes out in irregular lumps, never blocks.
+      const middle = P.spawn({ parts: [{ kind: kindName, geometry: box(size.x * 0.97, h, size.z * 0.97, mc) }], pos: mc, role: 'fragment', floor: p.floor, structural: false });
+      const out = burst ? new THREE.Vector3(Math.random() - 0.5, -0.2, Math.random() - 0.5).normalize() : dir;
+      if (soon) this.fractureSoon(middle, point, out, burst ? 3 : 2, 3);
+      else this.fracture(middle, point, out, burst ? 3 : 2, 3);
+    }
+    for (let i = 0; i < 50; i++) particles.spawn('dust', sc.x, lo + Math.random() * size.y, sc.z, (Math.random() - 0.5) * 3, Math.random(), (Math.random() - 0.5) * 3, 0xb8b2a8);
+    this.fx.chips.burst('concrete', new THREE.Vector3(sc.x, lo + 0.5, sc.z), dir, 70, 3, 0.05);
     this.fx.cloud?.(mc, 1.2);
     this.fx.onFailed?.(p);
     this.onStructure?.();

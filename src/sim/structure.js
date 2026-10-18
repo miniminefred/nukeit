@@ -46,7 +46,8 @@ const chainAt = (role) => (role === 'core' ? 5 : 3);
 
 const PANCAKE = 80;          // pieces: more than this falls together, cheaply
 const G = 9.81 * 0.72;       // progressive collapse runs at about 0.7 g
-const _c = new THREE.Vector3();
+const _c = new THREE.Vector3(), _v2 = new THREE.Vector3();
+const _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
 
 export class Structure {
   constructor(pieces, fx) {
@@ -136,7 +137,12 @@ export class Structure {
         crack(this.pieces, p, at, side, 1.2 + Math.random());
       }
       this.fx.audio?.creak?.(c.x, c.y, c.z);
-      this.warnings.push({ p, t: WARN + Math.random() * 0.4 });
+      // The crack it will go along: up a face at a slant, from about a third of
+      // the way up, drawn a step at a time while it holds.
+      const face = new THREE.Vector3(...[[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]][(Math.random() * 4) | 0]);
+      const path = { face, at: p.box.clampPoint(c.clone().addScaledVector(face, 2).setY(p.box.min.y + (p.box.max.y - p.box.min.y) * (0.25 + Math.random() * 0.2)), new THREE.Vector3()),
+        step: new THREE.Vector3(face.z, 0, -face.x).multiplyScalar((Math.random() < 0.5 ? -1 : 1) * 0.18).setY(0.32), n: 0 };
+      this.warnings.push({ p, t: WARN + Math.random() * 0.4, path, next: 0.12 });
     }
   }
 
@@ -149,6 +155,18 @@ export class Structure {
       if (p.state !== 'static') { w.t = -1; continue; }
       const c = p.box.getCenter(_c);
       if (Math.random() < 0.5) this.fx.particles.spawn('dust', c.x + (Math.random() - 0.5) * 0.6, p.box.max.y - 0.1, c.z + (Math.random() - 0.5) * 0.6, 0, -1.5, 0, 0x9a948a);
+      // The crack runs on up the face, with a crack you can hear, and grit
+      // spits out of it.
+      if (w.path && (w.next -= dt) <= 0 && w.path.n < 5) {
+        w.next = 0.12 + Math.random() * 0.1;
+        const k = w.path;
+        k.at.add(k.step);
+        k.at.copy(p.box.clampPoint(k.at, new THREE.Vector3()));
+        crack(this.pieces, p, k.at.clone(), k.face, 0.9 + k.n * 0.25);
+        this.fx.chips?.burst('concrete', k.at.clone().addScaledVector(k.face, 0.05), k.face, 4, 2, 0.025);
+        if (Math.random() < 0.6) this.fx.audio?.snap?.(k.at.x, k.at.y, k.at.z, 0.4 + k.n * 0.1);
+        k.n++;
+      }
       if (w.t <= 0) this.fx.damage.failSoon(p, c.clone(), new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize());
     }
     this.warnings = this.warnings.filter((w) => w.t > 0);
@@ -161,9 +179,40 @@ export class Structure {
         const b = p.box;
         this.fx.particles.spawn('dust', b.min.x + Math.random() * (b.max.x - b.min.x), b.min.y - 0.05, b.min.z + Math.random() * (b.max.z - b.min.z), 0, -1.2, 0, 0x9a948a);
       }
-      if (s.t <= 0) { p.sagging = false; P.makeDynamic(p, undefined, undefined, { quiet: true }); this.mark(p.building); }
+      // It hangs on its bars along the edge still tied to the floor beside it,
+      // tilting down from there, a few degrees, before they let go.
+      if (s.hinge) {
+        s.a = Math.min(s.max, (s.a ?? 0) + dt * s.max / s.total * 1.6);
+        _q2.setFromAxisAngle(s.hinge.axis, s.a);
+        P.turn(p, _q3.copy(_q2).multiply(s.q0));
+        P.move(p, _v2.copy(s.pos0).sub(s.hinge.at).applyQuaternion(_q2).add(s.hinge.at));
+        if (Math.random() < 0.15) this.fx.audio?.snap?.(s.hinge.at.x, s.hinge.at.y, s.hinge.at.z, 0.35);
+      }
+      if (s.t <= 0) {
+        p.sagging = false;
+        // Swinging down off the bars as it goes.
+        const spin = s.hinge ? s.hinge.axis.clone().multiplyScalar(1.2) : undefined;
+        P.makeDynamic(p, undefined, spin && { x: spin.x, y: spin.y, z: spin.z }, { quiet: true });
+        this.mark(p.building);
+      }
     }
     this.sagging = this.sagging.filter((s) => s.t > 0);
+  }
+
+  // The edge a slab still hangs on by: the one it shares with a neighbouring
+  // bay that is standing. Its line along the slab's top, and the axis to tip
+  // about so that the free side goes down.
+  _hinge(p) {
+    const n = (p.sides ?? []).find((q) => q.state === 'static');
+    if (!n) return null;
+    const a = p.box, b = n.box, c = a.getCenter(new THREE.Vector3());
+    const at = new THREE.Vector3(c.x, a.max.y, c.z), axis = new THREE.Vector3();
+    if (Math.abs(a.max.x - b.min.x) < 0.1) { at.x = a.max.x; axis.set(0, 0, 1); }
+    else if (Math.abs(b.max.x - a.min.x) < 0.1) { at.x = a.min.x; axis.set(0, 0, -1); }
+    else if (Math.abs(a.max.z - b.min.z) < 0.1) { at.z = a.max.z; axis.set(-1, 0, 0); }
+    else if (Math.abs(b.max.z - a.min.z) < 0.1) { at.z = a.min.z; axis.set(1, 0, 0); }
+    else return null;
+    return { at, axis };
   }
 
   // Something changed in `building` (or anywhere, if none is named).
@@ -195,7 +244,8 @@ export class Structure {
           p.sagging = true;
           const c = p.box.getCenter(new THREE.Vector3());
           this.fx.audio?.creak?.(c.x, c.y, c.z);
-          this.sagging.push({ p, t: SAG[0] + Math.random() * (SAG[1] - SAG[0]) });
+          const t = SAG[0] + Math.random() * (SAG[1] - SAG[0]);
+          this.sagging.push({ p, t, total: t, hinge: this._hinge(p), q0: p.quat.clone(), pos0: p.pos.clone(), max: 0.06 + Math.random() * 0.06 });
         } else this.pieces.makeDynamic(p, undefined, undefined, { quiet: true });
       }
       if (loose.length) this._wakeRubble(loose);

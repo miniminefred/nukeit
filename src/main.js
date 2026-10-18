@@ -89,6 +89,8 @@ function cloud(at, scale = 1) {
 damage.fx.cloud = cloud;
 rubble.fx.cloud = cloud;
 rubble.fx.onLand = (q, blows, at, by) => impacts.absorb(q, blows, at, by);
+// What hangs on under a slab — the top of a broken column, its bars — falls with it.
+damage.fx.hang = (p, from) => rubble._rest(p, from);
 // A floor with more rubble on it than it can carry gives way.
 rubble.fx.onOverload = (q) => {
   if (q.state !== 'static' || q.queued) return;

@@ -221,6 +221,15 @@ export class Audio {
     this._tone(out, { f: 70 + Math.random() * 30, len: 0.8, gain: 0.25, type: 'sawtooth', drop: 0.7 });
   }
 
+  // Concrete cracking under load, or steel giving: a sharp report.
+  snap(x, y, z, k = 0.6) {
+    if (!this.ctx) return;
+    const { gain, pan } = this._place(x, y, z, 30);
+    const out = this._out(gain * k, pan);
+    this._noise(out, { type: 'highpass', f: 1800 + Math.random() * 1500, q: 0.8, len: 0.07, gain: 1.2, attack: 0.001, drop: 0.02 });
+    this._noise(out, { type: 'bandpass', f: 320, q: 1.5, len: 0.25, gain: 0.6, attack: 0.002, drop: 0.12 });
+  }
+
   // Gas escaping from a punctured tank.
   hiss(x, y, z) {
     if (!this.ctx) return;
