@@ -215,6 +215,21 @@ side of the tower and across the avenue have a real ground floor at the front (`
 shops record where people belong (`places`: staff, queue, browse, seat) and `people.js`
 fills them, sitting people with thighs along the seat and shins down.
 
+**The scared meter** (`sim/fear.js`): how frightened the people in the tower are, 0–100,
+one bar across the top of the screen with a line that sums up the whole tower's mood
+(lines by level: calm, nervous, scared, panic). Fear is kept per zone (lower level, lobby,
+shops, food court, Grill, offices, apartments); the meter is the worst zone and a share of
+the rest. Up: smashing near people (more the more are near), chasing them with the
+sledge, fire, smoke, the alarm, blasts, supports failing, a collapse, a tower tipping. Down:
+quiet (faster with the lounge music), fires put out, a calm PA announcement, guards coming
+out, the police arriving, the police leaving. People nervous walk quicker; scared run with
+hands up and a cartoon "!" over their heads; in a panic each picks exits, hiding,
+crowding the lifts or filming. Fear calls the police (and again, quicker, each time) and
+over 70 brings the off-duty guards out of the **break room behind the lobby desk**
+(`BREAK_ROOM` in `interiors.js`). **The police only go for you if you have been seen at it,
+or are carrying the sledgehammer** (`security.spotted`, `fx.armed`); after searching every
+floor without a sighting they leave: "He is not here."
+
 **Sprinklers, smoke and water** (`sim/water.js`, `sim/smoke.js`): heads every 3.5 m under
 every ceiling of the tower (instanced, not pieces; each remembers its slab), fed by red
 mains hung under the slabs (pieces, role `pipe`). A head opens over a fire after about a
