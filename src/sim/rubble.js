@@ -105,7 +105,7 @@ export class Rubble {
     if (!p || p.state === 'dead' || p.state === 'flying') return;
     const P = this.pieces;
     // Glass does not survive a fall: it bursts into splinters where it is.
-    if (p.kind.name === 'glass') {
+    if (p.kind.glass) {
       if (Math.random() < 0.12) this.fx.chips?.burst('glass', p.box.getCenter(_v).clone(), UP, 3, 4, 0.03);
       P.destroy(p);
       return;

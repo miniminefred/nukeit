@@ -151,7 +151,7 @@ export class Pieces {
     const made = new Map();
     for (const [k, n] of need) {
       const b = new THREE.BatchedMesh(n.inst, n.vert, n.idx, KIND[k].material);
-      b.castShadow = KIND[k].name !== 'glass';
+      b.castShadow = !KIND[k].glass;
       b.receiveShadow = true;
       // No per-piece culling or sorting. Both run on the CPU over every
       // instance on every render pass, shadows included, and measured 9 ms of a
@@ -206,7 +206,7 @@ export class Pieces {
     for (const q of p.parts) {
       this._showDraws(q, false);
       q.mesh = new THREE.Mesh(q.geometry, q.materials ?? this._material(q));
-      q.mesh.castShadow = q.kind.name !== 'glass' && !small;
+      q.mesh.castShadow = !q.kind.glass && !small;
       q.mesh.receiveShadow = true;
       q.mesh.userData.piece = p;
       g.add(q.mesh);

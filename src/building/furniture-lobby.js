@@ -81,7 +81,7 @@ export function revolvingDoor(P, x, y, z, r = 1.2, h = 2.5) {
     const c = new THREE.Vector3(x, y + h / 2, z);
     // Sides solid: a collider down each curve's middle.
     const sx = Math.sin(g.parameters.thetaStart + 0.75) * (r - 0.05);
-    P.add({ parts: [{ kind: 'glass', geometry: g, tint: 0xdfe6ea }], pos: c, role: 'glass', floor: 0, structural: false,
+    P.add({ parts: [{ kind: 'clearglass', geometry: g, tint: 0xdfe6ea }], pos: c, role: 'glass', floor: 0, structural: false,
       colliders: [[sx - 0.08, -h / 2, -0.7, sx + 0.08, h / 2, 0.7]] });
   }
   assembly(P, x, y + h, z, 0, [
@@ -89,7 +89,7 @@ export function revolvingDoor(P, x, y, z, r = 1.2, h = 2.5) {
   ], 'furniture', { floor: 0, structural: false });
   assembly(P, x, y, z, 0, [
     { kind: 'brass', boxes: [{ cyl: [0, h / 2, 0], r: 0.05, h: h - 0.04, seg: 10 }] },
-    { kind: 'glass', boxes: [[-r + 0.06, 0.04, -0.015, r - 0.06, h - 0.04, 0.015], [-0.015, 0.04, -r + 0.06, 0.015, h - 0.04, r - 0.06]] },
+    { kind: 'clearglass', boxes: [[-r + 0.06, 0.04, -0.015, r - 0.06, h - 0.04, 0.015], [-0.015, 0.04, -r + 0.06, 0.015, h - 0.04, r - 0.06]] },
   ], 'furniture', { floor: 0, structural: false, tag: 'revolving' });
 }
 

@@ -128,7 +128,7 @@ export function plant(P, x, y, z, big = false) {
 export function waterCooler(P, x, y, z, yaw) {
   return assembly(P, x, y, z, yaw, [
     { kind: 'plastic', round: 0.03, boxes: [[-0.17, 0, -0.17, 0.17, 1.0, 0.17]], tint: 0xe8e8ea },
-    { kind: 'glass', boxes: [{ cyl: [0, 1.2, 0], r: 0.13, h: 0.38, seg: 18 }, { cyl: [0, 1.02, 0], r: 0.05, r2: 0.13, h: 0.05, seg: 18 }] },
+    { kind: 'clearglass', boxes: [{ cyl: [0, 1.2, 0], r: 0.13, h: 0.38, seg: 18 }, { cyl: [0, 1.02, 0], r: 0.05, r2: 0.13, h: 0.05, seg: 18 }] },
   ], 'furniture', { colliders: [[-0.17, 0, -0.17, 0.17, 1.4, 0.17]] });
 }
 
@@ -160,7 +160,7 @@ export function cooker(P, x, y, z, yaw) {
   return assembly(P, x, y, z, yaw, [
     { kind: 'metal', round: 0.02, boxes: b, tint: 0xcfd2d4 },
     { kind: 'metal', boxes: rings, tint: 0x1a1a1a },
-    { kind: 'glass', boxes: [[-0.24, 0.2, 0.3, 0.24, 0.6, 0.31]] },
+    { kind: 'clearglass', boxes: [[-0.24, 0.2, 0.3, 0.24, 0.6, 0.31]] },
   ], 'furniture', { colliders: b });
 }
 

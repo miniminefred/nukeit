@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { block, panel, plate, assembly } from './kit.js';
 import * as F from './furniture.js';
 import { fitOut as furnish } from './interiors.js';
-import { FLOOR_H, SLAB, PODIUM_FLOORS, TOP_FLOOR, ROOF, PENTHOUSE, HQ, LOWER, BASEMENT, T, U, CORE, ATRIUM, podiumFront, OUTLINE, inPoly, inCore, rectPoly } from './plan.js';
+import { FLOOR_H, SLAB, PODIUM_FLOORS, TOP_FLOOR, ROOF, RESIDENCES, HQ, LOWER, BASEMENT, T, U, CORE, ATRIUM, podiumFront, OUTLINE, inPoly, inCore, rectPoly } from './plan.js';
 
-// Trump Tower, at 50 m.
+// Trump Tower, at 70 m.
 //
 // The real one is 58 storeys on Fifth Avenue: a dark bronze glass shaft with a
 // sawtooth of notched corners up two faces, on a stepped podium whose terraces
@@ -65,7 +65,7 @@ function slabs(P, f) {
   // What you walk on: marble in the shops and the penthouse, tiles in the food
   // court, oak in the restaurant and the café, carpet in the offices.
   const FINISH = { 1: 'creammarble', 2: 'creammarble', 3: 'ceramic', 4: 'wood', 5: 'carpet' };
-  const finish = f === ROOF ? null : f >= PENTHOUSE ? 'creammarble' : f >= PODIUM_FLOORS ? 'carpet' : FINISH[f] ?? null;
+  const finish = f === ROOF ? null : f >= RESIDENCES ? 'creammarble' : f >= PODIUM_FLOORS ? 'carpet' : FINISH[f] ?? null;
   // The public floors and the penthouse are warm: cream marble, warm plaster
   // overhead. The offices stay the cool grey of offices.
   const rich = (g) => (g >= 0 && g < 5) || g >= HQ;
@@ -160,10 +160,11 @@ function columns(P, f) {
       if (inCore(x, z, 0.5)) continue;
       if (f === 0 && Math.abs(x) < 3.2 && z > 11) continue;      // the doorway
       if (!tower && x > ATRIUM.x0 && x < ATRIUM.x1 && z > ATRIUM.z0 && z < ATRIUM.z1) continue;
-      // Pink marble round the atrium on the public floors, dark veined marble in
-      // the rest of the lobby, cream in the penthouse, bare concrete elsewhere.
+      // Pink marble round the atrium and on the shop floors, dark veined marble
+      // in the rest of the lobby, cream in the penthouse, bare concrete elsewhere.
       const byAtrium = !tower && f >= 0 && x >= ATRIUM.x0 - 0.5 && x <= ATRIUM.x1 + 0.5 && z >= ATRIUM.z0 - 0.5 && z <= ATRIUM.z1 + 0.5;
-      block(P, byAtrium ? 'marble' : f === 0 ? 'darkmarble' : f >= PENTHOUSE ? 'creammarble' : 'concrete', x - s, T(f), z - s, x + s, U(f), z + s, 'column', { floor: f, load: ROOF - f });
+      const shops = f >= 1 && f <= 4;
+      block(P, byAtrium || shops ? 'marble' : f === 0 ? 'darkmarble' : f >= RESIDENCES ? 'creammarble' : 'concrete', x - s, T(f), z - s, x + s, U(f), z + s, 'column', { floor: f, load: ROOF - f });
     }
 }
 
@@ -267,7 +268,7 @@ function terraces(P) {
     const spans = f === PODIUM_FLOORS ? [[-20, -14.2], [12.2, 20]] : [[-20, 20]];
     for (const [xa, xb] of spans) {
       const A = new THREE.Vector3(xa, 0, zOut), B = new THREE.Vector3(xb, 0, zOut);
-      panel(P, 'glass', B, A, y, y + 1.1, 0.03, 0.07, 'glass', { floor: f });
+      panel(P, 'clearglass', B, A, y, y + 1.1, 0.03, 0.07, 'glass', { floor: f });
       panel(P, 'brass', B, A, y + 1.1, y + 1.16, 0.08, 0.07, 'furniture', { floor: f });
     }
     if (f === PODIUM_FLOORS) continue;
@@ -306,10 +307,21 @@ function mergeVerticesIndexed(g) {
 
 function roof(P) {
   const y = T(ROOF);
-  // Parapet round the roof edge.
+  // The crown: the glass carried on above the roof, rising to a point at every
+  // tooth of the sawtooth and dipping between, as in the photograph — and
+  // hiding the plant room. Each face in three panes, stepping.
+  const tip = (v) => v.x > 11.9 || v.z > 8.9;
+  const valley = (v) => (v.x > 9.9 && v.x < 10.1 && v.z > -9) || (v.z > 6.9 && v.z < 7.1);
+  const hAt = (v) => (tip(v) ? 6.5 : valley(v) ? 3.2 : 4.6);
   for (let e = 0; e < OUTLINE.length; e++) {
     const A = OUTLINE[e], B = OUTLINE[(e + 1) % OUTLINE.length];
-    panel(P, 'glass', A, B, y, y + 1.1, 0.03, 0, 'glass', { floor: ROOF });
+    const n = 3;
+    for (let i = 0; i < n; i++) {
+      const a = A.clone().lerp(B, i / n), b = A.clone().lerp(B, (i + 1) / n);
+      const h = hAt(A) + (hAt(B) - hAt(A)) * ((i + 0.5) / n);
+      panel(P, 'glass', a, b, y, y + h, 0.03, 0, 'glass', { floor: ROOF });
+    }
+    panel(P, 'bronze', A, B, y, y + 0.3, 0.12, 0, 'spandrel', { floor: ROOF, tint: 0x6a5a48 });
   }
   // The plant room over the core, the lift motor room, and a generator.
   const h = y + 3.6;

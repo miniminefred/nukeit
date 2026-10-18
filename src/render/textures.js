@@ -210,7 +210,7 @@ const SURFACES = {
   },
   bronze: (u, v, n, o) => {
     const b = fbm(n, u * 0.05, v * 6, 32, 2);
-    set(o, 92 + b * 10, 72 + b * 8, 50 + b * 6, 0, 0.4);
+    set(o, 62 + b * 8, 48 + b * 6, 34 + b * 5, 0, 0.45);
   },
   plastic: (u, v, n, o) => {
     const f = fbm(n, u, v, 32, 2);

@@ -14,7 +14,7 @@ export function clothTable(P, x, y, z, radius = 0.6) {
   return assembly(P, x, y, z, 0, [
     { kind: 'linen', boxes: [{ cyl: [0, 0.39, 0], r: radius + 0.05, r2: radius + 0.15, h: 0.76, seg: 24 }, { cyl: [0, 0.765, 0], r: radius + 0.05, h: 0.01, seg: 24 }] },
     { kind: 'ceramic', boxes: set },
-    { kind: 'glass', boxes: [{ cyl: [0, 0.86, 0], r: 0.04, r2: 0.03, h: 0.16, seg: 12 }] },
+    { kind: 'clearglass', boxes: [{ cyl: [0, 0.86, 0], r: 0.04, r2: 0.03, h: 0.16, seg: 12 }] },
   ], 'furniture', { colliders: [[-radius - 0.15, 0, -radius - 0.15, radius + 0.15, 0.78, radius + 0.15]] });
 }
 
@@ -46,7 +46,7 @@ export function barStool(P, x, y, z) {
 export function bar(P, x, y, z, yaw, len = 4) {
   const bottles = [];
   const cols = [0x2a5a2a, 0x6a3a10, 0x1a1a3a, 0x8a8a8a, 0x5a1a1a];
-  const glass = cols.map((tint) => ({ kind: 'glass', boxes: [], tint }));
+  const glass = cols.map((tint) => ({ kind: 'clearglass', boxes: [], tint }));
   for (let bx = -len / 2 + 0.15; bx < len / 2 - 0.1; bx += 0.12) {
     const h = r(0.24, 0.34);
     glass[(Math.random() * cols.length) | 0].boxes.push({ cyl: [bx, 1.35 + h / 2, -0.95], r: 0.035, h, seg: 10 });
@@ -82,8 +82,8 @@ export function jewelCase(P, x, y, z, yaw) {
     { kind: 'wood', round: 0.02, boxes: [[-0.75, 0, -0.35, 0.75, 0.95, 0.35]], tint: 0x2a1a12 },
     { kind: 'fabric', boxes: [[-0.72, 0.95, -0.32, 0.72, 0.97, 0.32]], tint: 0x1a1a2a },
     { kind: 'gold', boxes: items },
-    { kind: 'glass', boxes: gems, tint: 0x9ad0ff },
-    { kind: 'glass', boxes: [[-0.75, 0.97, -0.35, 0.75, 1.3, 0.35]] },
+    { kind: 'clearglass', boxes: gems, tint: 0x9ad0ff },
+    { kind: 'clearglass', boxes: [[-0.75, 0.97, -0.35, 0.75, 1.3, 0.35]] },
   ], 'furniture', { colliders: [[-0.75, 0, -0.35, 0.75, 1.3, 0.35]] });
 }
 

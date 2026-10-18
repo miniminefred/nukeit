@@ -185,7 +185,7 @@ export function shatter(pieces, piece, local, push, { coarse = false, chip = nul
     const d = Math.hypot(sx - u0, sy - v0);
     let vel;
     if (push) vel = push.clone().multiplyScalar((stays ? 0 : 1) * (2.5 + Math.random() * 2) / (1 + d * 2)).add(new THREE.Vector3((Math.random() - 0.5), Math.random() * 0.5, (Math.random() - 0.5)));
-    const shard = pieces.spawn({ parts: [{ kind: 'glass', geometry: g }], pos: world, quat: baseQ, role: 'shard', floor: piece.floor },
+    const shard = pieces.spawn({ parts: [{ kind: piece.parts[0].kind.name, geometry: g }], pos: world, quat: baseQ, role: 'shard', floor: piece.floor },
       { dynamic: !stays, vel, spin: { x: Math.random() * 6 - 3, y: Math.random() * 6 - 3, z: Math.random() * 6 - 3 }, debris: true });
     spawned.push(shard);
   }

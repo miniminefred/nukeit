@@ -27,7 +27,8 @@ const KINDS = {
   creammarble: { indoor: 0.45, surf: 'creammarble', repeat: 3.5, density: 2700, toughness: 18, structural: true, inside: 'broken', sound: 'marble', metal: 0, rough: 1 },
   mirror:      { indoor: 0.6, surf: 'mirror', repeat: 1, density: 2500, toughness: 0.4, metal: 1, rough: 1, tint: 0xf0dcc0, sound: 'glass' },
   flag:        { surf: 'flag', repeat: 1, density: 300, toughness: 0.4, burns: 6, inside: 'fabric', sound: 'drywall' },
-  glass:       { density: 2500, toughness: 0.4, sound: 'glass' },
+  glass:       { glass: true, density: 2500, toughness: 0.4, sound: 'glass' },
+  clearglass:  { glass: true, density: 2500, toughness: 0.4, sound: 'glass' },
   bronze:      { surf: 'bronze', repeat: 1, density: 2700, toughness: 40, metal: 0.6, sound: 'mullion' },
   steel:       { surf: 'metal', repeat: 1, density: 7800, toughness: 60, structural: true, metal: 0.8, sound: 'steel' },
   metal:       { surf: 'metal', repeat: 1, density: 1200, toughness: 6, metal: 0.7, sound: 'steel' },
@@ -61,7 +62,7 @@ const HITS = {
   concrete: 3, marble: 3, darkmarble: 3, creammarble: 3, mirror: 0.6, flag: 0.5, roofing: 2.5, steel: 9, bronze: 6, brass: 6, gold: 6, metal: 3,
   wood: 1.5, plaster: 1.2, carpet: 1, fabric: 0.8, leather: 1, plastic: 1, paper: 0.8,
   soil: 1, leaves: 0.5, ceramic: 1.2, lacquer: 1.5, linen: 0.6, gastank: 2, transformer: 5,
-  screen: 0.8, lamp: 0.3, glass: 1,
+  screen: 0.8, lamp: 0.3, glass: 1, clearglass: 1,
 };
 
 export const KIND = {};
@@ -72,16 +73,27 @@ const _mats = new Map();
 let _interior = null;
 export function setInteriorEnvironment(tex) {
   _interior = tex;
-  for (const [name, m] of _mats) if (KINDS[name]?.indoor) { m.envMap = tex; m.needsUpdate = true; }
+  for (const [name, m] of _mats) if (KINDS[name]?.indoor || name === 'clearglass') { m.envMap = tex; m.needsUpdate = true; }
 }
 
 function build(name, def, surf) {
   if (name === 'glass') {
+    // The curtain wall: dark bronze mirror glass, as in the photograph.
     return new THREE.MeshStandardMaterial({
-      color: 0x6b5238, metalness: 0.9, roughness: 0.04,
-      transparent: true, opacity: 0.5, envMapIntensity: 1.4, depthWrite: false,
+      color: 0x30251b, metalness: 0.95, roughness: 0.03,
+      transparent: true, opacity: 0.8, envMapIntensity: 1.6, depthWrite: false,
       side: THREE.DoubleSide,
     });
+  }
+  if (name === 'clearglass') {
+    // Glass indoors — partitions, balustrades, display cases, doors: clear,
+    // a little green at the edges, catching the room.
+    const m = new THREE.MeshStandardMaterial({
+      color: 0xe6f0ee, metalness: 0.1, roughness: 0.02,
+      transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide,
+    });
+    if (_interior) { m.envMap = _interior; m.envMapIntensity = 1.2; }
+    return m;
   }
   if (name === 'lamp') {
     // Warm white: the light of a hotel lobby, not a strip light.
@@ -113,6 +125,7 @@ for (const [name, def] of Object.entries(KINDS)) {
     density: def.density,
     toughness: def.toughness,
     structural: !!def.structural,
+    glass: !!def.glass,
     burns: def.burns ?? 0,
     explodes: def.explodes ?? 0,
     splinters: !!def.splinters,

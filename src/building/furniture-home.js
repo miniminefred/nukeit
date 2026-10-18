@@ -52,7 +52,7 @@ export function coffeeTable(P, x, y, z, yaw) {
   return assembly(P, x, y, z, yaw, [
     { kind: 'marble', round: 0.02, boxes: [[-0.7, 0.38, -0.4, 0.7, 0.44, 0.4]] },
     { kind: 'gold', boxes: [[-0.6, 0, -0.3, -0.56, 0.38, 0.3], [0.56, 0, -0.3, 0.6, 0.38, 0.3]] },
-    { kind: 'glass', boxes: [{ cyl: [0.3, 0.52, 0.05], r: 0.08, r2: 0.05, h: 0.16, seg: 14 }] },
+    { kind: 'clearglass', boxes: [{ cyl: [0.3, 0.52, 0.05], r: 0.08, r2: 0.05, h: 0.16, seg: 14 }] },
   ], 'furniture', { colliders: [[-0.7, 0, -0.4, 0.7, 0.44, 0.4]] });
 }
 
@@ -99,7 +99,7 @@ export function vanity(P, x, y, z, yaw) {
     { kind: 'marble', round: 0.01, boxes: [[-0.62, 0.8, -0.27, 0.62, 0.85, 0.27]] },
     { kind: 'ceramic', boxes: [{ cyl: [0, 0.87, 0.02], r: 0.18, r2: 0.12, h: 0.06, seg: 18 }] },
     { kind: 'gold', boxes: [{ cyl: [0, 0.95, -0.18], r: 0.015, h: 0.2, seg: 8 }] },
-    { kind: 'glass', boxes: [[-0.5, 1.05, -0.26, 0.5, 1.9, -0.25]] },
+    { kind: 'clearglass', boxes: [[-0.5, 1.05, -0.26, 0.5, 1.9, -0.25]] },
   ], 'furniture', { colliders: [[-0.62, 0, -0.27, 0.62, 0.85, 0.27]] });
 }
 

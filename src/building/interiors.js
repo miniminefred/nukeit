@@ -6,7 +6,7 @@ import * as E from './furniture-food.js';
 import * as W from './furniture-work.js';
 import * as L from './furniture-lobby.js';
 import {
-  PODIUM_FLOORS, PENTHOUSE, HQ, LOWER, T, U, ATRIUM, podiumFront, inCore, inAtrium,
+  PODIUM_FLOORS, PENTHOUSE, RESIDENCES, HQ, LOWER, T, U, ATRIUM, podiumFront, inCore, inAtrium,
   TOWER_COLUMNS, PODIUM_COLUMNS, clearOf, floorUse,
 } from './plan.js';
 
@@ -88,7 +88,7 @@ function escalator(P, e, y) {
     { kind: 'metal', boxes: steps, tint: 0x3a3b3d },
     { kind: 'brass', boxes: [run(-0.45, 0.05, za, e.z0 - 0.02, 10.4, 15.6), run(-0.45, 0.05, e.z1 + 0.02, zb, 10.4, 15.6),
       [16, 0, za, 16.7, 0.03, zb], [9.3, 4, za, 10, 4.03, zb]] },
-    { kind: 'glass', boxes: [run(0.05, 0.98, e.z0 - 0.085, e.z0 - 0.065), run(0.05, 0.98, e.z1 + 0.065, e.z1 + 0.085),
+    { kind: 'clearglass', boxes: [run(0.05, 0.98, e.z0 - 0.085, e.z0 - 0.065), run(0.05, 0.98, e.z1 + 0.065, e.z1 + 0.085),
       [16, 0.05, e.z0 - 0.085, 16.6, 0.98, e.z0 - 0.065], [16, 0.05, e.z1 + 0.065, 16.6, 0.98, e.z1 + 0.085]], tint: 0xdfe9ee },
     { kind: 'plastic', round: 0.02, boxes: [run(0.98, 1.06, e.z0 - 0.12, e.z0 - 0.03), run(0.98, 1.06, e.z1 + 0.03, e.z1 + 0.12),
       [16, 0.98, e.z0 - 0.12, 16.6, 1.06, e.z0 - 0.03], [16, 0.98, e.z1 + 0.03, 16.6, 1.06, e.z1 + 0.12]], tint: 0x0d0d0e },
@@ -105,7 +105,7 @@ function glassWall(P, f, axis, at, from, to, gaps = []) {
     if (s1 - s0 < 0.1) return;
     const A = axis === 'x' ? new THREE.Vector3(s0, 0, at) : new THREE.Vector3(at, 0, s0);
     const B = axis === 'x' ? new THREE.Vector3(s1, 0, at) : new THREE.Vector3(at, 0, s1);
-    panel(P, 'glass', A, B, y0, y1, 0.02, 0, 'glass', { floor: f, tint: 0xdfe9ee });
+    panel(P, 'clearglass', A, B, y0, y1, 0.02, 0, 'glass', { floor: f, tint: 0xdfe9ee });
     for (const c of [A, B]) block(P, 'metal', c.x - 0.03, y0, c.z - 0.03, c.x + 0.03, y1, c.z + 0.03, 'furniture', { floor: f, tint: 0x9aa0a6 });
   };
   for (const [g0, g1] of cuts) { seg(a, g0); a = g1; }
@@ -192,7 +192,7 @@ function lobby(P, y) {
   // Two revolving doors in the opening, glass either side of them.
   for (const x of [-1.4, 1.4]) L.revolvingDoor(P, x, y, 11.0);
   for (const [x0, x1] of [[-0.52, 0.52], [2.28, 2.95], [-2.95, -2.28]])
-    block(P, 'glass', x0, y, 11.97, x1, U(0) - 0.05, 12.0, 'glass', { floor: 0, tint: 0xdfe6ea });
+    block(P, 'clearglass', x0, y, 11.97, x1, U(0) - 0.05, 12.0, 'glass', { floor: 0, tint: 0xdfe6ea });
   F.receptionDesk(P, -10, y, 5.4, 0);
 
   // The atrium's back wall: rough blocks of pink marble at every depth, the
@@ -202,11 +202,11 @@ function lobby(P, y) {
   // whole podium up.
   block(P, 'marble', 10.3, y, -6.95, 14.7, 18, -6.8, 'wall', { floor: 0, structural: false, tint: 0xe2b09e });
   steppedStone(P, 10.3, 14.7, y + 0.6, 18, -6.8);
-  block(P, 'glass', 10.35, y, -6.8, 14.65, y + 0.45, -5.3, 'furniture', { floor: 0, structural: false, tint: 0x9ec9d8 });
+  block(P, 'clearglass', 10.35, y, -6.8, 14.65, y + 0.45, -5.3, 'furniture', { floor: 0, structural: false, tint: 0x9ec9d8 });
   assembly(P, 12.5, y, -6.05, 0, [
     { kind: 'brass', boxes: [[-2.25, 0, 0.65, 2.25, 0.55, 0.75], [-2.25, 0, -0.75, -2.15, 0.55, 0.75], [2.15, 0, -0.75, 2.25, 0.55, 0.75]] },
   ], 'furniture', { floor: 0 });
-  block(P, 'glass', 10.6, y + 0.45, -6.33, 14.4, 17.9, -6.3, 'furniture', { floor: 0, structural: false, tint: 0xe4f2f8, tag: 'waterfall' });
+  block(P, 'clearglass', 10.6, y + 0.45, -6.33, 14.4, 17.9, -6.3, 'furniture', { floor: 0, structural: false, tint: 0xe4f2f8, tag: 'waterfall' });
 
   // The café down in the atrium: white marble tables, black and white chairs.
   for (const [x, z] of [[11.2, 2.3], [13.3, 2.5], [11.2, 4.7], [13.3, 4.9], [11.4, -3.6], [13.4, -3.8]]) {
@@ -336,7 +336,7 @@ function atriumRail(P, f, y) {
   const rail = (a, b) => {
     const A = new THREE.Vector3(a[0], 0, a[1]), B = new THREE.Vector3(b[0], 0, b[1]);
     if (A.distanceTo(B) < 0.2) return;
-    panel(P, 'glass', A, B, y, y + 1.0, 0.02, -0.03, 'glass', { floor: f });
+    panel(P, 'clearglass', A, B, y, y + 1.0, 0.02, -0.03, 'glass', { floor: f });
     panel(P, 'brass', A, B, y + 1.0, y + 1.06, 0.06, -0.03, 'furniture', { floor: f });
   };
   rail([x0, z0], [x1, z0]);
@@ -531,10 +531,10 @@ function master(P, f, y) {
 
 function lights(P, f) {
   const top = U(f);
-  if (f >= PENTHOUSE) {
+  if (f >= RESIDENCES) {
     // Chandeliers in the big rooms, plain lights elsewhere.
-    for (const [x, z] of [[-9.5, 0], [7.4, 2.2]]) if (f === PENTHOUSE + 1) F.chandelier(P, x, top, z);
-    if (f === PENTHOUSE + 2) F.chandelier(P, -10, top, 1.5);
+    for (const [x, z] of [[-9.5, 0], [7.4, 2.2]]) if (f === PENTHOUSE) F.chandelier(P, x, top, z);
+    if (f === PENTHOUSE + 1) F.chandelier(P, -10, top, 1.5);
     for (const [x, z] of [[-11, -5], [-11, 4.5], [7.8, -5], [7.8, 5], [-2.5, -5.5], [2.5, 5]]) F.ceilingLight(P, x, top, z);
     return;
   }

@@ -110,7 +110,7 @@ export class Impacts {
   // if it runs out.
   _take(q, blows, from, by) {
     const { damage, structure } = this.fx;
-    if (q.kind.name === 'glass' && q.role === 'glass') { damage.hit(q, q.box.clampPoint(from, _v).clone(), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0), 2); return; }
+    if (q.kind.glass && q.role === 'glass') { damage.hit(q, q.box.clampPoint(from, _v).clone(), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0), 2); return; }
     q.hp -= blows;
     const point = q.box.clampPoint(from, new THREE.Vector3());
     point.y = Math.min(q.box.max.y, by.box.min.y + 0.01);
@@ -155,7 +155,7 @@ export class Impacts {
     if (p.role !== 'fragment' && p.role !== 'shard') return;
     // Glass that has come down does not lie there in panes: it breaks up, and
     // goes like the other small bits.
-    if (p.kind.name === 'glass') { this.fading.set(p, 0); return; }
+    if (p.kind.glass) { this.fading.set(p, 0); return; }
     this.rest.delete(p);
     this.speed.delete(p);
     this.pieces.freeze(p);

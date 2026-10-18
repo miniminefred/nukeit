@@ -17,7 +17,7 @@ import * as THREE from 'three';
 export const FLOOR_H = 4;
 export const SLAB = 0.3;
 export const PODIUM_FLOORS = 6;
-export const TOP_FLOOR = 11;         // 12 storeys: the roof at 48 m, the plant room to 52
+export const TOP_FLOOR = 16;         // 17 storeys: the roof at 68 m, the plant room to 72
 export const ROOF = TOP_FLOOR + 1;
 export const LOWER = -1;             // the lower level, under the whole podium
 // The pit the lower level stands in: the podium's plan, a storey deep.
@@ -27,13 +27,14 @@ export const BASEMENT = { x0: -20, x1: 20, z0: -12, z1: 12, depth: FLOOR_H };
 export const groundAt = (x, z) => (x > BASEMENT.x0 && x < BASEMENT.x1 && z > BASEMENT.z0 && z < BASEMENT.z1 ? -BASEMENT.depth : 0);
 
 // What each floor is — the real tower's programme, in the same proportions on
-// twelve storeys: under it all a lower level of vault, goods, plant and
+// seventeen storeys: under it all a lower level of vault, goods, plant and
 // kitchens; a public atrium of shops, cafés and the Grill round an 18-metre
-// waterfall and gold escalators; offices of glass-walled rooms on long
-// corridors; the Trump Organization's floor; and the residences on top, the
-// penthouse the top two.
-export const PENTHOUSE = TOP_FLOOR - 2;   // the residential storeys
-export const HQ = PENTHOUSE - 1;          // the Trump Organization
+// waterfall and gold escalators; four storeys of offices of glass-walled rooms
+// on long corridors; the Trump Organization's floor; then apartments, more of
+// them than offices, as in the real one; and the penthouse, the top two.
+export const HQ = 9;                      // the Trump Organization
+export const RESIDENCES = HQ + 1;         // the first storey of apartments
+export const PENTHOUSE = TOP_FLOOR - 1;   // the penthouse: living, then the master suite on top
 export const PROGRAMME = {
   [LOWER]: 'lower level',
   0: 'lobby',
@@ -42,11 +43,10 @@ export const PROGRAMME = {
   3: 'food court',
   4: 'restaurant',
   [HQ]: 'headquarters',
-  [PENTHOUSE]: 'condominiums',
-  [PENTHOUSE + 1]: 'penthouse: living',
-  [PENTHOUSE + 2]: 'penthouse: master suite',
+  [PENTHOUSE]: 'penthouse: living',
+  [PENTHOUSE + 1]: 'penthouse: master suite',
 };
-export const floorUse = (f) => PROGRAMME[f] ?? (f >= 5 && f < HQ ? 'offices' : '');
+export const floorUse = (f) => PROGRAMME[f] ?? (f >= 5 && f < HQ ? 'offices' : f >= RESIDENCES && f < PENTHOUSE ? 'condominiums' : '');
 
 export const T = (f) => f * FLOOR_H + SLAB;        // top of floor f's slab
 export const U = (f) => (f + 1) * FLOOR_H;         // underside of the slab above it

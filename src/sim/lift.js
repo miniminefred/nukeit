@@ -68,7 +68,7 @@ export class Lift {
     add('wood', 0.08, h, d, x0 + 0.04, h / 2, cz, 0x6a3a22);
     add('wood', 0.08, h, d, x1 - 0.04, h / 2, cz, 0x6a3a22);
     add('brass', w, 0.1, d, cx, h + 0.05, cz);
-    add('glass', w - 0.6, 1.6, 0.01, cx, 1.4, z0 + 0.09, 0xc8d0d8);         // mirror
+    add('mirror', w - 0.6, 1.6, 0.01, cx, 1.4, z0 + 0.09, 0xc8d0d8);         // mirror
     add('brass', w - 0.2, 0.04, 0.04, cx, 0.95, z0 + 0.12);                  // hand rail
     add('brass', 0.04, 0.04, d - 0.2, x0 + 0.12, 0.95, cz);
     add('brass', 0.04, 0.04, d - 0.2, x1 - 0.12, 0.95, cz);

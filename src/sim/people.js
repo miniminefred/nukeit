@@ -30,7 +30,7 @@ const DRESS = [0x7a1420, 0xe8e2d8, 0x101014, 0x2b3f6a, 0xb8962e, 0x5a2a4a];
 const SHIRT = [0xf2f0ea, 0xdfe6ee, 0xe8dcc8];
 
 // Where people are, by floor: how many, and whether they dress for it.
-const CROWD = { [-1]: 4, 0: 16, 1: 12, 2: 10, 3: 14, 4: 12, 5: 6, 6: 5, 7: 5, 8: 6, 9: 4, 10: 2, 11: 2 };
+const CROWD = { [-1]: 4, 0: 16, 1: 12, 2: 10, 3: 14, 4: 12, 5: 6, 6: 5, 7: 5, 8: 5, 9: 5, 10: 2, 11: 2, 12: 2, 13: 2, 14: 2, 15: 2, 16: 2 };
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _s = new THREE.Vector3(1, 1, 1), _c = new THREE.Color();
 
