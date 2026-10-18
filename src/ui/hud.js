@@ -1,3 +1,5 @@
+import { openSettings } from './settings.js';
+
 // The heads-up display and the full-screen overlays: loading, click-to-begin,
 // paused, down, and the results of a job.
 
@@ -97,6 +99,7 @@ export const screens = {
     $('p-resume').onclick = () => { s.classList.remove('open'); onResume(); };
     $('p-restart').onclick = () => { s.classList.remove('open'); onRestart(); };
     $('p-quit').onclick = () => { s.classList.remove('open'); onQuit(); };
+    $('p-settings').onclick = () => openSettings();
   },
   hidePause() { $('pause').classList.remove('open'); },
 
