@@ -3,6 +3,7 @@ import { assembly } from './kit.js';
 import * as S from './furniture-shop.js';
 import * as F from './furniture.js';
 import * as E from './furniture-food.js';
+import * as H2 from './furniture-home.js';
 
 // Shops: real ones, laid out the way a working shop is, after the owner's
 // photograph of a café-bakery. A unit is three walls, a glazed front with its
@@ -76,14 +77,45 @@ export const places = { list: [], clear() { this.list.length = 0; } };
 const place = (kind, fr, x, z, ly = 0) => { const [wx, wz] = fr.at(x, z); places.list.push({ kind, x: wx, y: fr.y, z: wz, yaw: fr.yaw(ly) }); };
 
 // The unit's frame: local (x, z) to the world, and a local yaw to a world one.
-function frame(cx, y, cz, yaw) {
-  const c = Math.cos(yaw), s = Math.sin(yaw);
+// `mirror`: the shop laid out the other way round, door and all.
+function frame(cx, y, cz, yaw, mirror = false) {
+  const c = Math.cos(yaw), s = Math.sin(yaw), m = mirror ? -1 : 1;
   return {
-    at: (x, z) => [cx + x * c + z * s, cz - x * s + z * c],
-    yaw: (ly = 0) => yaw + ly,
+    at: (x, z) => [cx + x * m * c + z * s, cz - x * m * s + z * c],
+    yaw: (ly = 0) => yaw + ly * m,
     y,
   };
 }
+
+// Each shop its own look, the same every time it is built (seeded by where it
+// is): which way round it is laid out, which of its layouts, its colours, and
+// the odd things that make it that shop and not the one next door.
+const PALETTE = {
+  wall: [0xece4d6, 0xf2ead8, 0xdfe6e2, 0xe8d8c8, 0xd8dcd4, 0xf4efe6, 0x5a5e62],
+  wood: [0xb08a5a, 0x6a4a30, 0xd8c09a, 0x3a2a1e, 0x8a6a48, 0xc8b490],
+  body: [0x3a3e44, 0x2a4a3a, 0x6a2a20, 0x2a2420, 0xd8d0c0, 0x1a2a3a],
+  board: [0xe8e0d0, 0x2a2420, 0xd8c8a8, 0x1a2236, 0xf2eee6, 0x6a5040],
+  seat: [0x6a5040, 0x2a4a3a, 0x7a2a22, 0x2a3a5a, 0xc8a070, 0x3a3a3a],
+  fascia: [0x2a2622, 0x1f3a2a, 0x2a1a1a, 0x1a2236, 0x141414, 0x3a2a1a],
+};
+const ART = [[0xc8a070, 0x2a4a6a, 0xe8e0d0], [0xb84a3a, 0xf2e8d0, 0x2a3a2a], [0x2a5a7a, 0xd8c8a0, 0x7a3a2a], [0xe8c060, 0xf4f0e8, 0x3a3a3a]];
+function look(cx, cz, y) {
+  let a = (Math.round(cx * 13) * 73856093) ^ (Math.round(cz * 17) * 19349663) ^ (Math.round(y * 7) * 83492791);
+  const rnd = () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const pick = (list) => list[(rnd() * list.length) | 0];
+  return { rnd, pick, mirror: rnd() < 0.5, variant: (rnd() * 2) | 0,
+    wall: pick(PALETTE.wall), wood: pick(PALETTE.wood), body: pick(PALETTE.body), board: pick(PALETTE.board), seat: pick(PALETTE.seat), fascia: pick(PALETTE.fascia), art: pick(ART) };
+}
+// A rug, turned with the shop (furniture-home's lies along x).
+const rugAt = (P, x, y, z, yaw, w, d, tint) => { const t = Math.abs(Math.sin(yaw)) > 0.7; return H2.rug(P, x, y, z, t ? d : w, t ? w : d, tint); };
+
+// Fit the unit with its look's colours, and put them back after.
+function styled(L, fn) {
+  Object.assign(S.style, { wood: L.wood, body: L.body, board: L.board, seat: L.seat });
+  try { return fn(); } finally { Object.assign(S.style, { wood: null, body: null, board: null, seat: null }); }
+}
+// Things on the walls, at a height: a picture or a mirror, its back to the wall.
+const onWall = (P, fr, fn, x, z, ly, height, ...args) => { const [wx, wz] = fr.at(x, z); return fn(P, wx, fr.y + height, wz, fr.yaw(ly), ...args); };
 
 // Place a builder `fn(P, x, y, z, yaw, ...args)` at local (x, z), facing local yaw `ly`.
 const put = (P, fr, fn, x, z, ly, ...args) => { const [wx, wz] = fr.at(x, z); return fn(P, wx, fr.y, wz, fr.yaw(ly), ...args); };
@@ -91,7 +123,7 @@ const put = (P, fr, fn, x, z, ly, ...args) => { const [wx, wz] = fr.at(x, z); re
 // Three walls, the glazed front with its door, and the sign band over it.
 // `door`: local x of the doorway's middle. `open`: the front is all doorway
 // (a kiosk on a concourse) instead.
-function shell(P, fr, w, d, { name, door = w / 2 - 1.1, open = false, wallTint = 0xece4d6, style = 'light', walls = [true, true, true], h: H = 3.6 } = {}) {
+function shell(P, fr, w, d, { name, door = w / 2 - 1.1, open = false, wallTint = 0xece4d6, style = 'light', walls = [true, true, true], h: H = 3.6, fascia: fasciaTint = null } = {}) {
   const t = 0.1, parts = [];
   if (walls[0]) parts.push([-w / 2, 0, -d / 2, w / 2, H, -d / 2 + t]);            // back
   if (walls[1]) parts.push([-w / 2, 0, -d / 2, -w / 2 + t, H, d / 2]);            // left side
@@ -116,7 +148,7 @@ function shell(P, fr, w, d, { name, door = w / 2 - 1.1, open = false, wallTint =
   }
   // The fascia over the front, and the shop's name on it.
   const fascia = put(P, fr, (P2, x, y, z, yaw) => assembly(P2, x, y, z, yaw, [
-    { kind: 'lacquer', boxes: [[-w / 2, top, d / 2 - 0.12, w / 2, H, d / 2]], tint: style === 'dark' ? 0x141414 : 0x2a2622 },
+    { kind: 'wood', boxes: [[-w / 2, top, d / 2 - 0.12, w / 2, H, d / 2]], tint: fasciaTint ?? (style === 'dark' ? 0x141414 : 0x2a2622) },
   ], 'wall', { structural: false }), 0, 0, 0);
   if (name) {
     const [sx, sz] = fr.at(0, d / 2 + 0.01);
@@ -140,136 +172,187 @@ function menu(P, fr, x, z, h, lines, ly = 0) {
 // with the till at its end; behind that the staff's side: the espresso bar on
 // the back wall under the chalkboards, shelves of bread beside it, the tiled
 // wall; a steel frame of shelving at the counter's open end with the pendant
-// lamps over the counter; the seats on the other side, tables in a row along
-// a banquette. `seats`: room for them inside (a kiosk has its tables outside).
+// lamps over the counter; the seats on the other side — tables along a
+// banquette, or a counter along the window with stools — pictures on the wall,
+// plants, cups and plates on the tables. `seats`: room for them inside (a
+// kiosk has its tables outside).
+const MENUS = [
+  ['COFFEE\nespresso  2.50\nlatte  3.80\ncappuccino  3.60', 'BAKERY\ncroissant  2.90\ncinnamon bun  3.20\nsourdough  6.50', 'TODAY\ncarrot cake\nlemon tart\nbanana bread'],
+  ['HOT DRINKS\nflat white  3.50\nmocha  4.20\nhot chocolate  3.90', 'FRESH\nbagel  3.10\npain au choc  3.00\nrye loaf  5.80', 'SPECIALS\napple pie\nbrownie\nquiche of the day'],
+  ['ESPRESSO BAR\nmacchiato  2.80\namericano  3.00\nchai latte  4.00', 'SWEET\neclair  3.40\nmacarons  1.90\ncheesecake  4.50', 'SANDWICHES\nham & cheese\navocado toast\ntuna melt'],
+];
 export function cafe(P, cx, y, cz, yaw, w, d, { name = 'BAKER & BEAN', seats = true, walls, h = H } = {}) {
-  const fr = frame(cx, y, cz, yaw);
-  shell(P, fr, w, d, { name, walls, h, door: seats ? -w / 2 + 1.2 : w / 2 - 1.0 });
-  const back = -d / 2 + 0.1;
-  // The counter runs across in front of the staff's side, on the right; the
-  // seats take the left.
-  const cw = seats ? Math.min(w * 0.55, 3.6) : w - 1.2;
-  const cxL = w / 2 - cw / 2 - 0.15;
-  const counterZ = back + Math.min(2.1, d * 0.45);
-  put(P, fr, S.displayCounter, cxL + 0.3, counterZ, 0, cw - 0.6);
-  put(P, fr, S.till, cxL - cw / 2 + 0.5, counterZ, 0);
-  // The back wall: tiled behind the espresso bar, the bar, the shelves.
-  put(P, fr, (P2, x, yy, z, yaw) => assembly(P2, x, yy, z, yaw, [{ kind: 'tiles', boxes: [[-cw / 2, 0.9, 0, cw / 2, 2.4, 0.02]] }], 'cladding', { structural: false }), cxL, back + 0.01, 0);
-  put(P, fr, S.espressoBar, cxL + 0.3, back + 0.35, 0, Math.min(2.4, cw - 0.8));
-  put(P, fr, S.breadShelves, cxL - cw / 2 + 0.5, back + 0.4, 0, 0.9);
-  menu(P, fr, cxL - 0.6, back + 0.03, 1.75, 'COFFEE\nespresso  2.50\nlatte  3.80\ncappuccino  3.60');
-  menu(P, fr, cxL + 0.3, back + 0.03, 1.75, 'BAKERY\ncroissant  2.90\ncinnamon bun  3.20\nsourdough  6.50');
-  menu(P, fr, cxL + 1.2, back + 0.03, 1.75, 'TODAY\ncarrot cake\nlemon tart\nbanana bread');
-  // The steel frame at the counter's open end, and the pendants over the counter.
-  put(P, fr, S.steelFrame, cxL - cw / 2 - 0.3, counterZ + 0.2, Math.PI / 2, 1.4, 3.3);
-  for (let k = 0; k < 4; k++) { const [px, pz] = fr.at(cxL - cw / 2 + 0.5 + k * (cw - 1) / 3, counterZ); S.pendant(P, px, y + h, pz, 1.2); }
-  // The seats.
-  if (seats) {
-    const left = -w / 2 + 0.6, room = w / 2 - cw - 0.6 - left;
-    put(P, fr, S.banquette, -w / 2 + 0.35, 0, Math.PI / 2, Math.min(d - 1.6, 5));
-    for (let z = -d / 2 + 1.2; z < d / 2 - 1.2; z += 1.5) {
-      put(P, fr, S.woodTable, left + 0.75, z, 0);
-      put(P, fr, S.woodChair, left + 1.45, z, -Math.PI / 2);
-      place('seat', fr, left + 1.45, z, -Math.PI / 2);
-      place('seat', fr, -w / 2 + 0.38, z, Math.PI / 2);
+  const L = look(cx, cz, y);
+  const fr = frame(cx, y, cz, yaw, L.mirror);
+  return styled(L, () => {
+    shell(P, fr, w, d, { name, walls, h, door: seats ? -w / 2 + 1.2 : w / 2 - 1.0, wallTint: L.wall, fascia: L.fascia });
+    const back = -d / 2 + 0.1;
+    // The counter runs across in front of the staff's side, on the right; the
+    // seats take the left.
+    const cw = seats ? Math.min(w * 0.55, 3.6) : w - 1.2;
+    const cxL = w / 2 - cw / 2 - 0.15;
+    const counterZ = back + Math.min(2.1, d * 0.45);
+    put(P, fr, S.displayCounter, cxL + 0.3, counterZ, 0, cw - 0.6);
+    put(P, fr, S.till, cxL - cw / 2 + 0.5, counterZ, 0);
+    // The back wall: tiled behind the espresso bar, the bar, the shelves.
+    put(P, fr, (P2, x, yy, z, yaw2) => assembly(P2, x, yy, z, yaw2, [{ kind: 'tiles', boxes: [[-cw / 2, 0.9, 0, cw / 2, 2.4, 0.02]] }], 'cladding', { structural: false }), cxL, back + 0.01, 0);
+    put(P, fr, S.espressoBar, cxL + 0.3, back + 0.35, 0, Math.min(2.4, cw - 0.8));
+    put(P, fr, S.breadShelves, cxL - cw / 2 + 0.5, back + 0.4, 0, 0.9);
+    const menus = MENUS[(L.rnd() * MENUS.length) | 0];
+    menus.forEach((m, k) => menu(P, fr, cxL - 0.6 + k * 0.9, back + 0.03, 1.75, m));
+    // The steel frame at the counter's open end, and the pendants over the counter.
+    put(P, fr, S.steelFrame, cxL - cw / 2 - 0.3, counterZ + 0.2, Math.PI / 2, 1.4, h - 0.3);
+    for (let k = 0; k < 4; k++) { const [px, pz] = fr.at(cxL - cw / 2 + 0.5 + k * (cw - 1) / 3, counterZ); S.pendant(P, px, y + h, pz, 1.2); }
+    // The seats.
+    if (seats) {
+      const left = -w / 2 + 0.6, room = w / 2 - cw - 0.6 - left;
+      if (L.variant === 0) {
+        put(P, fr, S.banquette, -w / 2 + 0.35, 0, Math.PI / 2, Math.min(d - 1.6, 5));
+        for (let z = -d / 2 + 1.2; z < d / 2 - 1.2; z += 1.5) {
+          put(P, fr, S.woodTable, left + 0.75, z, 0);
+          put(P, fr, S.woodChair, left + 1.45, z, -Math.PI / 2);
+          if (L.rnd() < 0.6) put(P, fr, S.tableware, left + 0.75, z, L.rnd() * 6);
+          place('seat', fr, left + 1.45, z, -Math.PI / 2);
+          place('seat', fr, -w / 2 + 0.38, z, Math.PI / 2);
+        }
+      } else {
+        // A counter along the window, stools facing the street.
+        const bl = Math.min(room + 1.2, 3.2);
+        put(P, fr, S.windowBar, left + bl / 2 - 0.2, d / 2 - 0.35, 0, bl);
+        for (let sx = -bl / 2 + 0.35; sx < bl / 2 - 0.2; sx += 0.6) place('seat', fr, left + bl / 2 - 0.2 + sx, d / 2 - 0.8, 0);
+      }
+      // Tables for two in rows across the rest of the room, a walkway between rows.
+      for (let x = left + (L.variant === 0 ? 2.6 : 0.8); x < left + room - 0.4; x += 2.2) for (let z = -d / 2 + 1.6; z < d / 2 - (L.variant === 0 ? 1.6 : 2.0); z += 1.9) {
+        put(P, fr, S.woodTable, x, z, 0);
+        put(P, fr, S.woodChair, x, z - 0.62, 0);
+        put(P, fr, S.woodChair, x, z + 0.62, Math.PI);
+        if (L.rnd() < 0.6) put(P, fr, S.tableware, x, z, L.rnd() * 6);
+        place('seat', fr, x, z - 0.62, 0);
+        place('seat', fr, x, z + 0.62, Math.PI);
+      }
+      // Pictures over the seats, a plant by the door.
+      for (let k = 0; k < (d > 6 ? 2 : 1); k++) onWall(P, fr, S.picture, -w / 2 + 0.1, -d / 2 + 1.5 + k * 2.6, Math.PI / 2, 1.55, 0.9, 0.65, L.art);
+      put(P, fr, F.plant, -w / 2 + 0.5, d / 2 - 0.5, 0, true);
     }
-    // Tables for two in rows across the rest of the room, a walkway between rows.
-    for (let x = left + 2.6; x < left + room - 0.4; x += 2.2) for (let z = -d / 2 + 1.6; z < d / 2 - 1.6; z += 1.9) {
-      put(P, fr, S.woodTable, x, z, 0);
-      put(P, fr, S.woodChair, x, z - 0.62, 0);
-      put(P, fr, S.woodChair, x, z + 0.62, Math.PI);
-      place('seat', fr, x, z - 0.62, 0);
-      place('seat', fr, x, z + 0.62, Math.PI);
-    }
-  }
-  // The till staff and the barista stand here; customers queue here and sit there.
-  // The one at the till faces the customers; the barista faces the machine.
-  place('staff', fr, cxL - cw / 2 + 0.5, counterZ - 0.7, 0);
-  place('staff', fr, cxL + 0.4, back + 0.95, Math.PI);
-  place('queue', fr, cxL - cw / 2 + 0.5, counterZ + 0.9, Math.PI);
-  place('queue', fr, cxL - cw / 2 + 0.35, counterZ + 1.65, Math.PI);
-  return {
-    staff: [fr.at(cxL - cw / 2 + 0.5, counterZ - 0.7), fr.at(cxL + 0.4, back + 0.95)],
-    queue: [fr.at(cxL - cw / 2 + 0.5, counterZ + 0.9), fr.at(cxL - cw / 2 + 0.3, counterZ + 1.7)],
-    yaw: fr.yaw(),
-  };
+    // The till staff and the barista stand here; customers queue here and sit there.
+    // The one at the till faces the customers; the barista faces the machine.
+    place('staff', fr, cxL - cw / 2 + 0.5, counterZ - 0.7, 0);
+    place('staff', fr, cxL + 0.4, back + 0.95, Math.PI);
+    place('queue', fr, cxL - cw / 2 + 0.5, counterZ + 0.9, Math.PI);
+    place('queue', fr, cxL - cw / 2 + 0.35, counterZ + 1.65, Math.PI);
+    return { yaw: fr.yaw() };
+  });
 }
 
 // ---------------------------------------------------------------- clothes
 
 // A clothes shop: the window display beside the door, rails of clothes down
-// one wall and shelves of folded things down the other, a table of jumpers in
-// the middle, the fitting rooms and the cash desk at the back.
+// one wall and shelves of folded things down the other (or rails both sides
+// and the shelves at the back), a table of jumpers or a sofa on a rug in the
+// middle, the fitting rooms and the cash desk at the back, a mirror, a plant.
 export function boutique(P, cx, y, cz, yaw, w, d, { name = 'MAISON', h = H, style = 'dark' } = {}) {
-  const fr = frame(cx, y, cz, yaw);
-  shell(P, fr, w, d, { name, h, style, door: w / 2 - 1.0 });
-  const len = d - 1.9;
-  put(P, fr, S.windowDisplay, -w / 4, d / 2 - 0.65, 0, Math.min(2.4, w / 2 - 0.4));
-  put(P, fr, S.wallRail, -w / 2 + 0.52, -0.25, Math.PI / 2, len);
-  put(P, fr, S.foldShelves, w / 2 - 0.52, -0.35, -Math.PI / 2, Math.min(len, 2.4));
-  if (w > 4.2) put(P, fr, S.foldTable, 0, 0.15, 0);
-  put(P, fr, S.fittingRooms, -w / 4, -d / 2 + 0.7, 0, 2);
-  put(P, fr, S.cashDesk, w / 4, -d / 2 + 0.75, 0, 1.4);
-  place('staff', fr, w / 4, -d / 2 + 0.25, 0);
-  place('browse', fr, -w / 2 + 1.25, -0.2, -Math.PI / 2);
-  place('browse', fr, w / 2 - 1.2, -0.5, Math.PI / 2);
-  place('browse', fr, 0.1, 0.85, Math.PI);
-  return { yaw: fr.yaw() };
+  const L = look(cx, cz, y);
+  const fr = frame(cx, y, cz, yaw, L.mirror);
+  return styled(L, () => {
+    shell(P, fr, w, d, { name, h, style, door: w / 2 - 1.0, wallTint: L.wall, fascia: L.fascia });
+    const len = d - 1.9;
+    put(P, fr, S.windowDisplay, -w / 4, d / 2 - 0.65, 0, Math.min(2.4, w / 2 - 0.4));
+    put(P, fr, S.wallRail, -w / 2 + 0.52, -0.25, Math.PI / 2, len);
+    if (L.variant === 0) put(P, fr, S.foldShelves, w / 2 - 0.52, -0.35, -Math.PI / 2, Math.min(len, 2.4));
+    else put(P, fr, S.wallRail, w / 2 - 0.52, -0.25, -Math.PI / 2, Math.min(len, 2.4));
+    if (w > 5.5 && L.rnd() < 0.6) {
+      put(P, fr, rugAt, 0, 0.1, 0, 2.2, 1.6, L.seat);
+      put(P, fr, F.sofa, 0, -0.35, Math.PI, L.seat);          // a sofa faces −z at rest: this one faces the door
+    } else if (w > 4.2) put(P, fr, S.foldTable, 0, 0.15, L.rnd() < 0.5 ? 0 : Math.PI / 2);
+    put(P, fr, S.fittingRooms, -w / 4, -d / 2 + 0.7, 0, 2);
+    put(P, fr, S.cashDesk, w / 4, -d / 2 + 0.75, 0, 1.4);
+    if (L.variant === 1) put(P, fr, S.foldShelves, w / 4, -d / 2 + 0.45, 0, Math.min(1.6, w / 2 - 0.6));
+    onWall(P, fr, S.roundMirror, w / 2 - 0.1, d / 2 - 1.1, -Math.PI / 2, 1.0, 0.38);
+    if (L.rnd() < 0.7) put(P, fr, F.plant, w / 2 - 0.45, d / 2 - 0.45, 0, true);
+    place('staff', fr, w / 4, -d / 2 + 0.25, 0);
+    place('browse', fr, -w / 2 + 1.25, -0.2, -Math.PI / 2);
+    place('browse', fr, w / 2 - 1.2, -0.5, Math.PI / 2);
+    place('browse', fr, 0.1, 0.85, Math.PI);
+    return { yaw: fr.yaw() };
+  });
 }
 
 // ---------------------------------------------------------------- shoes and bags
 
 export function shoes(P, cx, y, cz, yaw, w, d, { name = 'STRIDE', h = H } = {}) {
-  const fr = frame(cx, y, cz, yaw);
-  shell(P, fr, w, d, { name, h, door: w / 2 - 1.0 });
-  const len = d - 1.6;
-  put(P, fr, S.shoeWall, -w / 2 + 0.45, -0.1, Math.PI / 2, len);
-  put(P, fr, S.shoeWall, w / 2 - 0.45, -0.3, -Math.PI / 2, Math.min(len, 2.4));
-  put(P, fr, S.shoeWall, -w / 4, -d / 2 + 0.45, 0, Math.min(2.4, w / 2 - 0.4));
-  put(P, fr, S.bagCubes, -w / 4, d / 2 - 0.6, 0);
-  put(P, fr, S.tryOnBench, -0.3, 0.1, 0);
-  put(P, fr, S.cashDesk, w / 4, -d / 2 + 0.75, 0, 1.2);
-  place('staff', fr, w / 4, -d / 2 + 0.25, 0);
-  place('browse', fr, -w / 2 + 1.0, 0.4, -Math.PI / 2);
-  place('seat', fr, -0.6, 0.1, 0);
-  return { yaw: fr.yaw() };
+  const L = look(cx, cz, y);
+  const fr = frame(cx, y, cz, yaw, L.mirror);
+  return styled(L, () => {
+    shell(P, fr, w, d, { name, h, door: w / 2 - 1.0, wallTint: L.wall, fascia: L.fascia });
+    const len = d - 1.6;
+    put(P, fr, S.shoeWall, -w / 2 + 0.45, -0.1, Math.PI / 2, len);
+    if (L.variant === 0) put(P, fr, S.shoeWall, w / 2 - 0.45, -0.3, -Math.PI / 2, Math.min(len, 2.4));
+    else put(P, fr, S.bagCubes, w / 2 - 0.5, -0.3, -Math.PI / 2);
+    put(P, fr, S.shoeWall, -w / 4, -d / 2 + 0.45, 0, Math.min(2.4, w / 2 - 0.4));
+    put(P, fr, S.bagCubes, -w / 4, d / 2 - 0.6, 0);
+    put(P, fr, rugAt, -0.3, 0.1, 0, 2.0, 1.4, L.seat);
+    put(P, fr, S.tryOnBench, -0.3, 0.1, 0);
+    put(P, fr, S.cashDesk, w / 4, -d / 2 + 0.75, 0, 1.2);
+    if (L.rnd() < 0.6) put(P, fr, F.plant, w / 2 - 0.45, d / 2 - 0.45, 0, false);
+    place('staff', fr, w / 4, -d / 2 + 0.25, 0);
+    place('browse', fr, -w / 2 + 1.0, 0.4, -Math.PI / 2);
+    place('seat', fr, -0.6, 0.1, 0);
+    return { yaw: fr.yaw() };
+  });
 }
 
 // ---------------------------------------------------------------- jewellers and watches
 
-// Lit vitrines round the walls, a glass island in the middle, and the counter
-// at the back where a customer sits on a stool to be shown a ring.
+// Lit vitrines round the walls, a glass island in the middle, the counter at
+// the back where a customer sits on a stool to be shown a ring; armchairs to
+// wait in, or towers of watches; a rug, a picture, a plant.
 export function jeweller(P, cx, y, cz, yaw, w, d, { name = 'AURUM', h = H } = {}) {
-  const fr = frame(cx, y, cz, yaw);
-  shell(P, fr, w, d, { name, h, style: 'gold', door: 0, wallTint: 0xe8dcc6 });
-  const len = d - 1.4;
-  put(P, fr, S.vitrine, -w / 2 + 0.45, -0.15, Math.PI / 2, len);
-  put(P, fr, S.vitrine, w / 2 - 0.45, -0.15, -Math.PI / 2, len);
-  put(P, fr, S.vitrine, 0, -d / 2 + 0.45, 0, Math.min(2.4, w - 2));
-  put(P, fr, S.cashDesk, 0, -d / 2 + 1.35, 0, Math.min(2, w - 2.4));
-  for (const sx of [-0.45, 0.45]) put(P, fr, E.barStool, sx, -d / 2 + 2.0, 0);
-  if (d > 4) put(P, fr, E.jewelCase, 0, d / 2 - 1.1, 0);
-  place('staff', fr, 0, -d / 2 + 0.85, 0);
-  place('seat', fr, -0.45, -d / 2 + 2.0, Math.PI);
-  place('browse', fr, -w / 2 + 1.1, 0.4, -Math.PI / 2);
-  return { yaw: fr.yaw() };
+  const L = look(cx, cz, y);
+  const fr = frame(cx, y, cz, yaw, L.mirror);
+  return styled(L, () => {
+    shell(P, fr, w, d, { name, h, style: 'gold', door: 0, wallTint: L.variant ? 0xe8dcc6 : L.wall, fascia: L.fascia });
+    const len = d - 1.4;
+    put(P, fr, S.vitrine, -w / 2 + 0.45, -0.15, Math.PI / 2, len);
+    put(P, fr, S.vitrine, w / 2 - 0.45, -0.15, -Math.PI / 2, len);
+    put(P, fr, S.vitrine, 0, -d / 2 + 0.45, 0, Math.min(2.4, w - 2));
+    put(P, fr, S.cashDesk, 0, -d / 2 + 1.35, 0, Math.min(2, w - 2.4));
+    for (const sx of [-0.45, 0.45]) put(P, fr, E.barStool, sx, -d / 2 + 2.0, 0);
+    put(P, fr, rugAt, 0, -d / 2 + 2.1, 0, Math.min(2.6, w - 1.4), 1.2, L.seat);
+    const watches = /WATCH|TEMPO/.test(name) || L.variant === 1;
+    if (watches) for (const sx of [-w / 4, w / 4]) put(P, fr, S.watchTower, sx, d / 2 - 1.0, 0);
+    else if (d > 4) put(P, fr, E.jewelCase, 0, d / 2 - 1.1, 0);
+    if (d > 4.8 || w > 6) {
+      put(P, fr, H2.armchair, -w / 2 + 1.4, d / 2 - 1.2, -Math.PI / 2, L.seat);   // facing into the shop
+      put(P, fr, H2.coffeeTable, -w / 2 + 2.2, d / 2 - 1.2, 0);
+    }
+    if (L.rnd() < 0.6) put(P, fr, F.plant, w / 2 - 1.0, d / 2 - 0.45, 0, true);
+    place('staff', fr, 0, -d / 2 + 0.85, 0);
+    place('seat', fr, -0.45, -d / 2 + 2.0, Math.PI);
+    place('browse', fr, -w / 2 + 1.1, 0.4, -Math.PI / 2);
+    return { yaw: fr.yaw() };
+  });
 }
 
 // ---------------------------------------------------------------- souvenirs
 
 export function souvenirs(P, cx, y, cz, yaw, w, d, { name = 'TOWER GIFTS', h = H } = {}) {
-  const fr = frame(cx, y, cz, yaw);
-  shell(P, fr, w, d, { name, h, style: 'gold', door: w / 2 - 1.0 });
-  const len = d - 1.5;
-  put(P, fr, S.souvenirWall, -w / 2 + 0.42, -0.2, Math.PI / 2, len);
-  put(P, fr, S.souvenirWall, w / 2 - 0.42, -0.4, -Math.PI / 2, Math.min(len, 2.4));
-  put(P, fr, S.souvenirWall, -w / 4, -d / 2 + 0.42, 0, Math.min(2.4, w / 2 - 0.4));
-  put(P, fr, S.postcardSpinner, -0.4, 0.4, 0);
-  put(P, fr, S.cashDesk, w / 4, -d / 2 + 0.8, 0, 1.4);
-  place('staff', fr, w / 4, -d / 2 + 0.3, 0);
-  place('browse', fr, -w / 2 + 1.0, 0, -Math.PI / 2);
-  place('browse', fr, -0.4, 1.0, Math.PI);
-  return { yaw: fr.yaw() };
+  const L = look(cx, cz, y);
+  const fr = frame(cx, y, cz, yaw, L.mirror);
+  return styled(L, () => {
+    shell(P, fr, w, d, { name, h, style: 'gold', door: w / 2 - 1.0, wallTint: L.wall, fascia: L.fascia });
+    const len = d - 1.5;
+    put(P, fr, S.souvenirWall, -w / 2 + 0.42, -0.2, Math.PI / 2, len);
+    put(P, fr, S.souvenirWall, w / 2 - 0.42, -0.4, -Math.PI / 2, Math.min(len, 2.4));
+    put(P, fr, S.souvenirWall, -w / 4, -d / 2 + 0.42, 0, Math.min(2.4, w / 2 - 0.4));
+    put(P, fr, S.towerModel, -w / 4, d / 2 - 0.6, 0);
+    put(P, fr, S.postcardSpinner, -0.4, 0.4, 0);
+    if (w > 4) put(P, fr, S.toteRack, 0.6, -0.2, Math.PI / 2);
+    put(P, fr, S.cashDesk, w / 4, -d / 2 + 0.8, 0, 1.4);
+    place('staff', fr, w / 4, -d / 2 + 0.3, 0);
+    place('browse', fr, -w / 2 + 1.0, 0, -Math.PI / 2);
+    place('browse', fr, -0.4, 1.0, Math.PI);
+    return { yaw: fr.yaw() };
+  });
 }
 
 // ---------------------------------------------------------------- the mall floors
