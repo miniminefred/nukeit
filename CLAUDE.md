@@ -197,6 +197,24 @@ They arrive with sirens and lit cars on the avenue, search floor by floor, chang
 only by the stairs (out of sight for a few seconds a floor), and one catching you is a
 comic heap, "BUSTED", and the job failed.
 
+**Shops are real places** (`building/shops.js`, fixtures in `furniture-shop.js`), after the
+owner's photograph of a café-bakery (`~/Downloads/Screenshot 2026-10-18 122332.png`): "an
+actual place, not just some random stuff sitting". A unit is its own walls (each wall a
+piece, so what hangs on it is `cladding` fixed to its face), a glazed front with a door, a
+fascia with the shop's name and chalkboard menus as decals (`signs`), and inside the layout
+of a working shop: customers come in at the front, the counter faces them, staff work
+behind it, stock is on the walls, seats are grouped. Types: café-bakery (display counter of
+pastries, till, espresso bar on a patterned `tiles` wall, bread shelves, a black steel
+frame, pendant bulbs, tables and a banquette), clothes boutique, shoes and bags, jeweller
+and watches, souvenirs (neutral: caps, mugs, T-shirts, snow globes). The shop floors (1–2)
+are a **mall** (`mall()`): units along both sides, a walkway round the core and atrium, a
+flagship across the west end. The lobby café is one. **Street cafés**: the blocks either
+side of the tower and across the avenue have a real ground floor at the front (`CAFES` in
+`scenery/city.js`, built by `building/street.js`), split into units 8–10 m wide — one
+26 m hall of tables looked like nothing real — and are never woken whole (`noWake`). The
+shops record where people belong (`places`: staff, queue, browse, seat) and `people.js`
+fills them, sitting people with thighs along the seat and shins down.
+
 **Sprinklers, smoke and water** (`sim/water.js`, `sim/smoke.js`): heads every 3.5 m under
 every ceiling of the tower (instanced, not pieces; each remembers its slab), fed by red
 mains hung under the slabs (pieces, role `pipe`). A head opens over a fire after about a
