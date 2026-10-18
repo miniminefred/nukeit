@@ -89,7 +89,9 @@ function shell(P, fr, w, d, { name, door = w / 2 - 1.1, open = false, wallTint =
   if (walls[0]) parts.push([-w / 2, 0, -d / 2, w / 2, H, -d / 2 + t]);            // back
   if (walls[1]) parts.push([-w / 2, 0, -d / 2, -w / 2 + t, H, d / 2]);            // left side
   if (walls[2]) parts.push([w / 2 - t, 0, -d / 2, w / 2, H, d / 2]);              // right side
-  if (parts.length) put(P, fr, (P2, x, y, z, yaw) => assembly(P2, x, y, z, yaw, [{ kind: 'plaster', boxes: parts, tint: wallTint }], 'wall', { structural: false }), 0, 0, 0);
+  // Each wall its own piece: what hangs on a wall is fixed to that wall's face
+  // (support.js), and three walls as one piece have the whole unit for a box.
+  for (const box of parts) put(P, fr, (P2, x, y, z, yaw) => assembly(P2, x, y, z, yaw, [{ kind: 'plaster', boxes: [box], tint: wallTint }], 'wall', { structural: false }), 0, 0, 0);
   // The front: glass between slim black frames, a gap for the door.
   const top = 2.6;
   if (!open) {
@@ -174,4 +176,100 @@ export function cafe(P, cx, y, cz, yaw, w, d, { name = 'BAKER & BEAN', seats = t
     queue: [fr.at(cxL - cw / 2 + 0.5, counterZ + 0.9), fr.at(cxL - cw / 2 + 0.3, counterZ + 1.7)],
     yaw: fr.yaw(),
   };
+}
+
+// ---------------------------------------------------------------- clothes
+
+// A clothes shop: the window display beside the door, rails of clothes down
+// one wall and shelves of folded things down the other, a table of jumpers in
+// the middle, the fitting rooms and the cash desk at the back.
+export function boutique(P, cx, y, cz, yaw, w, d, { name = 'MAISON', h = H, style = 'dark' } = {}) {
+  const fr = frame(cx, y, cz, yaw);
+  shell(P, fr, w, d, { name, h, style, door: w / 2 - 1.0 });
+  const len = d - 1.9;
+  put(P, fr, S.windowDisplay, -w / 4, d / 2 - 0.65, 0, Math.min(2.4, w / 2 - 0.4));
+  put(P, fr, S.wallRail, -w / 2 + 0.52, -0.25, Math.PI / 2, len);
+  put(P, fr, S.foldShelves, w / 2 - 0.52, -0.35, -Math.PI / 2, Math.min(len, 2.4));
+  if (w > 4.2) put(P, fr, S.foldTable, 0, 0.15, 0);
+  put(P, fr, S.fittingRooms, -w / 4, -d / 2 + 0.7, 0, 2);
+  put(P, fr, S.cashDesk, w / 4, -d / 2 + 0.75, 0, 1.4);
+  return { staff: [fr.at(w / 4, -d / 2 + 0.25)], browse: [fr.at(-w / 2 + 1.2, 0), fr.at(w / 2 - 1.2, -0.3), fr.at(0, 1)], yaw: fr.yaw() };
+}
+
+// ---------------------------------------------------------------- shoes and bags
+
+export function shoes(P, cx, y, cz, yaw, w, d, { name = 'STRIDE', h = H } = {}) {
+  const fr = frame(cx, y, cz, yaw);
+  shell(P, fr, w, d, { name, h, door: w / 2 - 1.0 });
+  const len = d - 1.6;
+  put(P, fr, S.shoeWall, -w / 2 + 0.45, -0.1, Math.PI / 2, len);
+  put(P, fr, S.shoeWall, w / 2 - 0.45, -0.3, -Math.PI / 2, Math.min(len, 2.4));
+  put(P, fr, S.shoeWall, -w / 4, -d / 2 + 0.45, 0, Math.min(2.4, w / 2 - 0.4));
+  put(P, fr, S.bagCubes, -w / 4, d / 2 - 0.6, 0);
+  put(P, fr, S.tryOnBench, -0.3, 0.1, 0);
+  put(P, fr, S.cashDesk, w / 4, -d / 2 + 0.75, 0, 1.2);
+  return { staff: [fr.at(w / 4, -d / 2 + 0.25)], browse: [fr.at(-w / 2 + 1, 0.3), fr.at(0.2, -0.5)], yaw: fr.yaw() };
+}
+
+// ---------------------------------------------------------------- jewellers and watches
+
+// Lit vitrines round the walls, a glass island in the middle, and the counter
+// at the back where a customer sits on a stool to be shown a ring.
+export function jeweller(P, cx, y, cz, yaw, w, d, { name = 'AURUM', h = H } = {}) {
+  const fr = frame(cx, y, cz, yaw);
+  shell(P, fr, w, d, { name, h, style: 'gold', door: 0, wallTint: 0xe8dcc6 });
+  const len = d - 1.4;
+  put(P, fr, S.vitrine, -w / 2 + 0.45, -0.15, Math.PI / 2, len);
+  put(P, fr, S.vitrine, w / 2 - 0.45, -0.15, -Math.PI / 2, len);
+  put(P, fr, S.vitrine, 0, -d / 2 + 0.45, 0, Math.min(2.4, w - 2));
+  put(P, fr, S.cashDesk, 0, -d / 2 + 1.35, 0, Math.min(2, w - 2.4));
+  for (const sx of [-0.45, 0.45]) put(P, fr, E.barStool, sx, -d / 2 + 2.0, 0);
+  if (d > 4) put(P, fr, E.jewelCase, 0, d / 2 - 1.1, 0);
+  return { staff: [fr.at(0, -d / 2 + 0.85)], browse: [fr.at(0, -d / 2 + 2.0), fr.at(-w / 2 + 1.1, 0.4)], yaw: fr.yaw() };
+}
+
+// ---------------------------------------------------------------- souvenirs
+
+export function souvenirs(P, cx, y, cz, yaw, w, d, { name = 'TOWER GIFTS', h = H } = {}) {
+  const fr = frame(cx, y, cz, yaw);
+  shell(P, fr, w, d, { name, h, style: 'gold', door: w / 2 - 1.0 });
+  const len = d - 1.5;
+  put(P, fr, S.souvenirWall, -w / 2 + 0.42, -0.2, Math.PI / 2, len);
+  put(P, fr, S.souvenirWall, w / 2 - 0.42, -0.4, -Math.PI / 2, Math.min(len, 2.4));
+  put(P, fr, S.souvenirWall, -w / 4, -d / 2 + 0.42, 0, Math.min(2.4, w / 2 - 0.4));
+  put(P, fr, S.postcardSpinner, -0.4, 0.4, 0);
+  put(P, fr, S.cashDesk, w / 4, -d / 2 + 0.8, 0, 1.4);
+  return { staff: [fr.at(w / 4, -d / 2 + 0.3)], browse: [fr.at(-w / 2 + 1, 0), fr.at(0, 0.9)], yaw: fr.yaw() };
+}
+
+// ---------------------------------------------------------------- the mall floors
+
+// The tower's shop floors as a mall: a row of units along each long side,
+// fronts onto the walkway round the core and the atrium, a column line
+// between each, the flagship across the west end. Each floor its own mix.
+// Returns where staff stand and customers browse (sim/people.js).
+const BAYS = [[-14, -9.5], [-9.5, -5], [-5, 0], [0, 5], [5, 10], [15, 19.6]];
+const NAMES = {
+  boutique: ['MAISON', 'LINEA', 'VELOUR', 'ATELIER', 'NORTH & CO'],
+  shoes: ['STRIDE', 'SOLE', 'CARRY'],
+  jeweller: ['AURUM', 'CARAT', 'LUMEN', 'TEMPO WATCHES'],
+  souvenirs: ['TOWER GIFTS'],
+  cafe: ['BAKER & BEAN', 'CRUMB'],
+};
+export function mall(P, f, y, h, plan) {
+  const build = { boutique, shoes, jeweller, souvenirs, cafe };
+  const out = [];
+  const count = {};
+  const unit = (type, cx, cz, yaw, w, d) => {
+    const n = (count[type] = (count[type] ?? -1) + 1);
+    const name = NAMES[type][(n + f) % NAMES[type].length];
+    out.push(build[type](P, cx, y, cz, yaw, w, d, { name, h, seats: true }));
+  };
+  // North row: backs to the north facade, fronts facing +z.
+  plan.north.forEach((type, i) => { if (!type) return; const [a, b] = BAYS[i]; unit(type, (a + b) / 2, -9.5, 0, b - a - 0.8, 4.2); });
+  // South row: fronts facing −z.
+  plan.south.forEach((type, i) => { if (!type) return; const [a, b] = BAYS[i]; unit(type, (a + b) / 2, 9.5, Math.PI, b - a - 0.8, 4.2); });
+  // The flagship, the whole west end, front facing +x.
+  if (plan.west) unit(plan.west, -16.9, 0, Math.PI / 2, 12.8, 5.0);
+  return out;
 }

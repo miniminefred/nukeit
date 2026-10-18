@@ -289,43 +289,32 @@ function steppedStone(P, x0, x1, y0, y1, face) {
   }
 }
 
+// The shop floors are a mall (building/shops.js): real shops in units along
+// both sides, fronts onto the walkway round the core and the atrium, a
+// flagship across the west end. Benches and planters on the walkway.
 function boutiques(P, f, y) {
-  const front = podiumFront(f);
-  // Racks and tables in aisles, mannequins in the windows, a till by the atrium.
-  for (let x = -17; x <= 7; x += 3.2)
-    for (const z of [-9.2, -5.6, 5.6, 8.6]) {
-      if (!freePodium(f, x, z, 0.9)) continue;
-      if ((x + z) % 2 < 1) F.clothesRack(P, x, y, z, 0);
-      else F.displayTable(P, x, y, z, 0);
-    }
-  for (const x of [-15, -11, -7, 5]) if (freePodium(f, x, front - 1.3, 0.3)) F.mannequin(P, x, y, front - 1.3, Math.PI);
-  F.counter(P, 17.2, y, front - 3.5, HALF, 2.4);
-  F.plant(P, 18.6, y, -11, false);
-  // The flagship store, the whole west end: a glass front with a gold portal.
-  glassWall(P, f, 'z', -13.2, -11.6, front - 0.4, [[-1.2, 1.2]]);
-  assembly(P, -13.2, y, 0, 0, [
-    { kind: 'gold', round: 0.02, boxes: [[-0.15, 0, -1.4, 0.15, 3.4, -1.2], [-0.15, 0, 1.2, 0.15, 3.4, 1.4], [-0.15, 3.0, -1.4, 0.15, 3.4, 1.4], [-0.2, 3.45, -3, 0.2, 3.65, 3]] },
-  ], 'furniture', { floor: f });
-  for (const z of [-8, -4.5, 4.5, 8]) F.mannequin(P, -16.8, y, z, HALF);
-  // Changing rooms along the back wall.
-  for (let n = 0; n < 3; n++) {
-    const x0 = 9.4 + n * 1.2;
-    block(P, 'plaster', x0, y, -11.6, x0 + 0.08, y + 2.2, -10.2, 'wall', { floor: f, tint: 0xe8e0d6 });
-  }
-  block(P, 'fabric', 9.4, y, -10.25, 13, y + 2.1, -10.2, 'furniture', { floor: f, tint: 0x6a1a22 });
+  SH.mall(P, f, y, U(f) - y, {
+    north: ['boutique', 'shoes', 'souvenirs', 'boutique', 'shoes', 'cafe'],
+    south: ['boutique', 'cafe', 'boutique', 'shoes', 'boutique', 'souvenirs'],
+    west: 'boutique',
+  });
+  walkway(P, f, y);
 }
 
 function jewellers(P, f, y) {
-  for (let x = -16; x <= 7; x += 2.6)
-    for (const z of [-9.5, -6.8, 6, 8.8]) {
-      if (!freePodium(f, x, z, 0.8)) continue;
-      E.jewelCase(P, x, y, z, 0);
-    }
-  for (const x of [-12, -6]) if (freePodium(f, x, 10.6, 0.3)) F.mannequin(P, x, y, 10.6, Math.PI);
-  F.counter(P, 17.2, y, 8, HALF, 2.4);
-  for (const z of [-10, 3]) F.plant(P, 18.4, y, z, true);
-  F.chandelier(P, -10, U(f), 1);
-  F.chandelier(P, 3, U(f), 7.5);
+  SH.mall(P, f, y, U(f) - y, {
+    north: ['jeweller', 'jeweller', 'cafe', 'jeweller', 'boutique', 'jeweller'],
+    south: ['jeweller', 'boutique', 'jeweller', 'shoes', 'jeweller', 'cafe'],
+    west: 'jeweller',
+  });
+  walkway(P, f, y);
+  F.chandelier(P, -10, U(f), 0);
+  F.chandelier(P, 2.5, U(f), 5.2);
+}
+
+function walkway(P, f, y) {
+  for (const [x, z] of [[-11.5, -5.6], [-11.5, 5.6], [7.5, -5.6], [7.5, 5.6]]) F.plant(P, x, y, z, true);
+  for (const [x, z, yaw] of [[-8, 5.6, Math.PI], [-8, -5.6, 0], [17.5, 0, HALF]]) L.steelBench(P, x, y, z, yaw);
 }
 
 function foodCourt(P, f, y) {

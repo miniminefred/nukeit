@@ -82,7 +82,7 @@ let _interior = null;
 export const interiorEnvironment = () => _interior;
 export function setInteriorEnvironment(tex) {
   _interior = tex;
-  for (const [name, m] of _mats) if (KINDS[name]?.indoor || name === 'clearglass') { m.envMap = tex; m.needsUpdate = true; }
+  for (const [name, m] of _mats) if (KINDS[name]?.indoor || name === 'clearglass') { m.envMap = tex; if (name === 'clearglass') m.envMapIntensity = 0.45; m.needsUpdate = true; }
 }
 
 function build(name, def, surf) {
@@ -99,9 +99,9 @@ function build(name, def, surf) {
     // a little green at the edges, catching the room.
     const m = new THREE.MeshStandardMaterial({
       color: 0xe6f0ee, metalness: 0.1, roughness: 0.02,
-      transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide,
+      transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide,
     });
-    if (_interior) { m.envMap = _interior; m.envMapIntensity = 1.2; }
+    if (_interior) { m.envMap = _interior; m.envMapIntensity = 0.45; }
     return m;
   }
   if (name === 'lamp') {
