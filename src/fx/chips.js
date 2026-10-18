@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { KIND } from '../render/materials.js';
 import { blob } from '../damage/cutter.js';
 import { G_RAY } from '../physics.js';
+import { groundAt } from '../building/plan.js';
 
 // Small bits: the chips of timber, grit of concrete, crumbs of plaster and
 // slivers of glass that a blow throws off.
@@ -125,7 +126,7 @@ export class Chips {
         }
         c.x = nx; c.y = ny; c.z = nz;
         c.rx += c.sx * dt; c.ry += c.sy * dt;
-        if (c.y < -2) c.rest = true;
+        if (c.y < groundAt(c.x, c.z) - 2) c.rest = true;
       }
       if (moving || this.dirty[key]) this._write(key);
       this.dirty[key] = moving || list.some((c) => c.rest && c.t > LINGER);

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { groundAt } from '../building/plan.js';
 
 // Every soft, short-lived thing in the game — dust, smoke, flame, sparks, paint
 // mist, extinguisher foam — is a particle in one of two pools: one blended
@@ -151,7 +152,11 @@ class Pool {
       this.pos[i] += this.vel[i] * dt;
       this.pos[i + 1] += this.vel[i + 1] * dt;
       this.pos[i + 2] += this.vel[i + 2] * dt;
-      if (this.pos[i + 1] < 0.05) { this.pos[i + 1] = 0.05; this.vel[i + 1] *= -0.2; }
+      // The ground: the street, or the pit's floor under the podium. A flat
+      // floor at street level threw the lower level's foam and dust up
+      // through the lobby.
+      const g = groundAt(this.pos[i], this.pos[i + 2]) + 0.05;
+      if (this.pos[i + 1] < g) { this.pos[i + 1] = g; this.vel[i + 1] *= -0.2; }
       this.size[p] = Math.max(0.01, this.size[p] + this.grow[p] * dt);
       const t = this.age[p] / this.life[p];
       this.info[p * 2 + 1] = t;
