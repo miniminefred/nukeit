@@ -37,6 +37,7 @@ const BREAK_SPEED = 5;       // m/s at which hitting the street breaks it apart
 const CRUSH_PER_FRAME = 150; // pieces a frame the low side grinds off into the street
 const HINGE_SNAP = 0.45;     // rad of lean at which the columns it pivots on give way
 
+const _box = new THREE.Box3();
 const _m = new THREE.Matrix4();
 const _t = new THREE.Vector3();
 const _q = new THREE.Quaternion();
@@ -242,8 +243,6 @@ export class Topple {
     for (const p of list) zone.union(p.box);
     const reach = zone.max.y - zone.min.y;
     zone.expandByVector(new THREE.Vector3(Math.abs(dir.x) * reach + 4, 0, Math.abs(dir.z) * reach + 4));
-    // Any city block it could come down on is a building from now on.
-    this.fx.wake?.(new THREE.Box3(zone.min.clone().setY(0), zone.max.clone()));
     const C = 2, x0 = zone.min.x, z0 = zone.min.z;
     const nx = Math.ceil((zone.max.x - x0) / C), nz = Math.ceil((zone.max.z - z0) / C);
     const h = new Float32Array(nx * nz);
@@ -370,6 +369,28 @@ export class Topple {
     if (n) { fx.audio?.rumble(Math.min(1, 0.4 + n / 100)); fx.shake?.add(Math.min(0.3, n / 300)); }
   }
 
+  // A city block is a box until something reaches it. Every tenth of a second,
+  // the mass's own boxes, where they are now and a few metres on, wake any
+  // block they are about to meet — only those, and only then. Waking every
+  // block in its path as it started to tip woke five forty-storey blocks at
+  // once (a 1.2 s frame), and most of them were never touched but stood there,
+  // twelve thousand colliders the simulation paid for on every step.
+  _wakeAhead(dt) {
+    const M = this.mass;
+    if (!this.fx.wake || (M.wakeT = (M.wakeT ?? 0) - dt) > 0) return;
+    M.wakeT = 0.1;
+    const lv = M.body.linvel(), lead = 3 + Math.hypot(lv.x, lv.y, lv.z) * 0.3;
+    for (let n = 0; n < M.body.numColliders(); n++) {
+      const c = M.body.collider(n), h = c.halfExtents(), t = c.translation(), r = c.rotation();
+      _q.set(r.x, r.y, r.z, r.w);
+      _box.makeEmpty();
+      for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1])
+        _box.expandByPoint(_v.set(sx * h.x, sy * h.y, sz * h.z).applyQuaternion(_q).add(_t.set(t.x, t.y, t.z)));
+      _box.expandByScalar(lead);
+      this.fx.wake(_box);
+    }
+  }
+
   _release() {
     const M = this.mass;
     if (M?.joint) { this.physics.world.removeImpulseJoint(M.joint, true); M.joint = null; }
@@ -384,6 +405,7 @@ export class Topple {
     const t = b.translation(), r = b.rotation();
     _m.compose(_t.set(t.x, t.y, t.z), _q.set(r.x, r.y, r.z, r.w), _s);
     if (M.joint) this._grind(_m);
+    this._wakeAhead(dt);
     this._smash();
     for (const rd of M.riders) {
       const p = rd.p;

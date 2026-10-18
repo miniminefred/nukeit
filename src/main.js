@@ -251,11 +251,12 @@ player.onDeath = (cause) => {
   downT = 3;
 };
 
-// The job's measure: the highest point of anything still standing.
+// The job's measure: the highest point of anything still standing in the two
+// buildings of the job — not a city block it woke on the way down.
 function measure() {
   let top = 0;
   for (const p of pieces.list) {
-    if (p.state !== 'static') continue;
+    if (p.state !== 'static' || (p.building !== 'tower' && p.building !== 'neighbour')) continue;
     if (p.role === 'shard' || p.role === 'fragment' || p.role === 'rebar' || p.role === 'stub') continue;
     if (p.box.max.y > top) top = p.box.max.y;
   }

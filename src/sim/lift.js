@@ -86,6 +86,7 @@ export class Lift {
     this.wait = WAIT;
     this.doors = [];
     this.broken = false;
+    this._placed = null;
     this._place();
   }
 
@@ -206,10 +207,13 @@ export class Lift {
   }
 
   _place() {
+    if (this._placed === this.y) return;
+    this._placed = this.y;
     this.group.position.set(0, this.y, 0);
     for (const c of this.colliders) {
       const o = c.userData;
       c.setTranslation({ x: o.x, y: o.y + this.y, z: o.z });
     }
+    this.physics.dirty = true;
   }
 }

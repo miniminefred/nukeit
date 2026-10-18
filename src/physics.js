@@ -6,7 +6,10 @@ import { BASEMENT } from './building/plan.js';
 
 // Rigid-body physics, through Rapier.
 //
-// Everything standing is a fixed collider on one static body. A piece only
+// Everything standing is a fixed collider with no body at all. (They were all
+// on one static body once, and adding or removing any one of them marked that
+// body changed, so the next step re-synced every collider on it: twenty-five
+// thousand of them, every step of a collapse, 50 ms a frame.) A piece only
 // gets a dynamic body of its own once something knocks it loose — which keeps
 // the ten thousand pieces of an intact tower nearly free to simulate.
 //
@@ -114,8 +117,9 @@ export class Physics {
       .setRotation(quat)
       .setCollisionGroups(group)
       .setFriction(0.8);
-    const c = this.world.createCollider(d, this.fixed);
+    const c = this.world.createCollider(d);
     this.owner.set(c.handle, owner);
+    this.dirty = true;
     return c;
   }
 
@@ -123,7 +127,7 @@ export class Physics {
   addFixedMesh(owner, geometry, group = G_WORLD) {
     const { vertices, indices } = meshArrays(geometry);
     const d = RAPIER.ColliderDesc.trimesh(vertices, indices).setCollisionGroups(group).setFriction(0.8);
-    const c = this.world.createCollider(d, this.fixed);
+    const c = this.world.createCollider(d);
     this.owner.set(c.handle, owner);
     return c;
   }
@@ -132,6 +136,7 @@ export class Physics {
     if (!c) return;
     this.owner.delete(c.handle);
     this.world.removeCollider(c, false);
+    this.dirty = true;
   }
 
   // A dynamic body at `pos`/`quat`, with colliders built from `shapes`:
@@ -172,6 +177,7 @@ export class Physics {
     if (!body) return;
     for (let n = 0; n < body.numColliders(); n++) this.owner.delete(body.collider(n).handle);
     this.world.removeRigidBody(body);
+    this.dirty = true;
   }
 
   // --------------------------------------------------------- queries
@@ -205,13 +211,23 @@ export class Physics {
   // --------------------------------------------------------- stepping
 
   step(dt) {
-    // Enough steps to keep up with real time down to 10 fps.
-    this._acc = Math.min(this._acc + dt, STEP * 6);
+    // A world with nothing awake in it is not stepped at all: a step costs
+    // about a third of a microsecond for every collider in it, moving or not
+    // (Rapier's broad phase), and after a collapse that is twenty-five
+    // thousand colliders of rubble — 7 ms a step for nothing. It is stepped
+    // once after colliders come or go, so that queries see them.
+    if (!this.dirty && !this._awake()) { this._acc = 0; return 0; }
+    this.dirty = false;
+    // Enough steps to keep up with real time down to 10 fps — of 1/60 s while
+    // frames are quick, and of 1/30 s once they are not, so that a slow frame
+    // is three steps rather than six. Six made a slow frame slower still.
+    const step = dt > 1 / 40 ? STEP * 2 : STEP;
+    this._acc = Math.min(this._acc + dt, 0.1);
     let steps = 0;
-    while (this._acc >= STEP) {
-      this.world.timestep = STEP;
+    while (this._acc >= step - 1e-6) {
+      this.world.timestep = step;
       this.world.step(this.events);
-      this._acc -= STEP;
+      this._acc -= step;
       steps++;
       this.steps++;
       if (this.onForce) {
@@ -222,6 +238,13 @@ export class Physics {
       }
     }
     return steps;
+  }
+
+  // Is any dynamic body awake?
+  _awake() {
+    let awake = false;
+    this.world.bodies.forEach((b) => { if (!awake && b.isDynamic() && !b.isSleeping()) awake = true; });
+    return awake;
   }
 }
 

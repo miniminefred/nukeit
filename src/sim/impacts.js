@@ -55,11 +55,14 @@ export class Impacts {
         p.born ??= this.time;                  // simulation time, not the wall clock
         if (this.time - p.born > (crowded ? 1.2 : FADE_AFTER) + (p.id % 7) * 0.25) this.fading.set(p, 0);
       }
-      // Big ones that have stopped are frozen.
-      if (b.isSleeping() || s < 0.15) {
+      // Big ones that have stopped are frozen — asleep, or barely creeping for
+      // four seconds: a heavy lump wedged in a heap can rock at a few
+      // centimetres a second for ever, never sleep, and keep the whole
+      // simulation stepping for nothing.
+      if (b.isSleeping() || s < 0.5) {
         const t = (this.rest.get(p) ?? 0) + dt;
         this.rest.set(p, t);
-        if (!small && t > 2.5 && b.isSleeping()) this._freeze(p);
+        if (!small && ((t > 2.5 && (b.isSleeping() || s < 0.15)) || t > 4)) this._freeze(p);
       } else this.rest.set(p, 0);
       const before = this.speed.get(p) ?? s;
       this.speed.set(p, s);
