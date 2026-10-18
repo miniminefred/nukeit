@@ -65,7 +65,13 @@ export class Player {
     this._syncCamera(0);
   }
 
-  revive() { this.health = MAX_HEALTH; this.dead = false; }
+  revive() { this.health = MAX_HEALTH; this.dead = false; this._stun = 0; this._tangle = 0; }
+
+  // Knocked flat a moment — a taser, a tackle: no control, the view drops.
+  stun(t) { this._stun = Math.max(this._stun ?? 0, t); }
+  get stunned() { return (this._stun ?? 0) > 0; }
+  // Tangled in a net: you can barely move.
+  tangle(t) { this._tangle = Math.max(this._tangle ?? 0, t); }
 
   damage(amount, cause) {
     if (this.dead || amount <= 0.5) return;
@@ -77,7 +83,10 @@ export class Player {
 
   update(dt) {
     const { input } = this;
-    if (input.mouse.locked && !this.dead) {
+    if (this._stun > 0) this._stun -= dt;
+    if (this._tangle > 0) this._tangle -= dt;
+    if (input.mouse.locked && !this.dead && this.stunned) { input.takeMouse(); this.vel.x *= 0.8; this.vel.z *= 0.8; }
+    else if (input.mouse.locked && !this.dead) {
       const { dx, dy } = input.takeMouse();
       this.yaw -= dx * SENSITIVITY;
       this.pitch = THREE.MathUtils.clamp(this.pitch - dy * SENSITIVITY, -1.55, 1.55);
@@ -88,7 +97,7 @@ export class Player {
       const speed = crouching ? CROUCH
         : input.down('ShiftLeft') || input.down('ShiftRight') ? RUN : WALK;
       const m = this._move.set(r, 0, -f);
-      if (m.lengthSq() > 0) m.normalize().multiplyScalar(speed).applyAxisAngle(THREE.Object3D.DEFAULT_UP, this.yaw);
+      if (m.lengthSq() > 0) m.normalize().multiplyScalar(this._tangle > 0 ? speed * 0.25 : speed).applyAxisAngle(THREE.Object3D.DEFAULT_UP, this.yaw);
       // On a wet floor your feet hardly grip: you slide on into a turn, and
       // take a while to stop.
       const k = this.grounded ? Math.min(1, dt * 14 * (1 - 0.88 * this.wet)) : Math.min(1, dt * 2);
@@ -130,8 +139,10 @@ export class Player {
 
   _syncCamera(moving) {
     const b = Math.sin(this.bob * Math.PI) * Math.min(1, moving / 5) * 0.035;
-    this.camera.position.set(this.pos.x, this.pos.y + EYE - 0.62 * this.crouch + b, this.pos.z);
-    this.camera.rotation.set(this.pitch, this.yaw, 0);
+    // Stunned: down on the floor, the view tipped over.
+    const down = Math.min(1, (this._stun ?? 0) * 2);
+    this.camera.position.set(this.pos.x, this.pos.y + EYE - 0.62 * this.crouch - 1.1 * down + b, this.pos.z);
+    this.camera.rotation.set(this.pitch * (1 - down), this.yaw, down * 0.9);
     this.camera.updateMatrixWorld();
   }
 

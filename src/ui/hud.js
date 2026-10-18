@@ -42,7 +42,7 @@ export class Hud {
 
   hurt(amount) { this._hurt = Math.min(1, this._hurt + amount / 40); }
 
-  update(dt, { health, height, tip, fires, done }) {
+  update(dt, { health, height, tip, fires, done, alert }) {
     this.els.health.style.width = `${Math.max(0, health)}%`;
     this.els.health.classList.toggle('low', health < 30);
     this.els.healthText.textContent = Math.ceil(health);
@@ -51,7 +51,7 @@ export class Hud {
       const over = Math.max(0, height - this.target);
       const k = 1 - over / Math.max(1, this.start - this.target);
       this.els.height.textContent = done ? `${height.toFixed(1)} m — below ${this.target} m` : `${height.toFixed(1)} m standing`;
-      this.els.note.textContent = done ? 'Target reached' : `Bring it below ${this.target} m`;
+      this.els.note.textContent = (done ? 'Target reached' : `Bring it below ${this.target} m`) + (alert ? ` · ${alert}` : '');
       this.els.bar.style.width = `${Math.min(100, Math.max(0, k * 100))}%`;
       this.els.bar.classList.toggle('done', !!done);
     }
@@ -96,14 +96,15 @@ export const screens = {
   hidePause() { $('pause').classList.remove('open'); },
 
   down(cause) {
-    const text = { fall: 'You fell.', explosion: 'Caught in the blast.', fire: 'Burnt.', crushed: 'Crushed under the collapse.' }[cause] ?? 'You went down.';
+    const text = { fall: 'You fell.', explosion: 'Caught in the blast.', fire: 'Burnt.', crushed: 'Crushed under the collapse.', shot: 'Security got you.' }[cause] ?? 'You went down.';
     $('down-text').textContent = text;
     $('down').classList.add('open');
   },
   hideDown() { $('down').classList.remove('open'); },
 
-  results({ title, rows, unlocked, onBack }) {
+  results({ title, rows, unlocked, onBack, heading = 'Job complete' }) {
     const s = $('results');
+    s.querySelector('small').textContent = heading;
     $('r-title').textContent = title;
     $('r-rows').innerHTML = rows.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('');
     $('r-unlock').innerHTML = unlocked ? `<b>Unlocked:</b> ${unlocked}` : '';

@@ -233,6 +233,58 @@ export class Audio {
     this._noise(out, { type: 'bandpass', f: 320, q: 1.5, len: 0.25, gain: 0.6, attack: 0.002, drop: 0.12 });
   }
 
+  // A guard's "Hey!": a voice-like formant burst, rising.
+  shout(x, y, z) {
+    if (!this.ctx) return;
+    const { gain, pan } = this._place(x, y, z, 30);
+    const out = this._out(gain * 0.5, pan);
+    this._noise(out, { type: 'bandpass', f: 900, q: 4, len: 0.35, gain: 0.8, attack: 0.02, drop: 0.3 });
+    this._tone(out, { f: 210, len: 0.35, gain: 0.35, type: 'sawtooth', drop: 1.3 });
+  }
+  thwip(x, y, z) {
+    if (!this.ctx) return;
+    const { gain, pan } = this._place(x, y, z, 25);
+    this._noise(this._out(gain * 0.6, pan), { type: 'bandpass', f: 2400, q: 1.2, len: 0.25, gain: 1, attack: 0.005, drop: 0.15 });
+  }
+  buzz(x, y, z) {
+    if (!this.ctx) return;
+    const { gain, pan } = this._place(x, y, z, 20);
+    this._tone(this._out(gain * 0.25, pan), { f: 120, len: 0.6, gain: 0.6, type: 'square', drop: 1 });
+  }
+  shot(x, y, z) {
+    if (!this.ctx) return;
+    const { gain, pan } = this._place(x, y, z, 60);
+    const out = this._out(gain * 0.7, pan);
+    this._noise(out, { type: 'lowpass', f: 2200, q: 0.7, len: 0.18, gain: 1, attack: 0.001, drop: 0.06 });
+  }
+  thud(x, y, z) {
+    if (!this.ctx) return;
+    const { gain, pan } = this._place(x, y, z, 20);
+    this._noise(this._out(gain * 0.8, pan), { type: 'lowpass', f: 300, q: 0.8, len: 0.3, gain: 1, attack: 0.002, drop: 0.1 });
+  }
+  // Knocked down: a cartoon boing. It is that kind of game.
+  boing(x, y, z) {
+    if (!this.ctx) return;
+    const { gain, pan } = this._place(x, y, z, 25);
+    const out = this._out(gain * 0.4, pan);
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain(), t = this.ctx.currentTime;
+    o.type = 'sine'; o.frequency.setValueAtTime(520, t); o.frequency.exponentialRampToValueAtTime(140, t + 0.5);
+    g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+    o.connect(g).connect(out); o.start(t); o.stop(t + 0.6);
+  }
+  // Sirens on the avenue: the two-tone wail, coming and going.
+  siren(on) { this._siren = on; this._sirenT = 0; }
+  _sirenTick(dt) {
+    if (!this._siren) return;
+    this._sirenT += dt;
+    if (this._sirenT > 0.6) {
+      this._sirenT = 0;
+      this._hi = !this._hi;
+      const out = this._out(0.07, 0);
+      this._tone(out, { f: this._hi ? 960 : 720, len: 0.6, gain: 0.6, type: 'triangle', drop: 0.98 });
+    }
+  }
+
   // Gas escaping from a punctured tank.
   hiss(x, y, z) {
     if (!this.ctx) return;
@@ -274,6 +326,7 @@ export class Audio {
   update(dt) {
     if (!this.ctx) return;
     this._alarmTick(dt);
+    this._sirenTick(dt);
     this.loops.rumble.gain.setTargetAtTime(this._rumble * 1.4, this.ctx.currentTime, 0.2);
     this._rumble = Math.max(0, this._rumble - dt * 0.35);
     // Voices rise and fall: talk is a murmur that is never steady.

@@ -71,13 +71,16 @@ export class Sledge {
   }
 
   _strike(ctx) {
-    const { hit, dir } = aim(ctx, 2.4);
+    const { hit, dir, origin } = aim(ctx, 2.4);
+    // A guard or an officer in the way takes it: down, dazed, up again.
+    if (ctx.security?.strike(origin, dir, hit ? Math.min(2.4, hit.distance) : 2.4)) { ctx.shake?.add(0.1); return; }
     if (!hit || !hit.owner || !hit.owner.parts) {
       if (hit) ctx.audio?.hit('concrete', hit.point.x, hit.point.y, hit.point.z, 0.6);
       return;
     }
     const kind = ctx.damage.hit(hit.owner, hit.point, hit.normal, dir, 1);
     this.lastHit = kind?.name ?? null;
+    ctx.security?.noise(hit.point, 1, true);
     ctx.shake?.add(0.12);
   }
 }
@@ -185,6 +188,8 @@ export class Extinguisher {
       if (hit.owner?.parts && hit.normal) ctx.powder?.add(hit.point, hit.normal, dt * pressure, hit.owner);
       if (Math.random() < 0.3) ctx.particles.spawn('puff', hit.point.x, hit.point.y, hit.point.z, hit.normal?.x ?? 0, (hit.normal?.y ?? 0) + 0.3, hit.normal?.z ?? 0, 0xeeeeea);
     }
+    // In a guard's face: blinded, they stumble and sit down.
+    if (Math.random() < 0.2) ctx.security?.strike(ctx.camera.position, _dir, Math.min(4, stop), 'spray');
     // And it blows the dust away, as far as it reaches: a way to see through a collapse cloud.
     ctx.particles.blow(ctx.camera.position, _dir, Math.min(11, stop + 2), 0.32, dt);
   }

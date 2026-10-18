@@ -19,6 +19,7 @@ import { Doors } from './sim/doors.js';
 import { Water } from './sim/water.js';
 import { Smoke } from './sim/smoke.js';
 import { Powder } from './fx/powder.js';
+import { Security } from './sim/security.js';
 import { Topple } from './sim/topple.js';
 import { Rubble } from './sim/rubble.js';
 import { People } from './sim/people.js';
@@ -156,13 +157,23 @@ blast.explode = (at, r, power) => {
   return bang(at, r, power);
 };
 const gave = damage.fx.onFailed;
-damage.fx.onFailed = (p) => { people.alarm(p.box.getCenter(new THREE.Vector3()), 18); return gave(p); };
+damage.fx.onFailed = (p) => { people.alarm(p.box.getCenter(new THREE.Vector3()), 18); security.noise(p.box.getCenter(new THREE.Vector3()), 3, false); return gave(p); };
+// Guards and the police (sim/security.js). Caught by an officer, the job is
+// over; tackled by a guard, you are put out of the front door and carry on.
+const security = new Security({
+  people, physics, player, audio, hud, particles, smoke, veil: particles.veil, camera, shake, scene,
+  onBusted: () => failed('Arrested'),
+  onThrownOut: () => { if (thrownT <= 0) thrownT = 1.4; },
+});
+let thrownT = -1;
+const bang2 = blast.explode;
+blast.explode = (at, r, power) => { security.noise(at, 12 * (power ?? 1), false); return bang2(at, r, power); };
 let liftTip = null;
 let rig = null;           // dev: { at, look } to hold the camera there
 let toppling = false;
 let waterfall = null;     // the sheet of water down the atrium wall, while it stands
 
-const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene, world, powder };
+const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene, world, powder, security };
 
 // ---------------------------------------------------------------- state
 
@@ -210,6 +221,7 @@ async function start(jobId, toolIds, levelId = 'normal') {
   water.attach();
   smoke.attach();
   people.populate(pieces);
+  security.start(difficulty);
   waterfall = pieces.list.find((p) => p.tag === 'waterfall') ?? null;
   screens.loading('Wiring the gas and the lights', 0.85);
   await frames(2);
@@ -222,6 +234,8 @@ async function start(jobId, toolIds, levelId = 'normal') {
   for (const t of tools) { t.model.visible = false; vmScene.add(t.model); }
   hud.setJob(job);
   player.revive();
+  player.disguised = false;
+  thrownT = -1;
   player.teleport(job.entry.x, 0.05, job.entry.z, job.entry.yaw);
   // Every shader the first blast needs, compiled now rather than in its frame.
   const chipCounts = [chips.solid.count, chips.glass.count];
@@ -250,6 +264,7 @@ function unloadJob() {
   damage.clear();
   chips.clear();
   rubble.clear();
+  security.clear();
   people.clear();
   particles.clear();
   world.unload();
@@ -266,7 +281,7 @@ input.onLockChange((locked) => {
     audio.spray(false); audio.foam(false);
     screens.pause({
       onResume: () => input.lock(),
-      onRestart: () => { const ids = tools.map((t) => t.id); start(job.id, ids); },
+      onRestart: () => { const ids = tools.map((t) => t.id); start(job.id, ids, difficulty.id); },
       onQuit: () => { unloadJob(); openMenu(); },
     });
   }
@@ -300,6 +315,25 @@ function measure() {
     if (p.box.max.y > top) top = p.box.max.y;
   }
   return top;
+}
+
+// The job ended badly: caught by the police.
+function failed(why) {
+  if (state !== 'play') return;
+  state = 'done';
+  input.unlock();
+  hud.show(false);
+  const secs = Math.round((performance.now() - started) / 1000);
+  screens.results({
+    heading: 'Job failed',
+    title: `${why}`,
+    rows: [
+      ['Standing', `${height.toFixed(1)} m (target ${job.target} m)`],
+      ['Time on site', `${Math.floor(secs / 60)} min ${secs % 60} s`],
+      ['Difficulty', difficulty.name],
+    ],
+    onBack: () => { unloadJob(); openMenu(); },
+  });
 }
 
 function finish() {
@@ -390,6 +424,8 @@ function frame(dt) {
     smoke.update(dt);
     water.update(dt);
     powder.update();
+    if (state === 'play') security.update(dt);
+    if (thrownT > 0 && (thrownT -= dt) <= 0) { player.teleport(job.entry.x, 0.05, job.entry.z, job.entry.yaw); }
     player.wet = water.wetAt(player.pos);
     blast.update(dt);
     heightT -= dt;
@@ -437,7 +473,7 @@ function frame(dt) {
     hud.setSlots(tools, current);
     hud.update(dt, {
       health: player.health, height, fires: fire.count, done: doneT >= 0,
-      tip: liftTip ?? tipFor(t),
+      tip: liftTip ?? tipFor(t), alert: security.status,
     });
   }
   input.endFrame();
@@ -454,6 +490,17 @@ function select(i) {
 function spareTip() {
   camera.getWorldDirection(_look);
   const hit = physics.raycast(camera.position, _look, 2.4);
+  if (hit?.owner?.tag === 'disguise' && hit.owner.state === 'static') {
+    if (player.disguised) return 'A hi-vis vest and a hard hat (you have one on)';
+    if (input.pressed('KeyE')) {
+      player.disguised = true;
+      pieces.destroy(hit.owner);
+      audio.click();
+      hud.flash('Hi-vis and a hard hat: you look like you work here');
+      return null;
+    }
+    return 'E — put on the hi-vis vest and hard hat';
+  }
   if (hit?.owner?.tag !== 'extinguisher' || hit.owner.state !== 'static') return null;
   const ext = tools.find((t) => t.id === 'extinguisher');
   if (!ext) return null;
@@ -488,7 +535,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.

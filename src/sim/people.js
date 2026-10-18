@@ -116,6 +116,28 @@ export class People {
     }
   }
 
+  // A figure steered from outside — a guard, a police officer (sim/security.js).
+  // Drawn like everyone else; it falls when its floor goes, and otherwise goes
+  // where it is told: `target`, `speed`, `state` ('calm' | 'running' | 'down').
+  agent(f, at, colours, height = 1) {
+    const p = {
+      f, pos: at.clone(), yaw: 0, target: null, wait: 0, phase: 0, speed: WALK, vy: 0, floorY: at.y,
+      look: 0, state: 'calm', t: 0, height, colours, shirt: 0xf2f0ea, woman: false, agent: true, armUp: 0,
+    };
+    const i = this.list.length;
+    this.list.push(p);
+    for (const k in this.mesh) {
+      const per = k === 'leg' || k === 'arm' ? 2 : 1;
+      for (let j = 0; j < per; j++) this.mesh[k].setColorAt(i * per + j, _c.set(colours[k] ?? 0x222222));
+      this.mesh[k].count = this.list.length * per;
+    }
+    return p;
+  }
+
+  // Someone doing damage at `at`: those near enough stop and stare, some get
+  // their phones out to film it, and the close ones back away.
+  witness(at) { this._focus = { at: at.clone(), t: 4 }; }
+
   // A free spot on floor f: inside the building, clear of columns, the core,
   // the atrium, and anything standing there.
   _spot(f, near = null, far = 0) {
@@ -194,7 +216,22 @@ export class People {
           p.wait = Math.random() * 0.4;      // a moment's freeze, then run
         }
       }
+      if (p.agent) { this._fall(p, dt); continue; }
       if (p.state === 'down') { if (p.t > 6) p.state = 'gone'; continue; }
+      // Watching you break things: face it, maybe film it, step back if close.
+      const fo = this._focus;
+      if (fo && p.state === 'calm' && Math.abs(p.pos.y - fo.at.y) < 2.5) {
+        const d = Math.hypot(p.pos.x - fo.at.x, p.pos.z - fo.at.z);
+        if (d < 12) {
+          p.yaw += Math.atan2(Math.sin(Math.atan2(fo.at.x - p.pos.x, fo.at.z - p.pos.z) - p.yaw), Math.cos(Math.atan2(fo.at.x - p.pos.x, fo.at.z - p.pos.z) - p.yaw)) * Math.min(1, dt * 4);
+          p.watching = 2;
+          p.filming ??= Math.random() < 0.35;
+          if (d < 3.5 && !p.target) { p.target = this._spot(p.f, p.pos.clone().sub(fo.at).setY(0).normalize().multiplyScalar(4).add(p.pos), 1); p.wait = 0; }
+          else if (!p.target) { p.wait = Math.max(p.wait, 0.5); }
+        }
+      }
+      if (p.watching > 0) { p.watching -= dt; p.armUp = p.filming ? Math.min(1, (p.armUp ?? 0) + dt * 3) : 0; if (p.watching <= 0) p.filming = undefined; }
+      else p.armUp = Math.max(0, (p.armUp ?? 0) - dt * 2);
       // What is under them, now and then.
       p.look -= dt;
       if (p.look <= 0) {
@@ -216,6 +253,7 @@ export class People {
       if (p.state === 'running' && p.t > 14) { p.state = 'calm'; p.speed = WALK; }
       const running = p.state === 'running';
       if (p.wait > 0) { p.wait -= dt; continue; }
+      if (p.watching > 0 && !p.target) continue;
       if (!p.target) {
         const away = running && p.from ? p.pos.clone().sub(p.from).setY(0).normalize().multiplyScalar(8).add(p.pos) : null;
         const t = this._spot(p.f, away ?? p.pos, running ? 3 : 0);
@@ -235,7 +273,34 @@ export class People {
       p.pos.addScaledVector(to, Math.min(d, speed * dt));
       p.phase += dt * speed * 3.1;
     }
+    if (this._focus && (this._focus.t -= dt) <= 0) this._focus = null;
     this._draw(dt);
+  }
+
+  // An agent stands on what is under it and falls when that goes; it walks
+  // where security sends it.
+  _fall(p, dt) {
+    if (p.state === 'gone' || p.hidden) return;
+    p.look -= dt;
+    if (p.look <= 0) { p.look = LOOK; p.floorY = this._under(p.pos.x, p.pos.z, p.pos.y + 1.2); }
+    if (p.pos.y > p.floorY + 0.05) {
+      p.vy -= G * dt;
+      p.pos.y += p.vy * dt;
+      if (p.pos.y <= p.floorY) { p.pos.y = p.floorY; p.vy = 0; }
+      return;
+    }
+    p.pos.y = p.floorY;
+    if (p.target && p.state !== 'down') {
+      const to = _v.copy(p.target).sub(p.pos).setY(0), d = to.length();
+      if (d < 0.25) { p.target = null; return; }
+      to.divideScalar(d);
+      const want = Math.atan2(to.x, to.z);
+      let dy = want - p.yaw;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      p.yaw += dy * Math.min(1, dt * 8);
+      p.pos.addScaledVector(to, Math.min(d, p.speed * dt));
+      p.phase += dt * p.speed * 3.1;
+    }
   }
 
   _draw() {
@@ -244,12 +309,12 @@ export class People {
     const hide = new THREE.Matrix4().makeScale(0, 0, 0);
     for (let i = 0; i < this.list.length; i++) {
       const p = this.list[i];
-      if (p.state === 'gone') {
+      if (p.state === 'gone' || p.hidden) {
         for (const k in M) { const per = k === 'leg' || k === 'arm' ? 2 : 1; for (let j = 0; j < per; j++) set(M[k], i * per + j, hide); }
         continue;
       }
       const s = p.height;
-      const moving = !!p.target && p.wait <= 0;
+      const moving = !!p.target && p.wait <= 0 && p.state !== 'down';
       const swing = moving ? Math.sin(p.phase) * (p.state === 'running' ? 0.75 : 0.4) : 0;
       // Lying: the whole figure turned onto its back.
       const lying = p.state === 'down';
@@ -265,7 +330,9 @@ export class People {
       part(M.hips, i, 0, hip, 0, 0);
       part(M.body, i, 0, hip + 0.06, 0, lean);
       part(M.arm, i * 2, -0.25, hip + 0.6, lean * 0.5, -swing * 0.8, 0.06);
-      part(M.arm, i * 2 + 1, 0.25, hip + 0.6, lean * 0.5, swing * 0.8, -0.06);
+      // The right arm raised — pointing, shouting into a radio, filming on a phone.
+      const up = p.armUp ?? 0;
+      part(M.arm, i * 2 + 1, 0.25, hip + 0.6, lean * 0.5, swing * 0.8 * (1 - up) - 1.9 * up, -0.06);
       part(M.head, i, 0, hip + 0.83, lean * 0.4, 0);
       part(M.hair, i, 0, hip + 0.86, lean * 0.4 - 0.01, -0.15);
       if (p.woman) part(M.skirt, i, 0, hip + 0.12, 0, swing * 0.15);

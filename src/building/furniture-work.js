@@ -105,3 +105,14 @@ export function extinguisher(P, x, y, z, yaw, onWall = false) {
   // On the wall it is fixed to the wall (support.js: cladding), its bracket against it.
   return assembly(P, x, y, z, yaw, parts, onWall ? 'cladding' : 'furniture', { tag: 'extinguisher', structural: false, colliders: [[-0.1, h, -0.12, 0.13, h + 0.7, 0.1]] });
 }
+
+// A hi-vis vest and a white hard hat on a low cabinet in goods receiving. Put
+// them on (E) and security takes you for one of the contractors — until they
+// see you break something close up.
+export function hiVis(P, x, y, z, yaw) {
+  return assembly(P, x, y, z, yaw, [
+    { kind: 'metal', round: 0.01, boxes: [[-0.4, 0, -0.25, 0.4, 0.8, 0.25]], tint: 0x5a6068 },
+    { kind: 'fabric', round: 0.02, boxes: [[-0.25, 0.8, -0.18, 0.25, 0.86, 0.18], [-0.22, 0.86, -0.15, -0.08, 0.9, 0.12], [0.08, 0.86, -0.15, 0.22, 0.9, 0.12]], tint: 0xd8ff1a },
+    { kind: 'plastic', boxes: [{ ball: [0.12, 0.98, 0.05], s: [0.15, 0.09, 0.17], rough: 0 }, [-0.02, 0.92, -0.12, 0.26, 0.935, 0.22]], tint: 0xf4f4f0 },
+  ], 'furniture', { tag: 'disguise', structural: false, colliders: [[-0.4, 0, -0.25, 0.4, 1.05, 0.25]] });
+}

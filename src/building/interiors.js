@@ -196,6 +196,7 @@ function lowerLevel(P, y) {
   // Goods receiving.
   for (const [x, z] of [[-18, 5.5], [-16.6, 5.5], [-18, 7.2], [-15.2, 5.5], [-16.6, 7.2], [-13.4, 9.8]]) W.palletCrates(P, x, y, z, 0, (x * 7 + z) % 3 < 1.5 ? 2 : 1);
   W.forklift(P, -12.5, y, 6.6, HALF);
+  W.hiVis(P, -19.3, y, 3.2, HALF);
   block(P, 'steel', -19.55, y, 8.6, -19.45, y + 3.2, 11.2, 'furniture', { floor: f, tint: 0x7a7e82 });     // the roller door
   // The kitchens, for the Grill and the cafés upstairs.
   partition(P, f, 'x', 3.6, 5.6, 19.6, 7.4, 8.6);
