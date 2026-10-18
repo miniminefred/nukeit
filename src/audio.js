@@ -47,7 +47,10 @@ export class Audio {
       spray: this._loop('highpass', 5000, 0.5),
       foam: this._loop('bandpass', 1400, 0.4),
       murmur: this._loop('bandpass', 420, 1.1),
+      sprinkle: this._loop('highpass', 2600, 0.4),     // water hissing out of the heads
     };
+    this._alarm = false;
+    this._beep = 0;
     // The lounge music on the good floors: a soft chord that moves every few
     // seconds, a slow piano note over it.
     this.music = ctx.createGain();
@@ -250,8 +253,27 @@ export class Audio {
     this._tone(out, { f: 900, len: 0.06, gain: 0.3, type: 'square' });
   }
 
+  // The fire alarm: the pattern real ones use — three tones, a pause — kept
+  // soft. It is a children's game.
+  alarm(on) { this._alarm = on; }
+  sprinklers(k) { this.ctx && this.loops.sprinkle.gain.setTargetAtTime(k * 0.35, this.ctx.currentTime, 0.2); }
+
+  _alarmTick(dt) {
+    if (!this._alarm) { this._beep = 0; return; }
+    const before = this._beep;
+    this._beep = (this._beep + dt) % 3;
+    for (const at of [0, 0.75, 1.5]) {
+      if (before < at && this._beep >= at || (before > this._beep && at === 0)) {
+        const out = this._out(0.16, 0);
+        this._tone(out, { f: 3100, len: 0.42, gain: 0.5, type: 'square', drop: 0.95 });
+        this._tone(out, { f: 1550, len: 0.42, gain: 0.25, type: 'sine', drop: 0.95 });
+      }
+    }
+  }
+
   update(dt) {
     if (!this.ctx) return;
+    this._alarmTick(dt);
     this.loops.rumble.gain.setTargetAtTime(this._rumble * 1.4, this.ctx.currentTime, 0.2);
     this._rumble = Math.max(0, this._rumble - dt * 0.35);
     // Voices rise and fall: talk is a murmur that is never steady.

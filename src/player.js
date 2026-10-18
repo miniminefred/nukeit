@@ -39,6 +39,8 @@ export class Player {
 
     this.pos = new THREE.Vector3(0, 0, 20);
     this.vel = new THREE.Vector3();
+    this.crouch = 0;            // 0 standing .. 1 crouched: the eye comes down with it
+    this.wet = 0;               // 0 dry .. 1 standing in water (sim/water.js sets it)
     this.yaw = 0;
     this.pitch = 0;
     this.grounded = false;
@@ -81,11 +83,15 @@ export class Player {
       this.pitch = THREE.MathUtils.clamp(this.pitch - dy * SENSITIVITY, -1.55, 1.55);
       const f = (input.down('KeyW') || input.down('ArrowUp') ? 1 : 0) - (input.down('KeyS') || input.down('ArrowDown') ? 1 : 0);
       const r = (input.down('KeyD') || input.down('ArrowRight') ? 1 : 0) - (input.down('KeyA') || input.down('ArrowLeft') ? 1 : 0);
-      const speed = input.down('ControlLeft') || input.down('KeyC') ? CROUCH
+      const crouching = input.down('ControlLeft') || input.down('KeyC');
+      this.crouch += ((crouching ? 1 : 0) - this.crouch) * Math.min(1, dt * 10);
+      const speed = crouching ? CROUCH
         : input.down('ShiftLeft') || input.down('ShiftRight') ? RUN : WALK;
       const m = this._move.set(r, 0, -f);
       if (m.lengthSq() > 0) m.normalize().multiplyScalar(speed).applyAxisAngle(THREE.Object3D.DEFAULT_UP, this.yaw);
-      const k = this.grounded ? Math.min(1, dt * 14) : Math.min(1, dt * 2);
+      // On a wet floor your feet hardly grip: you slide on into a turn, and
+      // take a while to stop.
+      const k = this.grounded ? Math.min(1, dt * 14 * (1 - 0.88 * this.wet)) : Math.min(1, dt * 2);
       this.vel.x += (m.x - this.vel.x) * k;
       this.vel.z += (m.z - this.vel.z) * k;
       if (this.grounded && input.pressed('Space')) { this.vel.y = JUMP; this.grounded = false; }
@@ -124,7 +130,7 @@ export class Player {
 
   _syncCamera(moving) {
     const b = Math.sin(this.bob * Math.PI) * Math.min(1, moving / 5) * 0.035;
-    this.camera.position.set(this.pos.x, this.pos.y + EYE + b, this.pos.z);
+    this.camera.position.set(this.pos.x, this.pos.y + EYE - 0.62 * this.crouch + b, this.pos.z);
     this.camera.rotation.set(this.pitch, this.yaw, 0);
     this.camera.updateMatrixWorld();
   }

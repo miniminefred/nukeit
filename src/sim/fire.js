@@ -167,6 +167,28 @@ export class Fire {
 
   // ---------------------------------------------------------------- putting out
 
+  // Water or powder coming down on a fire: every spot within `radius` of
+  // `point` (across; and below it, if `above`) loses `amount` of heat, and one
+  // with none left is out, in a puff of steam. Returns how many it reached.
+  douse(point, radius, amount, above = false) {
+    let hit = 0;
+    for (const s of this.spots) {
+      if (s.heat <= 0) continue;
+      if (above && (s.p.y > point.y + 0.2 || s.p.y < point.y - 4.2)) continue;
+      const d = above ? Math.hypot(s.p.x - point.x, s.p.z - point.z) : s.p.distanceTo(point);
+      if (d > radius + s.r) continue;
+      s.heat -= amount;
+      s.r = Math.max(0.05, s.r - amount * 0.1);
+      hit++;
+      if (s.heat <= 0) {
+        s.heat = 0;
+        this.fx.particles.burst('smoke', s.p.x, s.p.y, s.p.z, 4, 0.8, 0xd8d8d8, 0.9);
+      }
+    }
+    for (const [p] of this.cooking) if (p.box.distanceToPoint(point) < radius) this.cooking.delete(p);
+    return hit;
+  }
+
   // Spray from `origin` along `dir`: every spot within the widening cone of the
   // spray loses heat.
   extinguish(origin, dir, range, spread, dt) {
@@ -202,7 +224,7 @@ export class Fire {
     // Flames per second: a few for a small spot, more as it widens. Flames are
     // added light, so too many in one place sum to a white blob — this is a
     // rate by area, not a fill. Capped overall for a big fire.
-    const rate = (s) => (10 + 140 * s.r * s.r) * s.heat;
+    const rate = (s) => (12 + 190 * s.r * s.r) * s.heat;
     const total = live.reduce((a, s) => a + rate(s), 0);
     const scale = Math.min(1, 900 / Math.max(1, total));
     let dps = 0;
@@ -211,12 +233,20 @@ export class Fire {
     for (const s of live) {
       const p = s.piece;
       if (p.state !== 'static' && p.state !== 'rubble') { s.heat = 0; this._hideScorch(s); continue; }
+      if (s.heat <= 0) continue;                 // put out: it goes to the scars below
       s.heat = Math.min(1, s.heat + dt * 0.2);
       if (s.r < s.rMax) { s.r = Math.min(s.rMax, s.r + dt * GROW * s.heat); this._drawScorch(s, 1); }
       const f = this.fuel.get(p);
       f.left -= dt * s.heat * (0.25 + (s.r / 0.5) ** 2);
       this.pieces.char(p, (1 - f.left / f.full) * 0.6);
       if (f.left <= 0) burnt.add(p);
+      // Smoke, into the room's layer under the ceiling (sim/smoke.js).
+      this.fx.smoke?.add(s.p, dt * s.heat * (0.05 + 0.7 * s.r * s.r));
+      // Furniture burnt half through gives way: it sags, and falls apart.
+      if (p.role === 'furniture' && !p.buckled && f.left < f.full * 0.45 && p.state === 'static') {
+        p.buckled = true;
+        this.fx.collapse?.(p, s.p);
+      }
 
       // Flames standing in the circle, rising whatever way the surface faces.
       const share = rate(s) * scale * dt;
@@ -227,7 +257,7 @@ export class Fire {
         // Taller in the middle of the patch, low licks round the edge.
         const edge = rr / Math.max(0.01, s.r);
         particles.spawn(edge > 0.7 ? 'flamelet' : 'flame', _v.x, _v.y, _v.z,
-          (Math.random() - 0.5) * 0.25, (0.7 + Math.random() * 0.9) * s.heat, (Math.random() - 0.5) * 0.25);
+          (Math.random() - 0.5) * 0.25, (0.8 + Math.random() * 1.3) * s.heat * (1 + s.r), (Math.random() - 0.5) * 0.25);
         if (Math.random() < 0.05) particles.spawn('smoke', _v.x, _v.y + 0.5, _v.z, 0, 0.8, 0);
         if (Math.random() < 0.01) particles.spawn('spark', _v.x, _v.y + 0.2, _v.z, (Math.random() - 0.5), 1.5 + Math.random(), (Math.random() - 0.5));
       }
@@ -236,6 +266,8 @@ export class Fire {
       if (d < s.r + 0.8) dps = Math.max(dps, 30 * s.heat * (1 - (d - s.r) / 0.8));
 
       if (spread && s.r > 0.18 && Math.random() < s.heat * 0.55) this._spread(s);
+      // Glass near a big fire cracks in the heat, then gives.
+      if (spread && s.r > 0.35 && s.heat > 0.7 && Math.random() < 0.12) this._heatGlass(s);
     }
     for (const p of burnt) this._burnOut(p);
     // Spots that have gone out become scars: no flame, just the scorch.
@@ -278,6 +310,16 @@ export class Fire {
     if (o.kind.explodes > 0) { this.ignite(o); return; }
     if (Math.max(...o.parts.map((q) => q.kind.burns)) <= 0) return;
     this._spot(o, hit.point, hit.normal, 0.25, 0.06);
+  }
+
+  _heatGlass(s) {
+    let done = false;
+    this.physics.overlapSphere(s.p, 1.8, (o) => {
+      if (done || !o?.parts || o.role !== 'glass' || o.state !== 'static') return;
+      done = true;
+      const at = o.box.clampPoint(s.p, new THREE.Vector3());
+      this.fx.heatGlass?.(o, at, at.clone().sub(s.p).normalize());
+    });
   }
 
   _burnOut(p) {

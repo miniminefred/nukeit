@@ -44,8 +44,30 @@ export function fitOut(P, f) {
   else if (use === 'penthouse: living') living(P, f, y);
   else if (use === 'penthouse: master suite') master(P, f, y);
   if (f >= 1 && f < PODIUM_FLOORS) atriumRail(P, f, y);
+  sprinklerMains(P, f);
   for (const e of ESCALATORS) if (e.f === f) escalator(P, e, y);
   lights(P, f);
+}
+
+// The sprinkler mains: red steel pipe hung under the slab along the corridors
+// either side of the core, in lengths of about five metres — a break is a
+// break somewhere, and water comes out of it (sim/water.js finds them by role).
+function sprinklerMains(P, f) {
+  const runs = f < PODIUM_FLOORS
+    ? [[-19, -8.6, 9.4], [-19, 8.2, 9.4], [15.6, -8.6, 19]]
+    : [[-13, -5.6, 9], [-13, 5, 9]];
+  const top = U(f) - 0.03;
+  for (const [x0, z, x1] of runs) {
+    if (f >= 0 && f < PODIUM_FLOORS && z > podiumFront(f) - 1) continue;
+    const n = Math.max(1, Math.round((x1 - x0) / 5));
+    for (let i = 0; i < n; i++) {
+      const a = x0 + (x1 - x0) * i / n, b = x0 + (x1 - x0) * (i + 1) / n;
+      assembly(P, (a + b) / 2, top - 0.12, z, 0, [
+        { kind: 'steel', boxes: [{ cylX: [0, 0.06, 0], r: 0.055, h: b - a - 0.02, seg: 10 }], tint: 0xb3261e },
+        { kind: 'steel', boxes: [[-0.05, 0.1, -0.04, 0.05, 0.12, 0.04]], tint: 0x555555 },
+      ], 'pipe', { floor: f, structural: false, hang: true });
+    }
+  }
 }
 
 // ---------------------------------------------------------------- placement

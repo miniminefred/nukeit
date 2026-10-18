@@ -78,6 +78,7 @@ const _mats = new Map();
 // The environment polished indoor things reflect (scene.js makes it). Kinds
 // with `indoor` use it, at that strength, instead of the sky.
 let _interior = null;
+export const interiorEnvironment = () => _interior;
 export function setInteriorEnvironment(tex) {
   _interior = tex;
   for (const [name, m] of _mats) if (KINDS[name]?.indoor || name === 'clearglass') { m.envMap = tex; m.needsUpdate = true; }

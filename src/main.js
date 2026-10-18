@@ -16,6 +16,8 @@ import { Blast } from './sim/blast.js';
 import { Impacts } from './sim/impacts.js';
 import { Lift } from './sim/lift.js';
 import { Doors } from './sim/doors.js';
+import { Water } from './sim/water.js';
+import { Smoke } from './sim/smoke.js';
 import { Topple } from './sim/topple.js';
 import { Rubble } from './sim/rubble.js';
 import { People } from './sim/people.js';
@@ -136,6 +138,13 @@ structure.onCrushPlayer = () => player.damage(500, 'crushed');
 const lift = new Lift(scene, physics);
 const doors = new Doors();
 const people = new People(scene, physics);
+// Smoke filling the rooms, and the sprinklers, mains, wet floors and alarm.
+const smoke = new Smoke(scene, pieces, { particles });
+const water = new Water(scene, pieces, physics, { particles, chips, audio, fire, people, smoke });
+fire.fx.smoke = smoke;
+// Furniture burnt half through gives way; glass by a fire cracks, then breaks.
+fire.fx.collapse = (p, at) => damage.fracture(p, at.clone(), new THREE.Vector3(0, -1, 0), 0.6, 1);
+fire.fx.heatGlass = (p, at, dir) => damage.hit(p, at, dir.clone().negate(), dir, p.crack ? 2 : 1);
 // People hear things: a blast, a support giving way, a building going over.
 const bang = blast.explode.bind(blast);
 blast.explode = (at, r, power) => {
@@ -191,6 +200,8 @@ async function start(jobId, toolIds) {
   world.load(job.build);
   lift.attach(pieces);
   doors.attach(pieces);
+  water.attach();
+  smoke.attach();
   people.populate(pieces);
   waterfall = pieces.list.find((p) => p.tag === 'waterfall') ?? null;
   screens.loading('Wiring the gas and the lights', 0.85);
@@ -221,6 +232,8 @@ function unloadJob() {
   topple.clear();
   impacts.clear();
   fire.clear();
+  water.clear();
+  smoke.clear();
   blast.clear();
   damage.clear();
   chips.clear();
@@ -314,7 +327,17 @@ function haze(dt) {
   scene.fog.near = CLEAR.near + (DUSTY_AIR.near - CLEAR.near) * k;
   scene.fog.far = CLEAR.far + (DUSTY_AIR.far - CLEAR.far) * k;
   scene.fog.color.copy(CLEAR.colour).lerp(DUSTY_AIR.colour, k);
+  // Your head in a room's smoke: you can barely see across it. Crouch.
+  const want2 = smoke.at(camera.position);
+  smoky += (want2 - smoky) * Math.min(1, dt * 3);
+  if (smoky > 0.01) {
+    scene.fog.near *= 1 - smoky;
+    scene.fog.far = scene.fog.far * (1 - smoky) + SMOKE_AIR.far * smoky;
+    scene.fog.color.lerp(SMOKE_AIR.colour, smoky);
+  }
 }
+let smoky = 0;
+const SMOKE_AIR = { far: 4, colour: new THREE.Color(0x1d1b19) };
 
 function frame(dt) {
   const playing = state === 'play';
@@ -351,6 +374,9 @@ function frame(dt) {
     damage.update();
     const dps = fire.update(dt, player.pos);
     if (dps > 0 && playing) player.damage(dps * dt, 'fire');
+    smoke.update(dt);
+    water.update(dt);
+    player.wet = water.wetAt(player.pos);
     blast.update(dt);
     heightT -= dt;
     if (heightT <= 0 && state === 'play') {
@@ -426,7 +452,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.

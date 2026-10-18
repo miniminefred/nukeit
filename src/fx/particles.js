@@ -70,6 +70,8 @@ const KINDS = {
   paint: { life: [0.25, 0.45], size: [0.08, 0.16], grow: 0.3, drag: 2.5, grav: 1, colour: 0xffffff, alpha: 0.8, add: false, blow: false },
   // The atrium waterfall: water falling eighteen metres down the marble.
   water: { life: [1.9, 2.1], size: [0.12, 0.3], grow: 0.05, drag: 0.05, grav: 9.8, colour: 0xe2f0f6, alpha: 0.45, add: false, blow: false },
+  // Sprinkler spray and water pouring from a broken main: fine drops, falling fast.
+  spray: { life: [0.7, 1.1], size: [0.02, 0.05], grow: 0, drag: 0.3, grav: 9.8, colour: 0xdfeff6, alpha: 0.7, add: false, blow: false },
   foam:  { life: [0.5, 1.0], size: [0.25, 0.45], grow: 1.2, drag: 2.2, grav: 1.5, colour: 0xf2f4f5, alpha: 0.75, add: false, blow: false },
 };
 
