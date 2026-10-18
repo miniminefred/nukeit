@@ -57,13 +57,22 @@ In dev, `window.dev` has everything, including:
 
 - `dev.start('trump', ['sledge', 'spray', 'extinguisher'])` loads a job without the menu.
 - `dev.bench()` is the collapse bench; `dev.rig = { at, look }` holds the camera.
-- `dev.step(dt, n)` runs whole frames by hand. **The test tab is always hidden**, so
-  `requestAnimationFrame` never fires. Pretend the pointer is locked with
+- `dev.step(dt, n)` runs whole frames by hand. Pretend the pointer is locked with
   `dev.input.mouse.locked = true; dev.state = 'play'`, and hold a tool down with
   `dev.input.mouse.left = true`.
-- `dev.select(i)` changes tool; `dev.measure()` gives the standing height.
+- `dev.select(i)` changes tool; `dev.measure()` gives the standing height. `dev.water`,
+  `dev.smoke`, `dev.powder`, `dev.security` are there too.
 
-Two traps in testing from a hidden tab:
+**Testing on screen without the browser extension**: start Chrome headless with a debugging
+port — `chrome.exe --headless=new --remote-debugging-port=9333 --user-data-dir=<scratch>
+--use-angle=d3d11 --enable-gpu --ignore-gpu-blocklist http://localhost:8093/` — and drive it
+over the DevTools protocol (a fifty-line Node script with the global `WebSocket`:
+`Runtime.evaluate`, `Page.captureScreenshot`, `Profiler.start/stop`). It renders on the real
+GTX 680, `document.hidden` is false and `requestAnimationFrame` runs, so `dev.bench()` times
+real frames. This is how every number in "Keeping it smooth" since October was measured.
+Vite reloads the page on every file edit: wait for `window.dev` again after one.
+
+Two traps in testing from a hidden tab (the Chrome extension's tab always was):
 
 - **Screenshots can go stale.** A background tab stops being composited after a while and
   every screenshot comes back identical. It is not the renderer (check
@@ -91,10 +100,21 @@ always come along. Then the job loads and you are put at the door.
 - **Jobs and tools are data** in `data/catalog.js`. Trump Tower is open, and two more slots
   are shown locked as "coming soon". Tools unlock by finishing jobs (`data/progress.js`,
   `localStorage` with every access guarded): Trump Tower unlocks the remote charges.
+- **Five difficulties**, chosen on the job page (`data/difficulty.js`): Super easy (a
+  practice run, no guards, a weak building), Easy, Normal (the building as built, light
+  security), Hard, and Insane — earned by finishing on Normal or Hard. Each sets the
+  building's strength (`pieces.strength`, times every durability), the target height
+  (40 / 32 / 26 / 20 / 12 m), the charges in the detonator, the seconds of powder in an
+  extinguisher, how soon the police come, and how many guards there are and what they carry.
+  Completions are remembered per difficulty.
 - **The job is a height**: bring the tower above the podium, and the office block next
-  door, below the podium roof — 26 m. Height is the top of every *static* piece that is
-  not debris, in both buildings. The job ends 3.5 s after the target is met with nothing
+  door, below the difficulty's target (26 m on Normal: the podium roof). Height is the top
+  of every *static* piece that is not debris, in **those two buildings only** — a city block
+  woken by the fall does not count. The job ends 3.5 s after the target is met with nothing
   still collapsing. The podium is meant to be left standing.
+- **It is a children's game.** Realism is for buildings, breaking, fire, water and the city;
+  people are stylised, nobody bleeds, there are no harrowing screams, a police tackle is a
+  comic heap. Real guns only on Insane, and a hit only costs health.
 - **You can die**: falls, blasts, fire, being under a collapse. You come back at the door
   and the building stays as broken as you left it.
 
@@ -104,8 +124,8 @@ Not a stack of offices — the owner asked for restaurants, shops and Trump's
 house on top. `building/plan.js` holds the plan and `PROGRAMME`;
 `building/interiors.js` furnishes each floor from it:
 
-The programme is **the real tower's**, in its proportions on twelve storeys (the owner
-supplied it):
+The programme is **the real tower's**, in its proportions on seventeen storeys (the owner
+supplied it; more apartments than offices, as in the real one):
 
 | floor | what it is |
 |---|---|
@@ -115,11 +135,11 @@ supplied it):
 | 2 | jewellers: glass cases of gold and stones |
 | 3 | food court: three counters with griddles, fridges and gas; seating |
 | 4 | the Grill: white tablecloths, a bar, a piano; its kitchen is on the lower level |
-| 5–7 | offices: glass-walled rooms either side of long corridors |
-| 8 | the Trump Organization: the corner office, the boardroom for fourteen, reception |
-| 9 | condominiums: two apartments |
-| 10 | penthouse living: fireplace, piano, sofas, dining for ten, kitchen |
-| 11 | master bedroom, dressing room, bathroom, study |
+| 5–8 | offices: glass-walled rooms either side of long corridors |
+| 9 | the Trump Organization: the corner office, the boardroom for fourteen, reception (`HQ`) |
+| 10–14 | condominiums: two apartments a floor (`RESIDENCES`) |
+| 15 | penthouse living: fireplace, piano, sofas, dining for ten, kitchen (`PENTHOUSE`) |
+| 16 | master bedroom, dressing room, bathroom, study |
 
 **The gold escalators** criss-cross the atrium, one from each public floor to the next
 (`ESCALATORS` in `interiors.js`); furniture keeps clear of their feet and heads, and the
@@ -127,9 +147,24 @@ atrium rail is open where they arrive. **The ground under the podium is the pit'
 (`groundAt` in `plan.js`): what stands on the ground there stands at −4 m, and the lobby
 floor stands on the lower level's columns and retaining walls, not on the ground.
 
-The tower is **50 m**: 12 storeys of 4 m, roof at 48 m, rooftop plant room to 52 m.
-It was 100 m, then 70 m; the owner asked for each cut.
-`TOP_FLOOR` in `plan.js` is the one number; the penthouse is always its top three.
+The tower is **70 m**: 17 storeys of 4 m, roof at 68 m, rooftop plant room to 72 m, and a
+**crown** of glass carried on above the roof, rising to a point at every tooth of the
+sawtooth, as in the photograph. It was 100 m, then 70, then 50; the owner then asked for it
+"taller and slimmer" again. `TOP_FLOOR` in `plan.js` is the one number; the penthouse is
+always its top two, the apartments the floors between `HQ` and it.
+
+**It looks like the photographs** the owner supplied (in `~/Downloads`: `trump.webp`,
+`trump 2.webp`, `trump 3.webp` inside, `Screenshot 2026-10-18 101610.png` outside):
+dark bronze mirror glass outside (`glass`; glass indoors is `clearglass`); in the lobby a
+cream marble floor polished to a mirror (`creammarble`), the core and columns in dark
+veined stone (`darkmarble`), brass round the lift doors, the monogrammed brass desk, red
+rope, black steel benches, two great flags inside the glass front, revolving doors that
+turn (`sim/doors.js`); in the atrium, rough pink marble blocks stepped in and out down
+its back wall with lights along their ledges (role `cladding`), brass escalators with glass
+sides, black handrails and mirror undersides (`shear` shapes in `render/geometry.js`),
+mirror-faced slab edges, a café of white marble tables. No real brand names or logos.
+Polished things indoors reflect a warm `RoomEnvironment`, not the sky (`indoor` in
+`render/materials.js`) — faked reflections, as the owner chose for the GTX 680.
 
 Floors are finished to their use (marble, tile, oak, carpet), and furniture is
 placed through `freePodium` so nothing stands in a column, the core or the atrium.
@@ -143,11 +178,34 @@ offices — built of pieces like the tower, and part of the same job. Every piec
 `building` ('tower' | 'neighbour'): storeys, support failures and toppling are counted
 per building.
 
-**People** (`sim/people.js`): about ninety — shoppers, diners, office workers, the
-family upstairs — walk between free spots on their floor, a few instanced parts each
+**People** (`sim/people.js`): about a hundred — shoppers, diners, office workers, the
+families upstairs — walk between free spots on their floor, a few instanced parts each
 (a dozen draw calls in all). They stand on whatever is really under them and fall
 when it goes; a blast, a support giving way or a building going over sends everyone in
-earshot running; knocked down by a fall they lie still and later are gone.
+earshot running; knocked down by a fall they lie still and later are gone. When you break
+things near them they stop and stare, some film it on their phones, the close ones back away.
+
+**Guards and police** (`sim/security.js`) are people too (`people.agent`), steered from
+outside. Guards stand posts on the public floors, the lower level and the Trump
+Organization's floor; each takes one of the difficulty's arms — shout and radio, tackle
+(you are put out of the front door and carry on), net (tangled), taser (stunned), gun
+(Insane only). They must **see** you: same floor, range, a clear line, less in dust and
+smoke, much less crouched or in the hi-vis vest and hard hat from goods receiving (E). A
+sledge or extinguisher on one knocks it down dazed (stars, a boing); up again angrier.
+Break enough (`HEAVY`) and the police are called; a guard radioing brings them sooner.
+They arrive with sirens and lit cars on the avenue, search floor by floor, change floors
+only by the stairs (out of sight for a few seconds a floor), and one catching you is a
+comic heap, "BUSTED", and the job failed.
+
+**Sprinklers, smoke and water** (`sim/water.js`, `sim/smoke.js`): heads every 3.5 m under
+every ceiling of the tower (instanced, not pieces; each remembers its slab), fed by red
+mains hung under the slabs (pieces, role `pipe`). A head opens over a fire after about a
+second (its bulb bursts), sprays, and puts out most fires it reaches; where water falls
+the floor is wet — a dark mirror you slide on (`player.wet`). A broken main pours from
+both ends and its floor's heads go dry. The alarm sounds (soft: three tones, a pause) and
+people leave. Smoke is a grid of two-metre cells per storey, fed by fires: it spreads
+under the ceiling and banks down, pours out of broken windows and rises up the stair and
+atrium. With your head in it you see a few metres (fog); crouching lowers your eyes under it.
 
 ### The lift
 
@@ -177,14 +235,15 @@ src/
   building/            pieces (the store), support (what holds what), kit, furniture, tower,
                        neighbour (the office block next door)
   damage/              damage (what a blow does), cutter (CSG), csg + csg.worker (breaking
-                       in Web Workers), splinters, glass, paint
+                       in Web Workers), rebar (cages and bars), splinters, glass, paint
   sim/                 structure (support + weight + pancake), topple, rubble, impacts,
-                       fire, blast, lift, people
-  fx/                  particles (and the dust veil), chips, shake
+                       fire, blast, lift, people, doors, water (sprinklers, mains, wet
+                       floors, alarm), smoke, security (guards, police)
+  fx/                  particles (and the dust veil), chips, shake, powder
   dev/bench.js         the collapse bench: an automated demolition, timed (see below)
   tools/               tools (sledge, spray, extinguisher, charges), viewmodels
   ui/                  menu, hud (and every overlay screen)
-  data/                catalog, progress
+  data/                catalog, progress, difficulty
   scenery/city.js      Street, pavements and blocks — solid (fixed colliders), not breakable
 ```
 
@@ -286,9 +345,10 @@ still standing over it**, measured by a ray down its line (`loadOf`), not what s
 it when it was built — a podium column carries the tower until the tower has gone. It
 fails when `hp <= hpMax · share / (share + 14)`, where share grows with the supports
 already lost within 7.5 m. When one fails, its neighbours are rechecked a moment later;
-an undamaged one gives way on its own when it has lost `24 / load` neighbours (at least
-two; twice that for core): two under twelve storeys, four under six. That is the chain
-reaction, and it stops where the losses thin out.
+an undamaged one gives way on its own when **three** supports beside it have (five for
+core walls), within 6.2 m, at any height — a frame has redundancy. That is the chain
+reaction, and it stops where the losses thin out. A gas bottle or transformer has a
+quarter of a charge's power against concrete.
 
 **Blasts are shielded** (`blast._shielded`): a slab, wall or column between a charge and a
 piece takes the blast instead — a charge on a column does not bring down the one on the
@@ -376,8 +436,31 @@ under it. The podium stands, its furniture thrown about.
 `sim/fire.js`: burning pieces have fuel and heat, char towards black (instance colour on
 batched pieces, so nothing is promoted), and **spread only to what they actually touch**.
 The first version lit everything within a sphere of a burning 5 m carpet bay, so a desk
-fire had a whole floor alight in eight seconds. Tanks in a fire cook off. The extinguisher
-tests each burning piece's nearest point along the spray cone.
+fire had a whole floor alight in eight seconds. Tanks in a fire cook off. Furniture burnt
+half through gives way; glass by a big fire cracks, then breaks. Fires feed the smoke.
+`fire.douse(point, radius, amount)` is how water and powder put fires out; a doused spot
+must not regrow heat before it is cleared, or it flickers on for ever.
+
+**The extinguisher** (`tools/tools.js`) holds about fourteen seconds of powder (by
+difficulty), its jet weakening as the pressure goes, coughing when nearly empty. A few
+rays a frame find where the jet lands — the first thing in its way, never through a wall —
+and that is where it douses and leaves white powder (`fx/powder.js`). Spares hang by the
+lifts on every third floor (role `cladding`, fixed to the core wall) and stand in the
+kitchens, plant room, vault, a pantry and the penthouse kitchen; E takes one.
+
+### Reinforced concrete
+
+A column that fails (`damage.fail`) leaves a stub at its foot and, if the slab it carried
+is still there, another hanging under it (`fx.hang` → `rubble._rest` on the slab). Between
+them it goes one of two ways: it **bursts** — the concrete falls out in lumps and the bars
+are left bowed outward between the stubs, a birdcage — or it **shears** along a rough
+diagonal (the CSG `split`, so the break shows aggregate) and the top slides off down the
+slope. Walls show their bars. A blow on concrete knocks out a shallow jagged **cone**, the
+shape a spall has. Before a warned column goes, its crack climbs the face with grit and
+sharp reports (`audio.snap`); a slab with nothing under it tilts on its bars along the edge
+still tied to a neighbour, then swings off them. **Destroy the column before putting its
+stub and bars in its place**: spawned first, they anchored on the column about to go and
+flew off with it.
 
 ## Keeping it smooth — without losing the collapse
 
@@ -444,6 +527,34 @@ survives a file edit: Vite reloads the page.
 
 ## Things already learned here
 
+- **Rapier's `World.step` wrapper walks every collider twice after each step** (a call out
+  of WebAssembly per handle to map new ones, a call in per collider to forget removed
+  ones). With a collapse's twenty-five thousand colliders that was the whole cost of a
+  step, 7 ms. `physics.js` steps the pipeline directly; colliders made and removed through
+  the World keep its maps right themselves. A step with the job loaded: 3.8 ms → 0.06 ms.
+- **An idle world is not stepped** (`physics.step`): nothing dynamic awake, no collider
+  added or removed (`physics.dirty`) — no step. Slow frames take 1/30 s steps, three at
+  most, not six of 1/60. Resting debris freezes after creeping four seconds, any role.
+- **Fixed colliders have no body.** All on one fixed body, adding any marked it changed.
+- **A material object must never be shared by a BatchedMesh and a Mesh**, nor by batches
+  with and without instance colours, nor drawn into the shadow map by both: three switches
+  shader programs between them object by object (6% of a collapse). Meshes get a twin
+  (`pieces._solo`), every batch gets colours (`_initColorsTexture`), batched and instanced
+  casters have their own depth materials (`BATCH_DEPTH`, `INSTANCE_DEPTH`).
+- **The sun's shadow map is cached**: drawn when its box moves, every other frame while
+  things fall, every sixth otherwise (`shadowsDue` in `main.js`). It was a third of the
+  GPU's frame. Never toggle `castShadow` to test it: that recompiles every material.
+- **Ray filters are calls out of WebAssembly per candidate collider.** Rubble's rays take
+  none: the first hit, its own collider left out by Rapier, a second look under anything
+  that is not to rest on. A piece in the air looks down when it could next reach the
+  ground, not every frame.
+- **The support grid is three-dimensional** (`link`): in two, a forty-storey block's cells
+  held all forty storeys — 785 ms to link the job, now 69.
+- **A city block wakes only when the falling mass reaches it** (`topple._wakeAhead`), not
+  when the tower starts to tip: waking five at once was a 1.2 s frame, most never touched.
+- **Rigid-body debris landing on structure goes through `impacts.absorb`** like rubble,
+  and the shock a slab has taken fades (half-life about 1.4 s). Judged by sledge blows,
+  every lump that bounced off the podium roof broke a bay of it.
 - **A CSG split was 30–60 ms on a 40-triangle lump**: two evaluations, each against a
   rough face 12 × 12 subdivisions fine. It is one evaluation now (`[INTERSECTION,
   SUBTRACTION]` in one pass), and pieces past their first generation get a 5 × 5 face.
