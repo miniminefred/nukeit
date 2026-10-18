@@ -60,7 +60,22 @@ function instrument(dev) {
   return { cost, undo: () => undo.forEach((u) => u()) };
 }
 
-export async function bench(dev, { charges = REFERENCE, secs = 40, view = VIEW, quality = null, profile = false } = {}) {
+// A seeded Math.random, so that two runs of a collapse are nearly the same
+// collapse and their timings can be compared. (Nearly: work paced by the clock
+// still falls on different frames.)
+function seeded(seed) {
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+export async function bench(dev, { seed = null, ...opts } = {}) {
+  if (seed === null) return run(dev, opts);
+  const random = Math.random;
+  Math.random = seeded(seed);
+  try { return await run(dev, opts); } finally { Math.random = random; }
+}
+
+async function run(dev, { charges = REFERENCE, secs = 40, view = VIEW, quality = null, profile = false } = {}) {
   if (quality !== null) dev.quality.set(quality);
   await dev.start('trump', ['bomb', 'sledge']);
   const { pieces, player, input } = dev;

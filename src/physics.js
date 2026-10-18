@@ -33,6 +33,9 @@ const BUILDING_GROUP = { tower: 0x0080, neighbour: 0x0100 };
 const bitOf = (b) => BUILDING_GROUP[b] ?? (/^block(\d+)$/.test(b) ? 0x0200 << (+b.slice(5) % 7) : 0);
 export const inBuilding = (g, building) => g | (bitOf(building) << 16);
 export const massGroups = (building) => groups(0x0010, 0x0020 | bitOf(building));
+// For asking what of *other* buildings something overlaps: Rapier passes over
+// the asker's own building and everything else without a call for each.
+export const otherBuildings = (building) => groups(GROUP_WORLD, 0xff80 & ~bitOf(building));
 const groups = (member, filter) => (member << 16) | filter;
 export const G_WORLD = groups(GROUP_WORLD, GROUP_WORLD | GROUP_DEBRIS | GROUP_PLAYER | GROUP_MASS);
 // The street and the city: the world, and also what a tipping mass lands on.

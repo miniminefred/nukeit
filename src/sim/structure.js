@@ -110,8 +110,8 @@ export class Structure {
     this.lost.push({ floor: p.floor, building: p.building, x: c.x, z: c.z });
     // Is the weight above still over what is left? If not, it tips.
     if (this.fx.topple?.check(p.floor, p.building)) return;
-    for (const q of this.pieces.list) {
-      if (q.state !== 'static' || q.floor !== p.floor || q.building !== p.building || (q.role !== 'column' && q.role !== 'core')) continue;
+    for (const q of this.pieces.inBuilding(p.building)) {
+      if (q.state !== 'static' || q.floor !== p.floor || (q.role !== 'column' && q.role !== 'core')) continue;
       const d = q.box.getCenter(_c).distanceTo(c);
       if (d < SPREAD + 1.5) this.checks.push({ p: q, t: 0.4 + Math.random() * 1.4 + d * 0.08 });
     }

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { FLOOR_H } from '../building/plan.js';
-import { G_MASS_HINGED, G_LAND, massGroups } from '../physics.js';
+import { G_MASS_HINGED, G_LAND, massGroups, otherBuildings } from '../physics.js';
 
 // A tower that has lost one side tips over.
 //
@@ -278,7 +278,7 @@ export class Topple {
         const o = owner.get(k.handle);
         if (other(o)) hit.add(o);
         return hit.size < 60;
-      }, undefined, G_LAND);
+      }, undefined, otherBuildings(M.building));
       // Off its hinge, it crushes the storey it stood on where it lies on it —
       // a roof built for people and furniture, not for a tower lying across
       // it. Below that its own building is whole and carries it, and it slides
