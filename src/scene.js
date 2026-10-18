@@ -23,6 +23,7 @@ export function createRenderer() {
   // Pixel ratio is set by render/quality.js.
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
+  renderer.shadowMap.autoUpdate = false;     // main.js says when (shadowsDue)
   // Plain PCF: the soft variant costs several times as many shadow samples.
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -98,9 +99,13 @@ export function followShadow(lights, camera) {
   const size = 80, texel = size / sun.shadow.mapSize.x;
   const c = camera.position;
   const snap = (v) => Math.round(v / texel) * texel;
-  sun.target.position.set(snap(c.x), snap(Math.max(0, c.y - 6)), snap(c.z));
-  sun.position.copy(sun.target.position).addScaledVector(SUN_DIR, 200);
+  const x = snap(c.x), y = snap(Math.max(0, c.y - 6)), z = snap(c.z);
+  const t = sun.target.position;
+  if (t.x === x && t.y === y && t.z === z) return false;
+  t.set(x, y, z);
+  sun.position.copy(t).addScaledVector(SUN_DIR, 200);
   sun.target.updateMatrixWorld();
+  return true;                 // moved: the shadow map must be drawn again
 }
 
 export function createPost(renderer, scene, camera) {

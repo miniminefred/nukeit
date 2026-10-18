@@ -52,6 +52,7 @@ export class Quality {
       sun.shadow.map?.dispose();
       sun.shadow.map = null;
     }
+    this.renderer.shadowMap.needsUpdate = true;
   }
 
   get label() { return (this.mode === 'auto' ? 'Auto · ' : '') + LEVELS[this.level].name; }

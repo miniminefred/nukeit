@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { KIND, insideMaterial } from './materials.js';
+import { KIND, insideMaterial, BATCH_DEPTH } from './materials.js';
 
 // Every shader a collapse will need, compiled while the loading screen is up.
 //
@@ -24,6 +24,8 @@ export async function warmUp(renderer, scene, camera, post, extra = []) {
     for (const x of [mesh, cut]) { x.castShadow = x.receiveShadow = true; x.frustumCulled = false; group.add(x); }
     for (const [g, n] of [[geo, 36], [flat, 0]]) {
       const b = new THREE.BatchedMesh(1, 36, n, m);
+      b._initColorsTexture();                 // as every batch in the game has (pieces.js)
+      b.customDepthMaterial = BATCH_DEPTH;
       const i = b.addInstance(b.addGeometry(g));
       b.setColorAt(i, new THREE.Color(0xffffff));
       b.castShadow = b.receiveShadow = true;
@@ -39,6 +41,7 @@ export async function warmUp(renderer, scene, camera, post, extra = []) {
   group.position.copy(camera.position).add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(2));
   scene.add(group);
   try { await renderer.compileAsync(scene, camera); } catch { /* compile on draw instead */ }
+  renderer.shadowMap.needsUpdate = true;      // the shadow pass's programs too
   post.composer.render(0);
   scene.remove(group);
   for (const b of batches) b.dispose();

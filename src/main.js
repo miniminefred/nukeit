@@ -253,6 +253,18 @@ player.onDeath = (cause) => {
   downT = 3;
 };
 
+// The sun's shadow map is not drawn every frame: it was a third of the GPU's
+// frame, four million triangles again. It is drawn when its box moves with
+// you, every other frame while things are falling, and a few times a second
+// otherwise — for the people walking, the doors turning, a wall knocked
+// through. Static shadow, cached: what every game does.
+let shadowClock = 0;
+function shadowsDue(moved) {
+  shadowClock++;
+  const falling = rubble.flying.length > 0 || physics.dynamic.size > 0 || topple.active || structure.collapsing;
+  return moved || (falling ? shadowClock % 2 === 0 : shadowClock % 6 === 0);
+}
+
 // The job's measure: the highest point of anything still standing in the two
 // buildings of the job — not a city block it woke on the way down.
 function measure() {
@@ -369,11 +381,11 @@ function frame(dt) {
   if (state === 'play' && job) {
     const at = player.pos, f = Math.floor((at.y + 0.5) / 4);
     const inside = Math.abs(at.x) < 20 && at.z > -12 && at.z < 12;
-    const lounge = inside && [0, 1, 2, 4, 8, 10, 11].includes(f) && !structure.collapsing && !topple.active;
+    const lounge = inside && ((f >= 0 && f <= 4 && f !== 3) || f >= 9) && !structure.collapsing && !topple.active;
     audio.ambience(inside ? people.crowdAt(at) : 0, lounge ? 1 : 0);
   } else audio.ambience(0, 0);
   audio.update(dt);
-  followShadow(lights, camera);
+  renderer.shadowMap.needsUpdate = shadowsDue(followShadow(lights, camera));
   shake.apply(camera, dt);
   post.composer.render(dt);
   if (state === 'play' && !rig) {

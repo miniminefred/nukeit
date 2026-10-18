@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { KIND } from '../render/materials.js';
+import { KIND, INSTANCE_DEPTH } from '../render/materials.js';
 import { blob } from '../damage/cutter.js';
 import { G_RAY } from '../physics.js';
 import { groundAt } from '../building/plan.js';
@@ -29,12 +29,13 @@ export class Chips {
     // Irregular lumps, not cubes: a coarse blob, squashed per chip below.
     const g = blob(3.1, 0.45, 0).scale(0.5, 0.5, 0.5);
     this.solid = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ roughness: 0.9 }), MAX);
-    this.glass = new THREE.InstancedMesh(g, KIND.glass.material, 800);
+    this.glass = new THREE.InstancedMesh(g, KIND.glass.material.clone(), 800);   // its own: batches draw with the original
     for (const m of [this.solid, this.glass]) {
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       m.frustumCulled = false;
       m.count = 0;
       m.castShadow = m === this.solid;
+      m.customDepthMaterial = INSTANCE_DEPTH;
       m.receiveShadow = true;
       scene.add(m);
     }

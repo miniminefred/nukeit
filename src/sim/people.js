@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { G_LAND } from '../physics.js';
+import { INSTANCE_DEPTH } from '../render/materials.js';
 import { T, PODIUM_FLOORS, podiumFront, OUTLINE, inPoly, inCore, inAtrium, TOWER_COLUMNS, PODIUM_COLUMNS, clearOf } from '../building/plan.js';
 
 // The people in the building: shoppers in the boutiques and among the
@@ -61,6 +62,7 @@ export class People {
       m.count = 0;
       m.castShadow = true;
       m.receiveShadow = true;
+      m.customDepthMaterial = INSTANCE_DEPTH;     // see render/materials.js
       m.frustumCulled = false;
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       scene.add(m);

@@ -207,7 +207,7 @@ export class Damage {
     const centre = local.clone().addScaledVector(ln, -radius * 0.35);
     let out;
     try {
-      const mats = q.materials ?? (Array.isArray(q.mesh?.material) ? q.mesh.material : [this.pieces._material(q)]);
+      const mats = q.materials ?? [this.pieces._material(q)];
       out = chunkOff(q.geometry, mats, insideMaterial(kind.name), centre, ln.clone().negate(), radius, radius * 1.2);
     } catch (e) { console.warn('chunk failed', e); return; }
     if (out.rest.geometry.attributes.position.count === 0) { this.pieces.destroy(p); return; }
@@ -244,7 +244,7 @@ export class Damage {
     const centre = local.clone().addScaledVector(ldir, depth * 0.35);
     if (soon) {
       const from = q.geometry;
-      const mats = q.materials ?? (Array.isArray(q.mesh?.material) ? q.mesh.material : [this.pieces._material(q)]);
+      const mats = q.materials ?? [this.pieces._material(q)];
       subtractAsync(from, mats, insideMaterial(kind.name), centre, ldir, radius, depth).then((out) => {
         // Still there, still the shape it was cut from, still where it stood?
         if (p.state !== 'static' || q.geometry !== from) return;
@@ -259,7 +259,7 @@ export class Damage {
       return;
     }
     try {
-      const mats = q.materials ?? (Array.isArray(q.mesh?.material) ? q.mesh.material : [this.pieces._material(q)]);
+      const mats = q.materials ?? [this.pieces._material(q)];
       const out = subtract(q.geometry, mats, insideMaterial(kind.name), centre, ldir, radius, depth);
       if (out.geometry.attributes.position.count === 0) { this.pieces.destroy(p); return; }
       this.pieces.reshape(p, part, out.geometry, out.materials);

@@ -65,6 +65,13 @@ const HITS = {
   screen: 0.8, lamp: 0.3, glass: 1, clearglass: 1,
 };
 
+// What the sun's shadow pass draws batches and instanced meshes with. Three
+// draws every caster with one depth material by default, so batched, instanced
+// and plain meshes took turns switching its shader program, object by object,
+// in every shadow pass. Each kind of mesh gets its own.
+export const BATCH_DEPTH = new THREE.MeshDepthMaterial();
+export const INSTANCE_DEPTH = new THREE.MeshDepthMaterial();
+
 export const KIND = {};
 const _mats = new Map();
 

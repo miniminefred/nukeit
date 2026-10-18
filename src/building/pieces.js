@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { KIND } from '../render/materials.js';
+import { KIND, BATCH_DEPTH } from '../render/materials.js';
 import { G_WORLD, G_RUBBLE, inBuilding } from '../physics.js';
 
 // Every wall, slab, column, pane of glass and chair in the building is a piece.
@@ -151,6 +151,10 @@ export class Pieces {
     const made = new Map();
     for (const [k, n] of need) {
       const b = new THREE.BatchedMesh(n.inst, n.vert, n.idx, KIND[k].material);
+      // Every batch has instance colours, tinted or not: a material drawn by
+      // batches with and without them switched shader programs between them.
+      b._initColorsTexture();
+      b.customDepthMaterial = BATCH_DEPTH;
       b.castShadow = !KIND[k].glass;
       b.receiveShadow = true;
       // No per-piece culling or sorting. Both run on the CPU over every
@@ -205,7 +209,7 @@ export class Pieces {
     const small = p.volume < 0.15;
     for (const q of p.parts) {
       this._showDraws(q, false);
-      q.mesh = new THREE.Mesh(q.geometry, q.materials ?? this._material(q));
+      q.mesh = new THREE.Mesh(q.geometry, q.materials ? q.materials.map((m) => this._solo(m)) : this._solo(this._material(q)));
       q.mesh.castShadow = !q.kind.glass && !small;
       q.mesh.receiveShadow = true;
       q.mesh.userData.piece = p;
@@ -214,6 +218,18 @@ export class Pieces {
     this.root.add(g);
     p.object = g;
     return g;
+  }
+
+  // A material for a piece's own mesh: never the very object a batch draws
+  // with. Three compiles a batched and a plain variant of a shader, and a
+  // material shared between a BatchedMesh and a Mesh switched between them for
+  // every piece, every frame: the renderer looking up programs was 6% of a
+  // collapse. Each gets a twin, textures shared.
+  _solo(m) {
+    this._solos ??= new Map();
+    let s = this._solos.get(m);
+    if (!s) { s = m.clone(); this._solos.set(m, s); }
+    return s;
   }
 
   _material(q) {
@@ -238,7 +254,7 @@ export class Pieces {
       if (q.charred === a) continue;
       q.charred = a;
       const base = _c.set(q.tint ?? 0xffffff).lerp(new THREE.Color(0x121010), a);
-      if (q.mesh) q.mesh.material = this._material(q);
+      if (q.mesh) q.mesh.material = this._solo(this._material(q));
       for (const d of q.draws) d.b.setColorAt(d.i, base);
     }
   }
@@ -251,7 +267,7 @@ export class Pieces {
     if (q.geometry !== geometry) q.geometry.dispose();
     q.geometry = geometry;
     q.mesh.geometry = geometry;
-    if (materials) { q.materials = materials; q.mesh.material = materials; }
+    if (materials) { q.materials = materials; q.mesh.material = materials.map((m) => this._solo(m)); }
     if (p.state === 'static' || p.state === 'rubble') {
       this._removeFixedColliders(p);
       // One trimesh per part, in world space.
@@ -444,6 +460,8 @@ export class Pieces {
       let b = list[list.length - 1];
       if (!b || attempt === 1) {
         b = new THREE.BatchedMesh(2048, Math.max(262144, g.attributes.position.count), 0, material);
+        b._initColorsTexture();
+        b.customDepthMaterial = BATCH_DEPTH;
         b.castShadow = material !== KIND.glass?.material;
         b.receiveShadow = true;
         b.perObjectFrustumCulled = false;
