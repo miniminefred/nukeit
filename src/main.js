@@ -225,7 +225,7 @@ function openMenu() {
   hud.show(false);
   screens.hidePause();
   audio.silence();
-  menu.show('jobs');
+  menu.show('mode');
   // Behind the menu: the city, from the avenue.
   camera.position.set(19, 2.2, 31);
   camera.lookAt(0, 42, 0);
@@ -239,6 +239,7 @@ async function start(jobId, toolIds, levelId = 'normal') {
   // The job as this difficulty has it: its own target height.
   job = { ...jobById(jobId), target: difficulty.target };
   pieces.strength = difficulty.strength;
+  player.immortal = !!difficulty.creative;
   screens.loading('Clearing the site', 0.05);
   await frames(2);
   unloadJob();
@@ -266,7 +267,7 @@ async function start(jobId, toolIds, levelId = 'normal') {
   }
   current = 0;
   for (const t of tools) { t.model.visible = false; vmScene.add(t.model); }
-  hud.setJob(job);
+  hud.setJob(job, difficulty.creative);
   player.revive();
   player.disguised = false;
   thrownT = -1;
@@ -473,7 +474,7 @@ function frame(dt) {
     if (heightT <= 0 && state === 'play') {
       heightT = 0.25;
       height = measure();
-      if (height < job.target && !structure.collapsing && !topple.active && !rubble.active && doneT < 0) { doneT = 3.5; hud.flash('Target reached'); }
+      if (!difficulty.creative && height < job.target && !structure.collapsing && !topple.active && !rubble.active && doneT < 0) { doneT = 3.5; hud.flash('Target reached'); }
     }
     if (doneT > 0 && state === 'play') { doneT -= dt; if (doneT <= 0) finish(); }
     if (downT > 0) {
@@ -561,7 +562,7 @@ const _spectacle = new THREE.Vector3(0, 30, -4);
 function tipFor(t) {
   if (!t) return '';
   if (t.id === 'spray') return `Colour: ${t.colourName} — right click to change`;
-  if (t.id === 'bomb') return `${t.left} charges · ${t.placed.length} placed — left click to place, right click to detonate`;
+  if (t.id === 'bomb') return `${t.left === Infinity ? 'Endless' : t.left} charges · ${t.placed.length} placed — left click to place, right click to detonate`;
   if (t.id === 'extinguisher') {
     const pct = Math.round(t.charge * 100);
     if (t.charge <= 0) return 'Empty — find another: red ones hang by the lifts on some floors';

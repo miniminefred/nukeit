@@ -69,7 +69,7 @@ export class Security {
     }
     // Off duty in the break room behind the lobby desk, sitting down — until
     // the building gets frightened.
-    const off = { supereasy: 0, easy: 1, normal: 2, hard: 3, insane: 4 }[level.id] ?? 2;
+    const off = { supereasy: 0, easy: 1, normal: 2, hard: 3, insane: 4 }[level.id] ?? 0;
     for (let n = 0; n < off; n++) {
       const [x, z, yaw] = BREAK_ROOM.seats[n];
       const at = new THREE.Vector3(x, T(0), z);

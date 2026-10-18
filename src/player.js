@@ -74,7 +74,7 @@ export class Player {
   tangle(t) { this._tangle = Math.max(this._tangle ?? 0, t); }
 
   damage(amount, cause) {
-    if (this.dead || amount <= 0.5) return;
+    if (this.dead || amount <= 0.5 || this.immortal) return;
     this.health = Math.max(0, this.health - amount);
     this._hurt = 0;
     this.onDamage?.(amount, cause);

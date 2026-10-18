@@ -24,4 +24,10 @@ export const LEVELS = [
     strength: 2, target: 12, charges: 8, discharge: 8, police: 25, guards: 8, arms: ['tackle', 'net', 'taser', 'gun'], earned: true },
 ];
 
-export const level = (id) => LEVELS.find((l) => l.id === id) ?? LEVELS[2];
+// Creative: not a job but a playground — no guards, no police, no crime meter,
+// no dying, no target; every tool, charges and powder that never run out, and
+// the people still about their day.
+export const CREATIVE = { id: 'creative', name: 'Creative', creative: true, blurb: 'Every tool, nothing runs out, nobody comes for you. Just have fun.',
+  strength: 1, target: -Infinity, charges: Infinity, discharge: Infinity, police: null, guards: 0, arms: [] };
+
+export const level = (id) => (id === 'creative' ? CREATIVE : LEVELS.find((l) => l.id === id) ?? LEVELS[2]);

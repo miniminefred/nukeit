@@ -18,8 +18,9 @@ export class Hud {
 
   show(on) { this.root.classList.toggle('on', on); }
 
-  setJob(job) {
-    this.els.title.textContent = job.title;
+  setJob(job, creative = false) {
+    this.creative = creative;
+    this.els.title.textContent = creative ? `${job.title} · Creative` : job.title;
     this.target = job.target;
     this.start = null;
   }
@@ -46,7 +47,11 @@ export class Hud {
     this.els.health.style.width = `${Math.max(0, health)}%`;
     this.els.health.classList.toggle('low', health < 30);
     this.els.healthText.textContent = Math.ceil(health);
-    if (height !== null) {
+    if (height !== null && this.creative) {
+      this.els.height.textContent = `${height.toFixed(1)} m standing`;
+      this.els.note.textContent = 'No rules, no hurry: break what you like';
+      this.els.bar.style.width = '0%';
+    } else if (height !== null) {
       if (this.start === null) this.start = height;
       const over = Math.max(0, height - this.target);
       const k = 1 - over / Math.max(1, this.start - this.target);

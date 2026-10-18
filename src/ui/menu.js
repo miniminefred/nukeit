@@ -2,8 +2,10 @@ import { JOBS, TOOLS, MAX_DEMOLITION, job as jobById } from '../data/catalog.js'
 import { progress } from '../data/progress.js';
 import { LEVELS, level as levelById } from '../data/difficulty.js';
 
-// The menu you arrive in. Two pages:
+// The menu you arrive in. Three pages:
 //
+//   0. Mode   — Deconstruction (the jobs, with guards, the police and the
+//               crime meter) or Creative (every tool, nobody comes for you).
 //   1. Jobs   — pick a job. One is open, the others are coming.
 //   2. Tools  — pick up to three demolition tools you have unlocked; the
 //               helper tools (spray can, extinguisher) always come along.
@@ -26,10 +28,13 @@ export class Menu {
     this.jobId = 'trump';
     this.level = 'normal';
     this.picked = new Set(['sledge']);
-    this.page = 'jobs';
+    this.mode = 'deconstruction';
+    this.page = 'mode';
   }
 
-  show(page = 'jobs') {
+  get creative() { return this.mode === 'creative'; }
+
+  show(page = 'mode') {
     this.page = page;
     this.root.classList.add('open');
     this.render();
@@ -40,7 +45,7 @@ export class Menu {
   render() {
     this.root.innerHTML = '';
     const frame = el('div', 'menu-frame');
-    const head = el('div', 'menu-head', `<h1>NUKE<span>IT</span></h1><div class="steps"><b class="${this.page === 'jobs' ? 'on' : ''}">1 · Job</b><b class="${this.page === 'tools' ? 'on' : ''}">2 · Tools</b></div>`);
+    const head = el('div', 'menu-head', `<h1>NUKE<span>IT</span></h1><div class="steps"><b class="${this.page === 'mode' ? 'on' : ''}">1 · Mode</b><b class="${this.page === 'jobs' ? 'on' : ''}">2 · Job</b>${this.creative ? '' : `<b class="${this.page === 'tools' ? 'on' : ''}">3 · Tools</b>`}</div>`);
     // Graphics: Auto, then each level in turn.
     if (this.quality) {
       const q = el('button', 'quality', `Graphics: ${this.quality.label}`);
@@ -53,8 +58,27 @@ export class Menu {
       head.append(q);
     }
     frame.append(head);
-    frame.append(this.page === 'jobs' ? this._jobs() : this._tools());
+    frame.append(this.page === 'mode' ? this._mode() : this.page === 'jobs' ? this._jobs() : this._tools());
     this.root.append(frame);
+  }
+
+  _mode() {
+    const page = el('div', 'menu-page');
+    page.append(el('h2', null, 'How do you want to play?'));
+    const grid = el('div', 'job-grid');
+    const MODES = [
+      { id: 'deconstruction', title: 'Deconstruction', art: '&#127959;', text: 'The job: bring the building down below the target. Guards, the police, and a record of every law you break.' },
+      { id: 'creative', title: 'Creative', art: '&#127912;', text: 'No guards, no police, no crime meter, no dying. Every tool, and nothing runs out. Just have fun with your tools.' },
+    ];
+    for (const m of MODES) {
+      const card = el('button', `job-card${m.id === this.mode ? ' picked' : ''}`);
+      card.append(el('div', 'job-art', `<div style="height:150px;display:grid;place-items:center;font-size:64px;background:linear-gradient(#39506e,#c9a27a)">${m.art}</div>`));
+      card.append(el('div', 'job-body', `<b>${m.title}</b><span>${m.text}</span>`));
+      card.onclick = () => { this.mode = m.id; this.onClick?.(); this.show('jobs'); };
+      grid.append(card);
+    }
+    page.append(grid);
+    return page;
   }
 
   _jobs() {
@@ -80,6 +104,21 @@ export class Menu {
     page.append(grid);
     const j = jobById(this.jobId);
     page.append(el('p', 'brief', j.brief));
+    const bar = el('div', 'menu-bar');
+    const back = el('button', 'back', '&larr; Mode');
+    back.onclick = () => { this.onClick?.(); this.show('mode'); };
+    if (this.creative) {
+      page.append(el('p', 'tool-note', 'Creative: every tool, endless charges and powder, nobody comes for you.'));
+      const go = el('button', 'go', `Go to ${j.title} &rarr;`);
+      go.onclick = () => {
+        this.onClick?.();
+        const all = TOOLS.filter((t) => !t.soon).map((t) => t.id);
+        this.onStart(this.jobId, all, 'creative');
+      };
+      bar.append(back, go);
+      page.append(bar);
+      return page;
+    }
     // How hard: five levels, Insane earned.
     page.append(el('h3', null, 'Difficulty'));
     const row = el('div', 'levels');
@@ -96,10 +135,9 @@ export class Menu {
     page.append(row);
     const L = levelById(this.level);
     page.append(el('p', 'tool-note', `${L.blurb} Bring it below ${L.target} m.`));
-    const bar = el('div', 'menu-bar');
     const next = el('button', 'go', 'Next: choose your tools &rarr;');
     next.onclick = () => { this.onClick?.(); this.show('tools'); };
-    bar.append(next);
+    bar.append(back, next);
     page.append(bar);
     return page;
   }
