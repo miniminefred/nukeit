@@ -21,7 +21,7 @@ import { Smoke } from './sim/smoke.js';
 import { Powder } from './fx/powder.js';
 import { Security } from './sim/security.js';
 import { Traffic } from './sim/traffic.js';
-import { signs } from './building/shops.js';
+import { signs, places } from './building/shops.js';
 import { Topple } from './sim/topple.js';
 import { Rubble } from './sim/rubble.js';
 import { People } from './sim/people.js';
@@ -223,6 +223,7 @@ async function start(jobId, toolIds, levelId = 'normal') {
   screens.loading(`Building ${job.title}`, 0.3);
   await frames(2);
   signs.clear();
+  places.clear();
   world.load(job.build);
   signs.build(scene);
   lift.attach(pieces);

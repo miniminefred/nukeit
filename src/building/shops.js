@@ -68,6 +68,13 @@ function text(lines, style, aspect) {
   return t;
 }
 
+// Where people go in the shops, recorded as the shops are built, for
+// sim/people.js: staff behind the counter and at the till, customers queuing,
+// browsing the walls, sitting at the tables. Each faces the way a person there
+// would. { kind: 'staff' | 'queue' | 'browse' | 'seat', x, y, z, yaw }
+export const places = { list: [], clear() { this.list.length = 0; } };
+const place = (kind, fr, x, z, ly = 0) => { const [wx, wz] = fr.at(x, z); places.list.push({ kind, x: wx, y: fr.y, z: wz, yaw: fr.yaw(ly) }); };
+
 // The unit's frame: local (x, z) to the world, and a local yaw to a world one.
 function frame(cx, y, cz, yaw) {
   const c = Math.cos(yaw), s = Math.sin(yaw);
@@ -163,14 +170,23 @@ export function cafe(P, cx, y, cz, yaw, w, d, { name = 'BAKER & BEAN', seats = t
     for (let z = -d / 2 + 1.2; z < d / 2 - 1.2; z += 1.5) {
       put(P, fr, S.woodTable, left + 0.75, z, 0);
       put(P, fr, S.woodChair, left + 1.45, z, -Math.PI / 2);
+      place('seat', fr, left + 1.45, z, -Math.PI / 2);
+      place('seat', fr, -w / 2 + 0.38, z, Math.PI / 2);
     }
     if (room > 2.2) for (let z = -d / 2 + 1.6; z < d / 2 - 1.6; z += 1.9) {
       put(P, fr, S.woodTable, left + room - 0.5, z, 0);
       put(P, fr, S.woodChair, left + room - 0.5, z - 0.62, 0);
       put(P, fr, S.woodChair, left + room - 0.5, z + 0.62, Math.PI);
+      place('seat', fr, left + room - 0.5, z - 0.62, 0);
+      place('seat', fr, left + room - 0.5, z + 0.62, Math.PI);
     }
   }
   // The till staff and the barista stand here; customers queue here and sit there.
+  // The one at the till faces the customers; the barista faces the machine.
+  place('staff', fr, cxL - cw / 2 + 0.5, counterZ - 0.7, 0);
+  place('staff', fr, cxL + 0.4, back + 0.95, Math.PI);
+  place('queue', fr, cxL - cw / 2 + 0.5, counterZ + 0.9, Math.PI);
+  place('queue', fr, cxL - cw / 2 + 0.35, counterZ + 1.65, Math.PI);
   return {
     staff: [fr.at(cxL - cw / 2 + 0.5, counterZ - 0.7), fr.at(cxL + 0.4, back + 0.95)],
     queue: [fr.at(cxL - cw / 2 + 0.5, counterZ + 0.9), fr.at(cxL - cw / 2 + 0.3, counterZ + 1.7)],
@@ -193,7 +209,11 @@ export function boutique(P, cx, y, cz, yaw, w, d, { name = 'MAISON', h = H, styl
   if (w > 4.2) put(P, fr, S.foldTable, 0, 0.15, 0);
   put(P, fr, S.fittingRooms, -w / 4, -d / 2 + 0.7, 0, 2);
   put(P, fr, S.cashDesk, w / 4, -d / 2 + 0.75, 0, 1.4);
-  return { staff: [fr.at(w / 4, -d / 2 + 0.25)], browse: [fr.at(-w / 2 + 1.2, 0), fr.at(w / 2 - 1.2, -0.3), fr.at(0, 1)], yaw: fr.yaw() };
+  place('staff', fr, w / 4, -d / 2 + 0.25, 0);
+  place('browse', fr, -w / 2 + 1.25, -0.2, -Math.PI / 2);
+  place('browse', fr, w / 2 - 1.2, -0.5, Math.PI / 2);
+  place('browse', fr, 0.1, 0.85, Math.PI);
+  return { yaw: fr.yaw() };
 }
 
 // ---------------------------------------------------------------- shoes and bags
@@ -208,7 +228,10 @@ export function shoes(P, cx, y, cz, yaw, w, d, { name = 'STRIDE', h = H } = {}) 
   put(P, fr, S.bagCubes, -w / 4, d / 2 - 0.6, 0);
   put(P, fr, S.tryOnBench, -0.3, 0.1, 0);
   put(P, fr, S.cashDesk, w / 4, -d / 2 + 0.75, 0, 1.2);
-  return { staff: [fr.at(w / 4, -d / 2 + 0.25)], browse: [fr.at(-w / 2 + 1, 0.3), fr.at(0.2, -0.5)], yaw: fr.yaw() };
+  place('staff', fr, w / 4, -d / 2 + 0.25, 0);
+  place('browse', fr, -w / 2 + 1.0, 0.4, -Math.PI / 2);
+  place('seat', fr, -0.6, 0.1, 0);
+  return { yaw: fr.yaw() };
 }
 
 // ---------------------------------------------------------------- jewellers and watches
@@ -225,7 +248,10 @@ export function jeweller(P, cx, y, cz, yaw, w, d, { name = 'AURUM', h = H } = {}
   put(P, fr, S.cashDesk, 0, -d / 2 + 1.35, 0, Math.min(2, w - 2.4));
   for (const sx of [-0.45, 0.45]) put(P, fr, E.barStool, sx, -d / 2 + 2.0, 0);
   if (d > 4) put(P, fr, E.jewelCase, 0, d / 2 - 1.1, 0);
-  return { staff: [fr.at(0, -d / 2 + 0.85)], browse: [fr.at(0, -d / 2 + 2.0), fr.at(-w / 2 + 1.1, 0.4)], yaw: fr.yaw() };
+  place('staff', fr, 0, -d / 2 + 0.85, 0);
+  place('seat', fr, -0.45, -d / 2 + 2.0, Math.PI);
+  place('browse', fr, -w / 2 + 1.1, 0.4, -Math.PI / 2);
+  return { yaw: fr.yaw() };
 }
 
 // ---------------------------------------------------------------- souvenirs
@@ -239,7 +265,10 @@ export function souvenirs(P, cx, y, cz, yaw, w, d, { name = 'TOWER GIFTS', h = H
   put(P, fr, S.souvenirWall, -w / 4, -d / 2 + 0.42, 0, Math.min(2.4, w / 2 - 0.4));
   put(P, fr, S.postcardSpinner, -0.4, 0.4, 0);
   put(P, fr, S.cashDesk, w / 4, -d / 2 + 0.8, 0, 1.4);
-  return { staff: [fr.at(w / 4, -d / 2 + 0.3)], browse: [fr.at(-w / 2 + 1, 0), fr.at(0, 0.9)], yaw: fr.yaw() };
+  place('staff', fr, w / 4, -d / 2 + 0.3, 0);
+  place('browse', fr, -w / 2 + 1.0, 0, -Math.PI / 2);
+  place('browse', fr, -0.4, 1.0, Math.PI);
+  return { yaw: fr.yaw() };
 }
 
 // ---------------------------------------------------------------- the mall floors
