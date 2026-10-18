@@ -77,6 +77,17 @@ export class Physics {
     // Two solver iterations, not four: debris tumbling and coming to rest does
     // not need stiff stacks, and in a blast it halved the physics time.
     this.world.numSolverIterations = 2;
+    // A step without the bookkeeping Rapier's JavaScript wrapper does after it.
+    // World.step goes on to walk every collider handle in the engine (a call
+    // out of WebAssembly for each, to map new ones) and then every collider it
+    // knows of (a call in for each, to forget removed ones): fifty thousand
+    // calls a step once a collapse has left twenty-five thousand colliders of
+    // rubble, and the whole of what a step cost. Colliders and bodies made and
+    // removed through the World update those maps when they are, which is the
+    // only way anything here makes or removes them — so the walk finds nothing.
+    const w = this.world;
+    w.step = (events, hooks) => w.physicsPipeline.step(w.gravity, w.integrationParameters, w.islands, w.broadPhase, w.narrowPhase,
+      w.bodies, w.colliders, w.softBodies, w.impulseJoints, w.multibodyJoints, w.ccdSolver, events, hooks);
     this.events = new RAPIER.EventQueue(true);
     this.fixed = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     this.owner = new Map();         // collider handle -> piece (or anything)
