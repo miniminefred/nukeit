@@ -31,7 +31,6 @@ import { groundAt } from '../building/plan.js';
 
 const G = 9.81;
 const DOWN = { x: 0, y: -1, z: 0 };
-const REFRESH = 0.15;            // s between looks at what is under a piece
 const SLIDE = 0.08;              // s of its horizontal speed it slides on landing
 const LAND_MS = 5;               // ms a frame for landings: the rest wait for the next frame, still in the air
 const SETTLE = 3;                // columns that must touch: a piece beds into loose rubble until three do
@@ -288,17 +287,30 @@ export class Rubble {
       // Once this frame's landings are spent, the rest close to the ground
       // wait their turn without looking again: after a break, a thousand
       // pieces arrive at once.
+      // How soon it next looks depends on how soon it could get there: a
+      // piece thirty metres up need not look again for a while, one about to
+      // touch looks often. (Looking every frame near the ground, and every
+      // 0.15 s up high, was a third of a million rays in fourteen seconds.)
       f.look -= dt;
-      const near = c.y - f.r - f.floor < Math.max(0.6, -f.v.y * dt * 3);
-      if (f.look <= 0 || (near && landings > 0)) {
-        f.look = REFRESH * (0.7 + Math.random() * 0.6);
+      // Close to the ground with this frame's landings spent, it waits its turn
+      // without looking again.
+      const waiting = landings === 0 && c.y - f.r - f.floor < 0.6;
+      if (f.look <= 0 && !waiting) {
         f.floor = this._under(c.x, c.z, c.y + f.r);
+        const above = c.y - f.r - f.floor, speed = Math.max(2, -f.v.y + Math.hypot(f.v.x, f.v.z));
+        f.look = Math.min(0.6, Math.max(0.04, (above / speed) * 0.4)) * (0.8 + Math.random() * 0.4);
       }
+      const near = c.y - f.r - f.floor < Math.max(0.6, -f.v.y * dt * 3);
       if (near && landings > 0) {
         P._updateBox(p);
-        if (p.box.min.y <= f.floor + 0.02 && this._land(f)) {
-          if (performance.now() - t0 > LAND_MS + CHUNK_MS) landings = 0;
-          continue;
+        if (p.box.min.y <= f.floor + 0.02) {
+          // About to touch: one more look, from where it is now, to be sure —
+          // unless it has only just looked.
+          if (f.look <= 0.02) { f.floor = this._under(c.x, c.z, c.y + f.r); f.look = 0.04; }
+          if (p.box.min.y <= f.floor + 0.02 && this._land(f)) {
+            if (performance.now() - t0 > LAND_MS + CHUNK_MS) landings = 0;
+            continue;
+          }
         }
       }
       if (p.pos.y < -30) { P.destroy(p); continue; }
@@ -315,13 +327,36 @@ export class Rubble {
   // are moved by hand — a raft of rubble came to rest on its roof and hung
   // there when it went), and not a collider already removed this frame, which
   // queries still find until the physics next steps.
+  //
+  // The ray takes no filter of ours: Rapier calls a filter for every collider
+  // whose box the ray passes, out of WebAssembly each time, and down through a
+  // pile that was dozens a ray — most of what rubble cost. It takes the first
+  // hit, and if that is not something to rest on, looks again from just under it.
   _under(x, z, y, self = null) {
-    const r = this._ray;
-    r.origin.x = x; r.origin.y = y; r.origin.z = z;
-    this._self = self;
-    const hit = this.physics.world.castRay(r, y + 5, true, this.physics.R.QueryFilterFlags.EXCLUDE_DYNAMIC, G_LAND, undefined, undefined, this._restable);
-    this._support = hit ? this.physics.owner.get(hit.collider.handle) ?? null : null;
-    return hit ? y - hit.timeOfImpact : -5;
+    const r = this._ray, { world, R, owner, ground } = this.physics;
+    r.origin.x = x; r.origin.z = z;
+    // Its own collider is left out by Rapier itself (it is where a resting
+    // piece's rays start, inside it).
+    const own = self?.colliders?.length === 1 ? self.colliders[0] : undefined;
+    let from = y;
+    for (let tries = 0; tries < 6; tries++) {
+      r.origin.y = from;
+      const hit = world.castRay(r, from + 5, true, R.QueryFilterFlags.EXCLUDE_DYNAMIC, G_LAND, own);
+      if (!hit) break;
+      const c = hit.collider, o = owner.get(c.handle);
+      const ok = o ? o !== self && (o.parts !== undefined || o.role === 'city') : ground.has(c.handle);
+      let at = from - hit.timeOfImpact;
+      if (ok) { this._support = o ?? null; return at; }
+      // Not something to rest on. Started inside it? Then out through its far side.
+      if (hit.timeOfImpact < 1e-4) {
+        const out = c.castRay(r, from + 5, false);
+        if (out < 0) break;
+        at = from - out;
+      }
+      from = at - 0.01;
+    }
+    this._support = null;
+    return -5;
   }
 
   // It has come down: lay it on its broadest side where it fell.
