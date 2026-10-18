@@ -45,6 +45,7 @@ export function fitOut(P, f) {
   else if (use === 'penthouse: master suite') master(P, f, y);
   if (f >= 1 && f < PODIUM_FLOORS) atriumRail(P, f, y);
   sprinklerMains(P, f);
+  spareExtinguishers(P, f, y);
   for (const e of ESCALATORS) if (e.f === f) escalator(P, e, y);
   lights(P, f);
 }
@@ -69,6 +70,22 @@ function sprinklerMains(P, f) {
     }
   }
 }
+
+// Spare extinguishers. A few in the open, on the core's east wall by the lifts
+// on every third floor; more about the building for those who look — in the
+// kitchens, the plant room, the vault, an office pantry, the penthouse kitchen.
+function spareExtinguishers(P, f, y) {
+  if (f >= 0 && f % 3 === 0) W.extinguisher(P, CORE_EAST + 0.12, y, 1.6, HALF, true);
+  const hidden = {
+    [LOWER]: [[13.9, 10.6], [9.6, -10.9], [-18.6, -7.2]],
+    3: [[-6.5, -10.9]],
+    6: [[8.9, 0.2]],
+    [HQ]: [[9.4, -6.5]],
+    [PENTHOUSE]: [[9.6, -5.8]],
+  }[f];
+  for (const [x, z] of hidden ?? []) W.extinguisher(P, x, y, z, Math.random() * Math.PI * 2);
+}
+const CORE_EAST = 5;
 
 // ---------------------------------------------------------------- placement
 

@@ -129,35 +129,70 @@ export class SprayCan {
 
 // ---------------------------------------------------------------- extinguisher
 
+// A powder extinguisher of the size that hangs on an office wall: about
+// fourteen seconds of discharge. The jet is strongest when it is full, and
+// weakens as the pressure goes — shorter, softer — until it coughs and stops.
+// Where the jet lands it puts out what is burning and leaves powder behind; it
+// goes no further than the first thing in its way. Spares hang by the lifts on
+// some floors, and more are about the building for those who look (E takes one).
+const DISCHARGE = 14;          // s from full to empty
+const JET = 7.5;               // m reach, full
+const RAYS = 3;                // a frame: where the jet lands, looked for along it
+
 export class Extinguisher {
   constructor() {
     this.id = 'extinguisher';
     this.name = 'Fire extinguisher';
     this.model = extinguisherModel();
     this.on = false;
+    this.charge = 1;
   }
 
+  get gauge() { return this.charge; }
+
+  refill() { this.charge = 1; }
+
   update(dt, ctx) {
-    const on = ctx.input.mouse.left && ctx.input.mouse.locked;
+    const pressed = ctx.input.mouse.left && ctx.input.mouse.locked;
+    const on = pressed && this.charge > 0;
     if (on !== this.on) { this.on = on; ctx.audio?.foam(on); }
-    const kick = on ? Math.sin(performance.now() * 0.05) * 0.004 : 0;
+    if (pressed && this.charge <= 0 && ctx.input.pressed('Mouse0')) ctx.audio?.click();
+    const pressure = Math.sqrt(Math.max(0, this.charge));
+    const kick = on ? Math.sin(performance.now() * 0.05) * 0.004 * pressure : 0;
     this.model.position.set(0.36, -0.5 + kick, -0.8);
     this.model.rotation.set(0.05, -0.4, 0.05);
     if (!on) return;
+    this.charge = Math.max(0, this.charge - dt / DISCHARGE);
+    // Nearly empty, it coughs: the jet comes and goes.
+    if (this.charge < 0.08 && Math.random() < 0.5) return;
     ctx.camera.getWorldDirection(_dir);
     const nozzle = ctx.camera.position.clone().addScaledVector(_dir, 0.6).add(new THREE.Vector3(0.18, -0.2, 0).applyQuaternion(ctx.camera.quaternion));
-    for (let i = 0; i < 6; i++) {
-      const s = 7 + Math.random() * 4;
+    const reach = 2 + (JET - 2) * pressure, speed = 4 + 7 * pressure;
+    // Where does it land? Down the middle, and a few rays about it.
+    const hit0 = ctx.physics.raycast(ctx.camera.position, _dir, reach);
+    const stop = hit0 ? hit0.distance ?? hit0.point.distanceTo(ctx.camera.position) : reach;
+    for (let i = 0; i < Math.round(1 + 6 * pressure); i++) {
+      const s = speed * (0.8 + Math.random() * 0.4);
       ctx.particles.spawn('foam', nozzle.x, nozzle.y, nozzle.z,
         _dir.x * s + (Math.random() - 0.5) * 2, _dir.y * s + (Math.random() - 0.5) * 2, _dir.z * s + (Math.random() - 0.5) * 2);
     }
-    ctx.fire.extinguish(ctx.camera.position, _dir, 7.5, 0.3, dt);
-    // And it blows the dust away: a way to see through a collapse cloud.
-    ctx.particles.blow(ctx.camera.position, _dir, 11, 0.32, dt);
+    for (let i = 0; i < RAYS; i++) {
+      const d = _jet.copy(_dir).add(_jit.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(0.28 * i)).normalize();
+      const hit = i === 0 ? hit0 : ctx.physics.raycast(ctx.camera.position, d, reach);
+      if (!hit) continue;
+      // It puts out what is burning where it lands, and a little round it.
+      ctx.fire.douse(hit.point, 0.7 + 0.5 * pressure, dt * 3.2 * pressure);
+      if (hit.owner?.parts && hit.normal) ctx.powder?.add(hit.point, hit.normal, dt * pressure, hit.owner);
+      if (Math.random() < 0.3) ctx.particles.spawn('puff', hit.point.x, hit.point.y, hit.point.z, hit.normal?.x ?? 0, (hit.normal?.y ?? 0) + 0.3, hit.normal?.z ?? 0, 0xeeeeea);
+    }
+    // And it blows the dust away, as far as it reaches: a way to see through a collapse cloud.
+    ctx.particles.blow(ctx.camera.position, _dir, Math.min(11, stop + 2), 0.32, dt);
   }
 
   unequip(ctx) { if (this.on) { this.on = false; ctx.audio?.foam(false); } }
 }
+
+const _jet = new THREE.Vector3(), _jit = new THREE.Vector3();
 
 // ---------------------------------------------------------------- charges
 

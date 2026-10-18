@@ -18,6 +18,7 @@ import { Lift } from './sim/lift.js';
 import { Doors } from './sim/doors.js';
 import { Water } from './sim/water.js';
 import { Smoke } from './sim/smoke.js';
+import { Powder } from './fx/powder.js';
 import { Topple } from './sim/topple.js';
 import { Rubble } from './sim/rubble.js';
 import { People } from './sim/people.js';
@@ -140,6 +141,7 @@ const doors = new Doors();
 const people = new People(scene, physics);
 // Smoke filling the rooms, and the sprinklers, mains, wet floors and alarm.
 const smoke = new Smoke(scene, pieces, { particles });
+const powder = new Powder(scene);
 const water = new Water(scene, pieces, physics, { particles, chips, audio, fire, people, smoke });
 fire.fx.smoke = smoke;
 // Furniture burnt half through gives way; glass by a fire cracks, then breaks.
@@ -159,7 +161,7 @@ let rig = null;           // dev: { at, look } to hold the camera there
 let toppling = false;
 let waterfall = null;     // the sheet of water down the atrium wall, while it stands
 
-const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene, world };
+const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene, world, powder };
 
 // ---------------------------------------------------------------- state
 
@@ -234,6 +236,7 @@ function unloadJob() {
   fire.clear();
   water.clear();
   smoke.clear();
+  powder.clear();
   blast.clear();
   damage.clear();
   chips.clear();
@@ -349,7 +352,8 @@ function frame(dt) {
   }
   if (state === 'play' || state === 'paused' || state === 'done') {
     if (playing) {
-      liftTip = player.dead ? null : lift.control(input, player);
+      // A spare extinguisher in reach comes first; then the lift.
+      liftTip = player.dead ? null : spareTip() ?? lift.control(input, player);
       lift.update(dt, player, { collapsing: structure.collapsing || topple.active });
       player.update(dt);
       // A camera held somewhere else — the collapse bench's, over the avenue.
@@ -376,6 +380,7 @@ function frame(dt) {
     if (dps > 0 && playing) player.damage(dps * dt, 'fire');
     smoke.update(dt);
     water.update(dt);
+    powder.update();
     player.wet = water.wetAt(player.pos);
     blast.update(dt);
     heightT -= dt;
@@ -436,11 +441,33 @@ function select(i) {
   audio.click();
 }
 
+// Looking at a spare extinguisher, close: E takes it, a full one for yours.
+function spareTip() {
+  camera.getWorldDirection(_look);
+  const hit = physics.raycast(camera.position, _look, 2.4);
+  if (hit?.owner?.tag !== 'extinguisher' || hit.owner.state !== 'static') return null;
+  const ext = tools.find((t) => t.id === 'extinguisher');
+  if (!ext) return null;
+  if (input.pressed('KeyE')) {
+    ext.refill();
+    pieces.destroy(hit.owner);
+    audio.click();
+    hud.flash('A full extinguisher');
+    return null;
+  }
+  return ext.charge < 0.98 ? 'E — take the extinguisher' : 'A spare extinguisher (yours is still full)';
+}
+const _look = new THREE.Vector3();
+
 function tipFor(t) {
   if (!t) return '';
   if (t.id === 'spray') return `Colour: ${t.colourName} — right click to change`;
   if (t.id === 'bomb') return `${t.left} charges · ${t.placed.length} placed — left click to place, right click to detonate`;
-  if (t.id === 'extinguisher') return fire.count ? 'Hold left click on the fire' : '';
+  if (t.id === 'extinguisher') {
+    const pct = Math.round(t.charge * 100);
+    if (t.charge <= 0) return 'Empty — find another: red ones hang by the lifts on some floors';
+    return `${pct}%${fire.count ? ' — hold left click on the fire' : ''}`;
+  }
   return '';
 }
 
@@ -452,7 +479,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.

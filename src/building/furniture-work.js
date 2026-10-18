@@ -88,3 +88,20 @@ export function boardTable(P, x, y, z, yaw, len = 6) {
     { kind: 'wood', round: 0.02, boxes: [[-len / 2 + 0.6, 0, -0.3, -len / 2 + 1.0, 0.7, 0.3], [len / 2 - 1.0, 0, -0.3, len / 2 - 0.6, 0.7, 0.3], [-0.2, 0, -0.3, 0.2, 0.7, 0.3]], tint: 0x2a160e },
   ], 'furniture', { colliders: [[-len / 2, 0, -0.75, len / 2, 0.76, 0.75]] });
 }
+
+// A spare fire extinguisher: a red canister with its black hose and handle.
+// On the wall in a red bracket with a sign over it by the lifts, or standing
+// on the floor somewhere less obvious. Tagged, so you can take it (E).
+export function extinguisher(P, x, y, z, yaw, onWall = false) {
+  const h = onWall ? 1.0 : 0;
+  const parts = [
+    { kind: 'metal', round: 0.02, boxes: [{ cyl: [0, h + 0.3, 0], r: 0.085, h: 0.52, seg: 16 }, { ball: [0, h + 0.56, 0], s: [0.085, 0.05, 0.085], rough: 0 }], tint: 0xc4161c },
+    { kind: 'plastic', boxes: [{ cyl: [0.02, h + 0.64, 0], r: 0.025, h: 0.08, seg: 8 }, [-0.02, h + 0.67, -0.015, 0.12, h + 0.69, 0.015], { cylX: [0.11, h + 0.45, 0.04], r: 0.012, h: 0.22, seg: 6 }], tint: 0x111111 },
+  ];
+  if (onWall) parts.push(
+    { kind: 'metal', boxes: [[-0.1, h + 0.12, -0.11, 0.1, h + 0.16, -0.08], [-0.03, h + 0.12, -0.12, 0.03, h + 0.62, -0.1]], tint: 0x8a1010 },
+    { kind: 'plastic', boxes: [[-0.14, h + 0.8, -0.12, 0.14, h + 1.08, -0.11]], tint: 0xd8201f },
+  );
+  // On the wall it is fixed to the wall (support.js: cladding), its bracket against it.
+  return assembly(P, x, y, z, yaw, parts, onWall ? 'cladding' : 'furniture', { tag: 'extinguisher', structural: false, colliders: [[-0.1, h, -0.12, 0.13, h + 0.7, 0.1]] });
+}

@@ -25,10 +25,13 @@ export class Hud {
   }
 
   setSlots(tools, current) {
-    const key = tools.map((t) => t.id).join() + '|' + current;
+    // A tool that runs out (the extinguisher) shows how much it has left.
+    const key = tools.map((t) => t.id + (t.gauge !== undefined ? Math.round(t.gauge * 25) : '')).join() + '|' + current;
     if (key === this._slotsKey) return;
     this._slotsKey = key;
-    this.els.slots.innerHTML = tools.map((t, i) => `<div class="slot${i === current ? ' on' : ''}"><b>${i + 1}</b>${t.name}</div>`).join('');
+    const gauge = (t) => t.gauge === undefined ? ''
+      : `<i style="display:block;height:3px;margin-top:3px;background:#0006;border-radius:2px"><i style="display:block;height:100%;width:${Math.round(t.gauge * 100)}%;background:${t.gauge > 0.2 ? '#e8e2d0' : '#e0553a'};border-radius:2px"></i></i>`;
+    this.els.slots.innerHTML = tools.map((t, i) => `<div class="slot${i === current ? ' on' : ''}"><b>${i + 1}</b>${t.name}${gauge(t)}</div>`).join('');
   }
 
   flash(text, seconds = 2.5) {
