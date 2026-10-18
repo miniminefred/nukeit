@@ -285,6 +285,14 @@ export class Audio {
     }
   }
 
+  // The ding-dong before an announcement.
+  chime() {
+    if (!this.ctx) return;
+    const out = this._out(0.18, 0);
+    this._tone(out, { f: 659, len: 0.7, gain: 0.5, type: 'sine', drop: 1 });
+    setTimeout(() => this.ctx && this._tone(this._out(0.18, 0), { f: 523, len: 0.9, gain: 0.5, type: 'sine', drop: 1 }), 380);
+  }
+
   // A car horn: two reedy notes together.
   horn(x, y, z) {
     if (!this.ctx) return;

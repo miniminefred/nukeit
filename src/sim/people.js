@@ -27,7 +27,19 @@ const HEAR = 26;                  // m: a blast this close sends people running
 const STEPS = 4;                  // m: how far ahead they check the way is clear
 const PER = { leg: 2, arm: 2, hand: 2, shoe: 2, shin: 2 };    // of each part a figure has; one of the rest
 const STREET = 26;
-const MAX_PEOPLE = 300;           // the instanced meshes are made for this many                // people on the avenue's pavements
+const MAX_PEOPLE = 300;
+const MARKS = 120;
+
+// A cartoon "!" in a white bubble.
+function bang() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff6d8'; g.beginPath(); g.arc(32, 30, 24, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#3a2a1a'; g.lineWidth = 3; g.stroke();
+  g.fillStyle = '#d8402a'; g.font = 'bold 38px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('!', 32, 32);
+  return new THREE.CanvasTexture(c);
+}           // the instanced meshes are made for this many                // people on the avenue's pavements
 const PAVEMENTS = [21.5, 46.5];   // z down the middle of our pavement and the far one
 
 const SKIN = [0xf1d3bd, 0xe2b594, 0xc98f6a, 0x9c6a4a, 0x6e4a33];
@@ -93,6 +105,12 @@ export class People {
       long: make(g.long, mat(0.9), 1), cap: make(g.cap, mat(0.6), 1),
     };
     this._ray = new physics.R.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
+    // The "!" marks, one quad each, turned to face you.
+    this.marks = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: bang(), transparent: true, depthWrite: false }), MARKS);
+    this.marks.count = 0;
+    this.marks.frustumCulled = false;
+    scene.add(this.marks);
+    this.fear = 0;
     this._alarm = [];            // { at, r, t }: things that went bang
   }
 
@@ -263,9 +281,16 @@ export class People {
           p.wait = Math.random() * 0.4;      // a moment's freeze, then run
         }
       }
+      if (p.agent && p.post && this.fear > 82 && Math.random() < dt * 0.5) { p.agent = false; p.sitting = false; p.state = 'calm'; p.f = Math.round((p.pos.y - 0.3) / 4); }
       if (p.agent) { this._fall(p, dt); continue; }
       if (p.street) { this._pavement(p, dt); continue; }
       if (p.state === 'down') { if (p.t > 6) p.state = 'gone'; continue; }
+      // A building in a panic: everyone picks what they do — most make for the
+      // exits, some hide, some crowd round the lifts, a few film it.
+      if (this.fear > 75 && p.state !== 'down') {
+        if (!p.panic) { const r = Math.random(); p.panic = r < 0.55 ? 'exit' : r < 0.7 ? 'hide' : r < 0.85 ? 'lifts' : 'film'; p.target = null; p.wait = Math.random() * 0.8; }
+        if (this._panic(p, dt)) continue;
+      } else if (p.panic && this.fear < 50) { p.panic = null; p.hide = false; p.handsUp = false; }
       // Watching you break things: face it, maybe film it, step back if close.
       const fo = this._focus;
       if (fo && p.state === 'calm' && Math.abs(p.pos.y - fo.at.y) < 2.5) {
@@ -299,6 +324,7 @@ export class People {
       }
       p.pos.y = p.floorY;
       if (p.state === 'running' && p.t > 14) { p.state = 'calm'; p.speed = WALK; }
+      p.handsUp = p.state === 'running' && this.fear > 45;
       const running = p.state === 'running';
       if (p.wait > 0) { p.wait -= dt; continue; }
       if (p.watching > 0 && !p.target) continue;
@@ -310,7 +336,7 @@ export class People {
       }
       const to = _v.copy(p.target).sub(p.pos).setY(0);
       const d = to.length();
-      const speed = running ? RUN : p.speed;
+      const speed = running ? RUN : p.speed * (this.fear > 30 ? 1.35 : 1);
       if (d < 0.2) { p.target = null; p.wait = running ? 0 : 1.5 + Math.random() * 5; continue; }
       to.divideScalar(d);
       // Turn toward where they are going, then walk.
@@ -323,6 +349,32 @@ export class People {
     }
     if (this._focus && (this._focus.t -= dt) <= 0) this._focus = null;
     this._draw(dt);
+  }
+
+  // What someone in a panic does. Returns true when it has moved them this frame.
+  _panic(p, dt) {
+    if (p.wait > 0) { p.wait -= dt; return true; }
+    const y = p.pos.y;
+    if (p.panic === 'hide') { p.hide = true; p.target = null; return true; }
+    if (p.panic === 'film') { p.armUp = 1; p.target = null; if (this._focus) p.yaw = Math.atan2(this._focus.at.x - p.pos.x, this._focus.at.z - p.pos.z); return true; }
+    let goal;
+    if (p.panic === 'lifts') goal = _w.set(1.2 + (p.phase % 2), y, 4.8 + (p.phase % 1.5));
+    else goal = p.f === 0 ? _w.set((p.phase % 3) - 1.5, y, 13.5) : _w.set(-3.3, y, 4.4);   // the front doors; the stair door
+    const to = _v.copy(goal).sub(p.pos).setY(0), d = to.length();
+    if (d < 0.5) {
+      if (p.panic === 'exit') { p.state = 'gone'; this.evacuated = (this.evacuated ?? 0) + 1; }
+      else { p.armUp = Math.sin(p.t * 8) > 0 ? 1 : 0.3; p.target = null; }       // pressing the lift button, again and again
+      return true;
+    }
+    p.handsUp = p.panic === 'exit';
+    p.state = 'running';
+    to.divideScalar(d);
+    p.yaw += Math.atan2(Math.sin(Math.atan2(to.x, to.z) - p.yaw), Math.cos(Math.atan2(to.x, to.z) - p.yaw)) * Math.min(1, dt * 8);
+    p.pos.addScaledVector(to, Math.min(d, RUN * dt));
+    p.phase += dt * RUN * 3.1;
+    p.target = p.target ?? new THREE.Vector3();
+    p.target.copy(goal);
+    return true;
   }
 
   // Walking along the pavement and back; running from a bang; stopping to stare
@@ -384,6 +436,7 @@ export class People {
 
   _draw() {
     const M = this.mesh;
+    let marks = 0;
     const set = (mesh, i, m) => mesh.setMatrixAt(i, m);
     const hide = new THREE.Matrix4().makeScale(0, 0, 0);
     for (let i = 0; i < this.list.length; i++) {
@@ -397,7 +450,13 @@ export class People {
       const swing = moving ? Math.sin(p.phase) * (p.state === 'running' ? 0.75 : 0.4) : 0;
       // Lying: the whole figure turned onto its back.
       const lying = p.state === 'down';
-      const root = new THREE.Matrix4().compose(p.pos, _q.setFromEuler(_e.set(lying ? -Math.PI / 2 : 0, p.yaw, 0, 'YXZ')), _s.set(s, s, s));
+      // Hiding: crouched down small behind whatever is nearest.
+      const root = new THREE.Matrix4().compose(p.pos, _q.setFromEuler(_e.set(lying ? -Math.PI / 2 : 0, p.yaw, 0, 'YXZ')), _s.set(s, p.hide ? s * 0.6 : s, s));
+      // A "!" over the head of anyone frightened: cartoon fright, not real.
+      if (marks < MARKS && (p.handsUp || (p.panic && p.panic !== 'film')) && this.camera) {
+        _m.compose(_v.set(p.pos.x, p.pos.y + (p.hide ? 1.3 : 2.05), p.pos.z), this.camera.quaternion, _s.set(0.28, 0.28, 0.28));
+        this.marks.setMatrixAt(marks++, _m);
+      }
       const sit = p.sitting && p.state !== 'down' && p.state !== 'running';
       const lean = p.state === 'running' ? 0.18 : sit ? -0.05 : 0;
       // Sitting: the root is the seat (the floor under them is the chair), the
@@ -424,10 +483,11 @@ export class People {
       part(M.hips, i, 0, hip, 0, 0);
       part(M.body, i, 0, hip + 0.06, 0, lean);
       const rest = sit ? -0.9 : 0;
-      end(M.hand, i * 2, part(M.arm, i * 2, -0.25, hip + 0.6, lean * 0.5, -swing * 0.8 + rest, 0.06), -0.68);
+      const both = p.handsUp ? -2.7 : 0;
+      end(M.hand, i * 2, part(M.arm, i * 2, -0.25, hip + 0.6, lean * 0.5, p.handsUp ? both + swing * 0.2 : -swing * 0.8 + rest, 0.06), -0.68);
       // The right arm raised — pointing, shouting into a radio, filming on a phone.
       const up = p.armUp ?? 0;
-      end(M.hand, i * 2 + 1, part(M.arm, i * 2 + 1, 0.25, hip + 0.6, lean * 0.5, (swing * 0.8 + rest) * (1 - up) - 1.9 * up, -0.06), -0.68);
+      end(M.hand, i * 2 + 1, part(M.arm, i * 2 + 1, 0.25, hip + 0.6, lean * 0.5, p.handsUp ? both - swing * 0.2 : (swing * 0.8 + rest) * (1 - up) - 1.9 * up, -0.06), -0.68);
       part(M.head, i, 0, hip + 0.83, lean * 0.4, 0);
       part(M.eyes, i, 0, hip + 0.85, lean * 0.4 + 0.112, 0);
       if (p.capped) { part(M.cap, i, 0, hip + 0.93, lean * 0.4, -0.05); set(M.hair, i, hide); }
@@ -437,6 +497,8 @@ export class People {
       else set(M.skirt, i, hide);
     }
     for (const k in M) { M[k].instanceMatrix.needsUpdate = true; if (M[k].instanceColor) M[k].instanceColor.needsUpdate = true; }
+    this.marks.count = marks;
+    this.marks.instanceMatrix.needsUpdate = true;
   }
 
   clear() {

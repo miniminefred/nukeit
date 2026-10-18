@@ -6,6 +6,7 @@ import * as E from './furniture-food.js';
 import * as W from './furniture-work.js';
 import * as L from './furniture-lobby.js';
 import * as SH from './shops.js';
+import * as SF from './furniture-shop.js';
 import {
   PODIUM_FLOORS, PENTHOUSE, RESIDENCES, HQ, LOWER, T, U, ATRIUM, podiumFront, inCore, inAtrium,
   TOWER_COLUMNS, PODIUM_COLUMNS, clearOf, floorUse,
@@ -235,6 +236,7 @@ function lobby(P, y) {
   for (const [x0, x1] of [[-0.52, 0.52], [2.28, 2.95], [-2.95, -2.28]])
     block(P, 'clearglass', x0, y, 11.97, x1, U(0) - 0.05, 12.0, 'glass', { floor: 0, tint: 0xdfe6ea });
   F.receptionDesk(P, -10, y, 5.4, 0);
+  breakRoom(P, y);
 
   // The atrium's back wall: rough blocks of pink marble at every depth, the
   // whole height of the public floors, lit from their ledges, and water
@@ -262,6 +264,29 @@ function lobby(P, y) {
     E.bistroChair(P, x - 0.6, y, z, HALF, 0x1a1a1a);
     E.bistroChair(P, x + 0.6, y, z, -HALF, 0x1a1a1a);
   }
+}
+
+// The guards' break room, behind the reception desk: a sofa, a TV, lockers, a
+// coffee machine, a table with a game of cards on it. The guards off duty
+// rest here and come out when the building gets frightened (sim/security.js).
+export const BREAK_ROOM = { door: [-6.6, 1.7], seats: [[-11.4, 1.15, 0], [-10.6, 1.15, 0], [-8.5, 2.35, 0], [-8.5, 3.65, Math.PI]] };
+function breakRoom(P, y) {
+  const top = U(0);
+  const w = (x0, z0, x1, z1) => block(P, 'plaster', x0, y, z0, x1, top, z1, 'wall', { floor: 0, structural: false, tint: 0xe8e2d6 });
+  w(-13, 0.3, -7, 0.4);
+  w(-13, 4.3, -7, 4.4);
+  w(-13.1, 0.3, -13, 4.4);
+  w(-7.1, 0.4, -7, 1.1);
+  w(-7.1, 2.3, -7, 4.3);
+  F.sofa(P, -11, y, 1.0, Math.PI, 0x3a4a5a);
+  H.tv(P, -11, y, 4.0, Math.PI);
+  for (const z of [1.0, 1.9, 2.8]) F.filingCabinet(P, -12.7, y, z, HALF);
+  F.counter(P, -12.4, y, 3.7, HALF, 1.0);
+  SF.woodTable(P, -8.5, y, 3.0);
+  SF.woodChair(P, -8.5, y, 2.35, 0);
+  SF.woodChair(P, -8.5, y, 3.65, Math.PI);
+  block(P, 'paper', -8.75, y + 0.76, 2.85, -8.25, y + 0.77, 3.15, 'furniture', { floor: 0, structural: false, tint: 0xf4f0e8 });
+  F.ceilingLight(P, -10, top, 2.4);
 }
 
 // Rough stone blocks over a wall face at z = `face`, standing out of it towards

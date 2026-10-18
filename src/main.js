@@ -21,6 +21,7 @@ import { Smoke } from './sim/smoke.js';
 import { Powder } from './fx/powder.js';
 import { Security } from './sim/security.js';
 import { Traffic } from './sim/traffic.js';
+import { Fear } from './sim/fear.js';
 import { signs, places } from './building/shops.js';
 import { Topple } from './sim/topple.js';
 import { Rubble } from './sim/rubble.js';
@@ -159,7 +160,7 @@ blast.explode = (at, r, power) => {
   return bang(at, r, power);
 };
 const gave = damage.fx.onFailed;
-damage.fx.onFailed = (p) => { people.alarm(p.box.getCenter(new THREE.Vector3()), 18); security.noise(p.box.getCenter(new THREE.Vector3()), 3, false); return gave(p); };
+damage.fx.onFailed = (p) => { const c = p.box.getCenter(new THREE.Vector3()); people.alarm(c, 18); security.noise(c, 3, false); fear.scare(c, 6, 0.5); return gave(p); };
 // Guards and the police (sim/security.js). Caught by an officer, the job is
 // over; tackled by a guard, you are put out of the front door and carry on.
 const security = new Security({
@@ -168,13 +169,25 @@ const security = new Security({
   onThrownOut: () => { if (thrownT <= 0) thrownT = 1.4; },
 });
 let thrownT = -1;
+// How scared the people in the tower are (sim/fear.js).
+let lounging = false;
+const fear = new Fear({
+  people, fire, smoke, water, security, audio, player, hud,
+  // Running at people with the sledgehammer.
+  chasing: () => tools[current]?.id === 'sledge' && Math.hypot(player.vel.x, player.vel.z) > 5 && people.crowdAt(player.pos, 5) > 0.1,
+  lounge: () => lounging,
+});
+security.fx.fear = fear;
+// The police know you by sight — or by the sledgehammer in your hands.
+security.fx.armed = () => tools[current]?.id === 'sledge' && !player.disguised;
+people.camera = camera;
 // The avenue's traffic (sim/traffic.js): it stops for the light, for you and
 // for rubble; heavy things landing on cars crush them.
 const traffic = new Traffic(scene, { physics, player, audio });
 const landed = rubble.fx.onLand;
 rubble.fx.onLand = (q, blows, at, by) => { if (by) traffic.landed(at, by.volume * by.kind.density * 0.6); return landed(q, blows, at, by); };
 const bang2 = blast.explode;
-blast.explode = (at, r, power) => { security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); return bang2(at, r, power); };
+blast.explode = (at, r, power) => { security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); fear.scare(at, 25 * (power ?? 1), 0.8); return bang2(at, r, power); };
 let liftTip = null;
 let rig = null;           // dev: { at, look } to hold the camera there
 let toppling = false;
@@ -232,6 +245,7 @@ async function start(jobId, toolIds, levelId = 'normal') {
   smoke.attach();
   people.populate(pieces);
   security.start(difficulty);
+  fear.reset();
   traffic.attach(pieces);
   waterfall = pieces.list.find((p) => p.tag === 'waterfall') ?? null;
   screens.loading('Wiring the gas and the lights', 0.85);
@@ -438,7 +452,9 @@ function frame(dt) {
     smoke.update(dt);
     water.update(dt);
     powder.update();
-    if (state === 'play') security.update(dt);
+    if (state === 'play') { security.update(dt); fear.update(dt); }
+    if (topple.active && !toppling) fear.scare(new THREE.Vector3(0, 30, 0), 45, 1);
+    if (structure.collapsing) fear.scare(new THREE.Vector3(0, 20, 0), dt * 4, 1);
     traffic.update(dt);
     signs.update();
     if (thrownT > 0 && (thrownT -= dt) <= 0) { player.teleport(job.entry.x, 0.05, job.entry.z, job.entry.yaw); }
@@ -474,6 +490,7 @@ function frame(dt) {
     const at = player.pos, f = Math.floor((at.y + 0.5) / 4);
     const inside = Math.abs(at.x) < 20 && at.z > -12 && at.z < 12;
     const lounge = inside && ((f >= 0 && f <= 4 && f !== 3) || f >= 9) && !structure.collapsing && !topple.active;
+    lounging = lounge;
     audio.ambience(inside ? people.crowdAt(at) : 0, lounge ? 1 : 0);
   } else audio.ambience(0, 0);
   audio.update(dt);
@@ -552,7 +569,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.

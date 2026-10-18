@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { T, FLOOR_H, CORE, PODIUM_FLOORS, TOP_FLOOR, LOWER, HQ } from '../building/plan.js';
+import { BREAK_ROOM } from '../building/interiors.js';
 
 // Guards, and the police.
 //
@@ -46,6 +47,7 @@ export class Security {
     this.eta = null;             // s until they come, once called
     this.police = false;         // here
     this.lastBlow = -99;
+    this.spotted = -99;          // when someone last saw you at it
     this.time = 0;
     this.grace = 0;              // until then, guards leave you be (just thrown out)
     this.cars = [];
@@ -64,18 +66,33 @@ export class Security {
       Object.assign(a, { kind: 'guard', arm, post: at.clone(), mode: 'patrol', cool: 0, seen: -99, last: null, shout: 0, daze: 0, angry: 0, radioed: false });
       this.agents.push(a);
     }
+    // Off duty in the break room behind the lobby desk, sitting down — until
+    // the building gets frightened.
+    const off = { supereasy: 0, easy: 1, normal: 2, hard: 3, insane: 4 }[level.id] ?? 2;
+    for (let n = 0; n < off; n++) {
+      const [x, z, yaw] = BREAK_ROOM.seats[n];
+      const at = new THREE.Vector3(x, T(0), z);
+      const arm = level.arms[(Math.random() * level.arms.length) | 0];
+      const a = people.agent(0, at, { ...GUARD, head: SKIN[(Math.random() * SKIN.length) | 0] }, 1);
+      Object.assign(a, { kind: 'guard', arm, post: at.clone(), mode: 'rest', cool: 0, seen: -99, last: null, shout: 0, daze: 0, angry: 0, radioed: false, yaw, sitting: true, seatY: T(0) + 0.47, capped: true });
+      this.agents.push(a);
+    }
+    this.searched = new Set();
+    this.calls = 0;
   }
 
   // Something broke at `at`. `loud`: how much; `byPlayer`: you did it, where you are.
   noise(at, loud, byPlayer) {
     if (!this.level) return;
     this.heat += loud;
+    this.lastNoise = at.clone();
     if (byPlayer) {
       this.lastBlow = this.time;
       this.fx.people.witness(at);
+      this.fx.fear?.scare(at, 3);
     }
     if (this.level.police !== null && this.eta === null && !this.police && this.heat > HEAVY) {
-      this.eta = this.level.police;
+      this.eta = this.level.police * Math.pow(0.6, this.calls ?? 0);
       this.fx.hud?.flash('Someone has called the police');
     }
     // Guards who hear it come and look.
@@ -97,6 +114,7 @@ export class Security {
       if (off > (kind === 'spray' ? 0.9 : 0.55)) continue;
       a.state = 'down'; a.daze = kind === 'spray' ? 2.5 : 4.5; a.target = null; a.armUp = 0;
       a.angry++;
+      this.fx.fear?.scare(a.pos, 8);
       this.fx.audio?.boing?.(a.pos.x, a.pos.y, a.pos.z);
       if (this.eta !== null) this.eta *= 0.8;
       else if (this.level?.police !== null) { this.heat += 20; this.noise(a.pos, 0, false); }
@@ -109,12 +127,16 @@ export class Security {
     if (!this.level) return;
     this.time += dt;
     const { player, physics, people, particles, audio, hud } = this.fx;
+    // A frightened building calls the police; a panicking one, again and again.
+    const fear = this.fx.fear?.level ?? 0;
+    if (fear > 60 && this.eta === null && !this.police && this.level.police !== null) { this.eta = this.level.police * Math.pow(0.6, this.calls ?? 0); this.fx.hud?.flash('Frightened people are calling the police'); }
+    if (fear > 85 && this.eta !== null) this.eta = Math.min(this.eta, 15);
     // The police on their way, then here.
     if (this.eta !== null && !this.police) {
       this.eta -= dt;
       if (this.eta <= 0) this._arrive();
     }
-    if (this.police) this._lights(dt);
+    if (this.police) { this._lights(dt); this._search(dt); }
     const eye = this.fx.camera.position;
     for (const a of this.agents) {
       if (a.hidden) { this._stairs(a, dt); continue; }
@@ -128,10 +150,27 @@ export class Security {
       }
       // Just thrown out: they let you go for a few seconds.
       const sees = this.time > this.grace && this._sees(a, eye);
-      if (sees) { a.seen = this.time; a.last = player.pos.clone(); }
+      // Seen at it — by a guard or an officer — and the police know who to look for.
+      if (sees && this.time - this.lastBlow < 4) this.spotted = this.time;
+      // An officer seeing someone who looks like they belong has seen nobody.
+      const noticed = sees && (a.kind !== 'cop' || this.time - this.spotted < 60 || this.fx.armed?.());
+      if (noticed) { a.seen = this.time; a.last = player.pos.clone(); }
+      // Off duty: out of the break room when the building gets frightened.
+      if (a.mode === 'rest') {
+        if ((this.fx.fear?.level ?? 0) > 70) {
+          a.mode = 'look'; a.sitting = false; a.last = this.lastNoise ?? player.pos.clone();
+          if (!this.rushed) { this.rushed = true; this.fx.hud?.flash('Guards rush out of the break room!'); this.fx.fear?.calm(6); }
+        } else continue;
+      }
       const dist = a.pos.distanceTo(player.pos);
       // Seen breaking things, or come looking and found you: after you.
-      if (sees && (a.kind === 'cop' || this.time - this.lastBlow < 4 || a.mode !== 'patrol')) {
+      // A guard goes for you if it sees you breaking things, or came looking.
+      // An officer only if you have been seen doing it, or you are walking
+      // about with a sledgehammer: otherwise you are just someone in a building.
+      const suspect = a.kind === 'cop'
+        ? this.time - this.spotted < 60 || this.fx.armed?.()
+        : this.time - this.lastBlow < 4 || a.mode !== 'patrol';
+      if (noticed && suspect) {
         if (a.mode !== 'chase') { a.mode = 'chase'; this._call(a); }
       }
       if (a.mode === 'chase' && this.time - a.seen > (a.kind === 'cop' ? 10 : 7)) a.mode = 'look';
@@ -328,6 +367,7 @@ export class Security {
     this.eta = null;
     const { people, scene, audio, hud } = this.fx;
     hud?.flash('Police! They are coming in', 3);
+    this.fx.fear?.calm(10);
     audio?.siren?.(true);
     const n = { supereasy: 0, easy: 3, normal: 4, hard: 6, insane: 10 }[this.level.id] ?? 4;
     for (let i = 0; i < n; i++) {
@@ -355,6 +395,41 @@ export class Security {
       scene.add(car);
       this.cars.push({ car, red, blue });
     }
+  }
+
+  // Officers search floor by floor. Each floor searched without a sight of
+  // you is ticked off; when every floor is, and nobody has seen you for half a
+  // minute, they leave: "He is not here." Called again, they come sooner.
+  _search(dt) {
+    const cops = this.agents.filter((a) => a.kind === 'cop' && a.state !== 'gone');
+    if (!cops.length) return;
+    const lastSeen = Math.max(...cops.map((a) => a.seen));
+    if (this.time - lastSeen < 2) this.searched.clear();
+    for (const a of cops) {
+      if (a.hidden || a.mode !== 'search') { a.onFloor = 0; continue; }
+      a.onFloor = (a.onFloor ?? 0) + dt;
+      if (a.onFloor > 20) {
+        this.searched.add(a.f);
+        a.onFloor = 0;
+        for (let f = LOWER; f <= TOP_FLOOR; f++) if (!this.searched.has(f) && !cops.some((b) => b !== a && b.goal === f)) { this._toFloor(a, f); break; }
+      }
+    }
+    if (this.searched.size >= TOP_FLOOR - LOWER + 1 && this.time - lastSeen > 30) this._leave();
+  }
+
+  _leave() {
+    const { hud, audio } = this.fx;
+    hud?.flash('Police: "He is not here." They are leaving.', 3.5);
+    for (const a of this.agents) if (a.kind === 'cop') { a.state = 'gone'; a.hidden = true; }
+    this.agents = this.agents.filter((a) => a.kind !== 'cop');
+    for (const c of this.cars) c.car.removeFromParent();
+    this.cars.length = 0;
+    this.police = false;
+    this.calls++;
+    this.heat = HEAVY * 0.5;
+    this.searched.clear();
+    audio?.siren?.(false);
+    this.fx.fear?.calm(20);
   }
 
   _lights(dt) {
