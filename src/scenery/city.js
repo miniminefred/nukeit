@@ -49,19 +49,43 @@ export function buildCity(scene, physics) {
   group.add(new THREE.Mesh(mergeGeometries(dashes), new THREE.MeshStandardMaterial({ color: 0xd8d2c0, roughness: 0.7 })));
 
   // City blocks, kept clear of the job site (x +/-32, z +/-24) so nothing here
-  // stands in anything you can break.
-  const windows = windowTexture();
+  // stands in anything you can break. Each in one of three dresses — stone with
+  // punched windows, a glass curtain wall, brick — some windows lit and some
+  // with their blinds down, a cornice on top, and along the avenue shops at
+  // street level under awnings.
+  const styles = facadeStyles();
+  const shops = shopTexture();
   const rand = mulberry(7);
   const blocks = [];
-  const tower = (x, z, w, d, h, tint) => {
-    const tex = windows.clone();
+  const tower = (x, z, w, d, h, tint, facing = 0) => {
+    const st = styles[(rand() * styles.length) | 0];
+    const tex = st.map.clone();
     tex.needsUpdate = true;
-    tex.repeat.set(Math.max(1, Math.round(w / 3)), Math.max(1, Math.round(h / 3.6)));
-    const mat = new THREE.MeshStandardMaterial({ color: tint, map: tex, roughness: 0.85 });
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    m.position.set(x, h / 2, z);
-    m.castShadow = true;
-    m.receiveShadow = true;
+    tex.repeat.set(Math.max(1, Math.round(w / 3)) / 4, Math.max(1, Math.round(h / 3.6)) / 4);
+    tex.offset.set(rand(), rand());
+    const mat = new THREE.MeshStandardMaterial({ color: st.glass ? 0xffffff : tint, map: tex, roughness: st.rough, metalness: st.metal });
+    const m = new THREE.Group();
+    const box = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    box.position.y = h / 2;
+    box.castShadow = box.receiveShadow = true;
+    m.add(box);
+    // A cornice: a stone band standing out round the top.
+    const cornice = new THREE.Mesh(new THREE.BoxGeometry(w + 0.8, 1.1, d + 0.8), corniceMat);
+    cornice.position.y = h - 0.55;
+    cornice.castShadow = true;
+    m.add(cornice);
+    // Shops along the avenue: a band of shop windows under a striped awning.
+    if (facing) {
+      const sm = new THREE.MeshStandardMaterial({ map: shopsFor(shops, w, rand), roughness: 0.5 });
+      const front = new THREE.Mesh(new THREE.BoxGeometry(w - 0.4, 4.2, 0.3), sm);
+      front.position.set(0, 2.1, facing * (d / 2 + 0.15));
+      const awn = new THREE.Mesh(new THREE.BoxGeometry(w - 1, 0.08, 1.6), new THREE.MeshStandardMaterial({ color: AWNINGS[(rand() * AWNINGS.length) | 0], roughness: 0.9 }));
+      awn.position.set(0, 3.6, facing * (d / 2 + 0.9));
+      awn.rotation.x = facing * 0.25;
+      awn.castShadow = true;
+      m.add(front, awn);
+    }
+    m.position.set(x, 0, z);
     group.add(m);
     const block = { role: 'city', id: blocks.length, x, z, w, d, h, tint, mesh: m, collider: null, built: false };
     block.solid = () => {
@@ -75,6 +99,7 @@ export function buildCity(scene, physics) {
     block.solid();
     blocks.push(block);
   };
+  const corniceMat = new THREE.MeshStandardMaterial({ color: 0xcfc6b4, roughness: 0.85 });
 
   const tints = [0xb9b2a6, 0x9ea3a8, 0xc7b89c, 0x8f9499, 0xa89586];
   // Along our side of the avenue, left and right of the plot.
@@ -83,7 +108,7 @@ export function buildCity(scene, physics) {
     while (Math.abs(x) < 300) {
       const w = 14 + rand() * 18;
       const h = 30 + rand() * 120;
-      tower(x + side * w / 2, -4, w, 36, h, tints[(rand() * tints.length) | 0]);
+      tower(x + side * w / 2, -4, w, 36, h, tints[(rand() * tints.length) | 0], 1);
       x += side * (w + 2);
     }
   }
@@ -99,7 +124,7 @@ export function buildCity(scene, physics) {
   // Across the avenue.
   for (let x = -280; x < 280;) {
     const w = 14 + rand() * 20;
-    tower(x + w / 2, 70, w, 40, 25 + rand() * 110, tints[(rand() * tints.length) | 0]);
+    tower(x + w / 2, 70, w, 40, 25 + rand() * 110, tints[(rand() * tints.length) | 0], -1);
     x += w + 2;
   }
 
@@ -107,22 +132,88 @@ export function buildCity(scene, physics) {
   return { group, blocks };
 }
 
-// One storey-and-bay of facade, repeated across every block.
-function windowTexture() {
+const AWNINGS = [0x1f4d3a, 0x7a1e22, 0x22344f, 0x3a3a3a, 0x6b4a1e];
+
+// Four bays by four storeys of facade, in each of three dresses, repeated up
+// and across every block (offset per block, so no two line up). Some windows
+// are lit, some have their blinds half down.
+function facadeStyles() {
+  const cell = 128, N = 4;
+  const make = (paint) => {
+    const c = document.createElement('canvas');
+    c.width = c.height = cell * N;
+    const g = c.getContext('2d');
+    const r = mulberry(31);
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) paint(g, i * cell, j * cell, cell, r);
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    return tex;
+  };
+  const pane = (g, x, y, w, h, r) => {
+    const lit = r() < 0.18, blind = r() < 0.3;
+    const grad = g.createLinearGradient(x, y, x + w, y + h);
+    grad.addColorStop(0, lit ? '#e8c98a' : '#4a5a6c');
+    grad.addColorStop(1, lit ? '#b8925a' : '#252c36');
+    g.fillStyle = grad;
+    g.fillRect(x, y, w, h);
+    if (blind) { g.fillStyle = 'rgba(225,220,205,0.9)'; g.fillRect(x, y, w, h * (0.3 + r() * 0.5)); }
+    g.fillStyle = 'rgba(255,255,255,0.10)';
+    g.fillRect(x, y, w * 0.45, h);
+  };
+  const stone = make((g, x, y, s, r) => {
+    g.fillStyle = '#ffffff'; g.fillRect(x, y, s, s);
+    g.fillStyle = 'rgba(0,0,0,0.06)'; for (let k = 0; k < 6; k++) g.fillRect(x, y + k * s / 6, s, 1);
+    pane(g, x + 30, y + 22, s - 60, s - 52, r);
+    g.fillStyle = '#d9d2c4'; g.fillRect(x + 24, y + s - 30, s - 48, 6);          // the sill
+    g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(x + 30, y + 22, s - 60, 4);     // the reveal's shadow
+  });
+  const glass = make((g, x, y, s, r) => {
+    pane(g, x, y, s, s * 0.74, r);
+    g.fillStyle = '#2c3138'; g.fillRect(x, y + s * 0.74, s, s * 0.26);           // the spandrel
+    g.fillStyle = '#8a9198'; g.fillRect(x, y, 3, s); g.fillRect(x + s / 2, y, 2, s * 0.74);
+  });
+  const brick = make((g, x, y, s, r) => {
+    g.fillStyle = '#8c4b38'; g.fillRect(x, y, s, s);
+    g.fillStyle = 'rgba(230,215,200,0.35)';
+    for (let k = 0; k < 16; k++) { g.fillRect(x, y + k * 8, s, 1); for (let m = 0; m < 6; m++) g.fillRect(x + ((m * 24 + (k % 2) * 12) % s), y + k * 8, 1, 8); }
+    g.fillStyle = '#eeeae0'; g.fillRect(x + 26, y + 20, s - 52, s - 46);
+    pane(g, x + 31, y + 25, s - 62, s - 56, r);
+  });
+  return [
+    { map: stone, rough: 0.85, metal: 0 },
+    { map: glass, rough: 0.15, metal: 0.4, glass: true },
+    { map: brick, rough: 0.9, metal: 0 },
+  ];
+}
+
+// Shopfronts: a sign band over big windows. Made-up shops, no real names.
+const SHOPS = ['DELI', 'BOOKS', 'CAFE', 'SHOES', 'FLOWERS', 'BANK', 'PHARMACY', 'BAKERY', 'TAILOR', 'GALLERY', 'NEWS', 'PIZZA'];
+function shopTexture() { return { cache: new Map() }; }
+function shopsFor(shops, w, rand) {
+  const n = Math.max(1, Math.round(w / 7));
   const c = document.createElement('canvas');
-  c.width = 64; c.height = 64;
+  c.width = 128 * n; c.height = 80;
   const g = c.getContext('2d');
-  g.fillStyle = '#ffffff';
-  g.fillRect(0, 0, 64, 64);
-  g.fillStyle = '#39414d';
-  g.fillRect(8, 10, 48, 38);
-  g.fillStyle = 'rgba(255,255,255,0.12)';
-  g.fillRect(8, 10, 24, 38);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
+  for (let i = 0; i < n; i++) {
+    const x = i * 128;
+    g.fillStyle = ['#1d2a22', '#2a1a1a', '#1a2230', '#2b2b2b', '#3a2a14'][(rand() * 5) | 0];
+    g.fillRect(x, 0, 128, 80);
+    g.fillStyle = '#f2ead6';
+    g.font = 'bold 13px sans-serif';
+    g.textAlign = 'center';
+    g.fillText(SHOPS[(rand() * SHOPS.length) | 0], x + 64, 15);
+    const grad = g.createLinearGradient(x, 22, x, 80);
+    grad.addColorStop(0, '#d8c8a0'); grad.addColorStop(1, '#6a5a40');
+    g.fillStyle = grad;
+    g.fillRect(x + 8, 22, 112, 54);
+    g.fillStyle = 'rgba(0,0,0,0.5)';
+    g.fillRect(x + 62, 22, 4, 54);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 function mulberry(seed) {
