@@ -17,11 +17,14 @@ function read() {
 const state = read();
 
 export const progress = {
-  done: (jobId) => state.done.includes(jobId),
-  finish(jobId) {
+  done: (jobId, levelId) => state.done.includes(levelId ? `${jobId}:${levelId}` : jobId),
+  finish(jobId, levelId) {
     if (!state.done.includes(jobId)) state.done.push(jobId);
+    if (levelId && !state.done.includes(`${jobId}:${levelId}`)) state.done.push(`${jobId}:${levelId}`);
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* nothing saved */ }
   },
+  // Insane is earned by finishing the job on Normal or Hard.
+  earned: (jobId) => state.done.includes(`${jobId}:normal`) || state.done.includes(`${jobId}:hard`),
   unlocked(toolId) {
     const t = tool(toolId);
     return !!t && !t.soon && (!t.unlockedBy || state.done.includes(t.unlockedBy));

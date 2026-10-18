@@ -1,5 +1,6 @@
 import { JOBS, TOOLS, MAX_DEMOLITION, job as jobById } from '../data/catalog.js';
 import { progress } from '../data/progress.js';
+import { LEVELS, level as levelById } from '../data/difficulty.js';
 
 // The menu you arrive in. Two pages:
 //
@@ -23,6 +24,7 @@ export class Menu {
     this.onStart = onStart;
     this.onClick = onClick;
     this.jobId = 'trump';
+    this.level = 'normal';
     this.picked = new Set(['sledge']);
     this.page = 'jobs';
   }
@@ -70,7 +72,7 @@ export class Menu {
         art.append(towerArt());
         card.append(art);
         const done = progress.done(j.id) ? '<em class="done">Completed</em>' : '';
-        card.append(el('div', 'job-body', `<b>${j.title}</b><span>${j.where}</span><span class="stat">${j.storeys} storeys · ${j.height} m · bring below ${j.target} m</span>${done}`));
+        card.append(el('div', 'job-body', `<b>${j.title}</b><span>${j.where}</span><span class="stat">${j.storeys} storeys · ${j.height} m · bring below ${levelById(this.level).target} m</span>${done}`));
         card.onclick = () => { this.jobId = j.id; this.onClick?.(); this.render(); };
       }
       grid.append(card);
@@ -78,6 +80,22 @@ export class Menu {
     page.append(grid);
     const j = jobById(this.jobId);
     page.append(el('p', 'brief', j.brief));
+    // How hard: five levels, Insane earned.
+    page.append(el('h3', null, 'Difficulty'));
+    const row = el('div', 'levels');
+    row.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px';
+    for (const L of LEVELS) {
+      const locked = L.earned && !progress.earned(this.jobId);
+      const on = L.id === this.level;
+      const b = el('button', `level${on ? ' picked' : ''}`, `${locked ? '&#128274; ' : ''}${L.name}${progress.done(this.jobId, L.id) ? ' &#10003;' : ''}`);
+      b.style.cssText = `padding:8px 14px;border-radius:8px;border:1px solid ${on ? '#c9a043' : '#ffffff33'};background:${on ? '#c9a04333' : '#00000044'};color:#fff;cursor:${locked ? 'not-allowed' : 'pointer'};opacity:${locked ? 0.5 : 1}`;
+      if (locked) { b.disabled = true; b.title = 'Finish this job on Normal or Hard to unlock'; }
+      else b.onclick = () => { this.level = L.id; this.onClick?.(); this.render(); };
+      row.append(b);
+    }
+    page.append(row);
+    const L = levelById(this.level);
+    page.append(el('p', 'tool-note', `${L.blurb} Bring it below ${L.target} m.`));
     const bar = el('div', 'menu-bar');
     const next = el('button', 'go', 'Next: choose your tools &rarr;');
     next.onclick = () => { this.onClick?.(); this.show('tools'); };
@@ -89,7 +107,7 @@ export class Menu {
   _tools() {
     const page = el('div', 'menu-page');
     const j = jobById(this.jobId);
-    page.append(el('h2', null, `Tools for ${j.title}`));
+    page.append(el('h2', null, `Tools for ${j.title} · ${levelById(this.level).name}`));
     page.append(el('div', 'tool-note', `Demolition: pick up to ${MAX_DEMOLITION}. Helpers always come with you.`));
     const grid = el('div', 'tool-grid');
     for (const t of TOOLS.filter((x) => x.kind === 'demolition')) {
@@ -122,7 +140,7 @@ export class Menu {
       this.onClick?.();
       const demolition = TOOLS.filter((t) => t.kind === 'demolition' && this.picked.has(t.id)).map((t) => t.id);
       const helpers = TOOLS.filter((t) => t.kind === 'helper').map((t) => t.id);
-      this.onStart(this.jobId, [...demolition, ...helpers]);
+      this.onStart(this.jobId, [...demolition, ...helpers], this.level);
     };
     bar.append(back, go);
     page.append(bar);

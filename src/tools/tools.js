@@ -162,7 +162,7 @@ export class Extinguisher {
     this.model.position.set(0.36, -0.5 + kick, -0.8);
     this.model.rotation.set(0.05, -0.4, 0.05);
     if (!on) return;
-    this.charge = Math.max(0, this.charge - dt / DISCHARGE);
+    this.charge = Math.max(0, this.charge - dt / (this.discharge ?? DISCHARGE));
     // Nearly empty, it coughs: the jet comes and goes.
     if (this.charge < 0.08 && Math.random() < 0.5) return;
     ctx.camera.getWorldDirection(_dir);

@@ -29,6 +29,7 @@ import { Quality } from './render/quality.js';
 import { warmUp } from './render/warmup.js';
 import { job as jobById, tool as toolById } from './data/catalog.js';
 import { progress } from './data/progress.js';
+import { level as levelById } from './data/difficulty.js';
 
 // The game: a menu, then a job.
 //
@@ -167,6 +168,7 @@ const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, bl
 
 let state = 'menu';
 let job = null;
+let difficulty = levelById('normal');
 let tools = [];
 let current = 0;
 let height = null, heightT = 0, doneT = -1, started = 0, downT = 0;
@@ -174,7 +176,7 @@ let height = null, heightT = 0, doneT = -1, started = 0, downT = 0;
 const menu = new Menu(document.getElementById('menu'), {
   onClick: () => audio.click(),
   quality,
-  onStart: (jobId, toolIds) => start(jobId, toolIds),
+  onStart: (jobId, toolIds, levelId) => start(jobId, toolIds, levelId),
 });
 
 function openMenu() {
@@ -189,11 +191,14 @@ function openMenu() {
   camera.lookAt(0, 42, 0);
 }
 
-async function start(jobId, toolIds) {
+async function start(jobId, toolIds, levelId = 'normal') {
   audio.start();
   menu.hide();
   state = 'loading';
-  job = jobById(jobId);
+  difficulty = levelById(levelId);
+  // The job as this difficulty has it: its own target height.
+  job = { ...jobById(jobId), target: difficulty.target };
+  pieces.strength = difficulty.strength;
   screens.loading('Clearing the site', 0.05);
   await frames(2);
   unloadJob();
@@ -209,6 +214,10 @@ async function start(jobId, toolIds) {
   screens.loading('Wiring the gas and the lights', 0.85);
   await frames(2);
   tools = toolIds.filter((id) => TOOL_CLASSES[id]).map((id) => new TOOL_CLASSES[id]());
+  for (const t of tools) {
+    if (t.id === 'bomb') t.left = difficulty.charges;
+    if (t.id === 'extinguisher') t.discharge = difficulty.discharge;
+  }
   current = 0;
   for (const t of tools) { t.model.visible = false; vmScene.add(t.model); }
   hud.setJob(job);
@@ -298,7 +307,7 @@ function finish() {
   input.unlock();
   hud.show(false);
   const first = !progress.done(job.id);
-  progress.finish(job.id);
+  progress.finish(job.id, difficulty.id);
   const secs = Math.round((performance.now() - started) / 1000);
   const unlockedTool = first && job.unlocks ? toolById(job.unlocks)?.name : null;
   screens.results({

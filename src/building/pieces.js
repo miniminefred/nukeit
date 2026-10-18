@@ -40,7 +40,8 @@ export class Pieces {
     this.onLeave = null;            // (piece): a piece that was solid has left where it was
     this.overflow = null;           // (piece, vel, spin): loose, but no room for another body
     this.onAnchor = null;           // (piece): wreckage made standing, to find what it sits on
-    this.maxBodies = 50;            // rigid bodies the simulation can afford at once
+    this.maxBodies = 50;
+    this.strength = 1;              // the job's difficulty: times every piece's durability            // rigid bodies the simulation can afford at once
     this.spares = new Map();        // material -> [BatchedMesh] for pieces made or cut after loading
     this._tintMats = new Map();
   }
@@ -98,7 +99,7 @@ export class Pieces {
     // Durability: the weakest-part-weighted blows it can take. A cracked piece
     // is one with less of this left; see damage/damage.js.
     const hits = Math.max(...p.parts.map((q) => q.kind.hits));
-    p.hpMax = p.hp = spec.hp ?? +(hits * THREE.MathUtils.clamp(Math.cbrt(p.volume / 0.5), 0.5, 3)).toFixed(2);
+    p.hpMax = p.hp = spec.hp ?? +(hits * this.strength * THREE.MathUtils.clamp(Math.cbrt(p.volume / 0.5), 0.5, 3)).toFixed(2);
     this._updateBox(p);
     this.list.push(p);
     const mine = this.byBuilding.get(p.building);
