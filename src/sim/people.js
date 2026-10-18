@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { G_LAND } from '../physics.js';
 import { INSTANCE_DEPTH } from '../render/materials.js';
 import { T, PODIUM_FLOORS, podiumFront, OUTLINE, inPoly, inCore, inAtrium, TOWER_COLUMNS, PODIUM_COLUMNS, clearOf } from '../building/plan.js';
@@ -23,6 +24,7 @@ const LOOK = 0.25;                // s between looks at what is under someone
 const G = 9.81;
 const HEAR = 26;                  // m: a blast this close sends people running
 const STEPS = 4;                  // m: how far ahead they check the way is clear
+const PER = { leg: 2, arm: 2, hand: 2, shoe: 2 };    // of each part a figure has; one of the rest
 const STREET = 26;                // people on the avenue's pavements
 const PAVEMENTS = [21.5, 46.5];   // z down the middle of our pavement and the far one
 
@@ -31,10 +33,12 @@ const HAIR = [0x1d1612, 0x3b2a1e, 0x6e4b2e, 0xb08a52, 0xd9c7a2, 0x8a8a8a];
 const SUIT = [0x1a1c22, 0x23262e, 0x2b2f3a, 0x3a3226, 0x111111, 0x4a4f5a];
 const DRESS = [0x7a1420, 0xe8e2d8, 0x101014, 0x2b3f6a, 0xb8962e, 0x5a2a4a];
 const SHIRT = [0xf2f0ea, 0xdfe6ee, 0xe8dcc8];
+const SHOES = [0x111111, 0x2a1c12, 0x3a2a1e, 0x1a1a22, 0x6a2a20];
 
 // Where people are, by floor: how many, and whether they dress for it.
 const CROWD = { [-1]: 4, 0: 16, 1: 12, 2: 10, 3: 14, 4: 12, 5: 6, 6: 5, 7: 5, 8: 5, 9: 5, 10: 2, 11: 2, 12: 2, 13: 2, 14: 2, 15: 2, 16: 2 };
 
+const _n = new THREE.Matrix4(), _o = new THREE.Matrix4();
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _w = new THREE.Vector3(), _s = new THREE.Vector3(1, 1, 1), _c = new THREE.Color();
 
 // A part, in the figure's frame: which bone it hangs from, where, and its shape.
@@ -49,6 +53,13 @@ function parts() {
     hair: new THREE.SphereGeometry(0.128, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55).scale(1, 1.1, 1.08),
     // A dress's skirt, waist to knee.
     skirt: new THREE.CylinderGeometry(0.2, 0.33, 0.62, 14, 1, true).translate(0, -0.31, 0),
+    // Hands at the ends of the arms, shoes at the ends of the legs, eyes, long
+    // hair down the back for some, and a peaked cap for guards and officers.
+    hand: new THREE.SphereGeometry(0.052, 8, 6).scale(0.9, 1.15, 0.7),
+    shoe: rb(0.11, 0.26, 0.09).rotateX(Math.PI / 2).translate(0, 0.02, 0.05),
+    eyes: mergeGeometries([new THREE.SphereGeometry(0.017, 6, 4).translate(-0.042, 0, 0), new THREE.SphereGeometry(0.017, 6, 4).translate(0.042, 0, 0)]),
+    long: rb(0.24, 0.34, 0.1).translate(0, -0.12, 0),
+    cap: mergeGeometries([new THREE.CylinderGeometry(0.125, 0.13, 0.09, 14).translate(0, 0.03, 0), new THREE.CylinderGeometry(0.1, 0.1, 0.012, 12, 1, false, -Math.PI / 2, Math.PI).scale(1, 1, 0.9).translate(0, -0.01, 0.1)]),
   };
 }
 
@@ -74,6 +85,8 @@ export class People {
       leg: make(g.leg, mat(0.8), 2), hips: make(g.hips, mat(0.8), 1), body: make(g.body, mat(0.7), 1),
       arm: make(g.arm, mat(0.7), 2), head: make(g.head, mat(0.6), 1), hair: make(g.hair, mat(0.9), 1),
       skirt: make(g.skirt, new THREE.MeshStandardMaterial({ roughness: 0.75, side: THREE.DoubleSide }), 1),
+      hand: make(g.hand, mat(0.6), 2), shoe: make(g.shoe, mat(0.4), 2), eyes: make(g.eyes, mat(0.3), 1),
+      long: make(g.long, mat(0.9), 1), cap: make(g.cap, mat(0.6), 1),
     };
     this._ray = new physics.R.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
     this._alarm = [];            // { at, r, t }: things that went bang
@@ -90,7 +103,7 @@ export class People {
     // And people on the pavements of the avenue, both sides, walking by.
     for (let i = 0; i < STREET; i++) this._spawn(0, true);
     const n = this.list.length;
-    for (const k in this.mesh) this.mesh[k].count = n * (k === 'leg' || k === 'arm' ? 2 : 1);
+    for (const k in this.mesh) this.mesh[k].count = n * (PER[k] ?? 1);
     this._draw(0);
   }
 
@@ -109,15 +122,19 @@ export class People {
       colours: {
         leg: woman ? skin : pick(SUIT), hips: woman ? dress : pick(SUIT), body: woman ? dress : pick(SUIT), skirt: dress,
         arm: woman ? skin : pick(SUIT), head: skin, hair: pick(HAIR),
+        hand: skin, shoe: pick(SHOES), eyes: 0x1c1a18, cap: 0x111111,
       },
       shirt: pick(SHIRT), woman,
       street, dir: Math.random() < 0.5 ? 1 : -1, side,
+      long: woman && Math.random() < 0.6,
     };
+    p.colours.long = p.colours.hair;
+    if (!woman) p.colours.hips = p.colours.leg;          // one pair of trousers
     // Suits have a white shirt at the collar: the body's colour is the jacket.
     const i = this.list.length;
     this.list.push(p);
     for (const k in this.mesh) {
-      const per = k === 'leg' || k === 'arm' ? 2 : 1;
+      const per = PER[k] ?? 1;
       for (let j = 0; j < per; j++) this.mesh[k].setColorAt(i * per + j, _c.set(p.colours[k]));
     }
   }
@@ -128,12 +145,14 @@ export class People {
   agent(f, at, colours, height = 1) {
     const p = {
       f, pos: at.clone(), yaw: 0, target: null, wait: 0, phase: 0, speed: WALK, vy: 0, floorY: at.y,
-      look: 0, state: 'calm', t: 0, height, colours, shirt: 0xf2f0ea, woman: false, agent: true, armUp: 0,
+      look: 0, state: 'calm', t: 0, height, shirt: 0xf2f0ea, woman: false, agent: true, armUp: 0, capped: true,
+      colours: { ...colours, hand: colours.head, shoe: 0x0c0c0c, eyes: 0x1c1a18, cap: colours.hair, long: colours.hair },
     };
+    colours = p.colours;
     const i = this.list.length;
     this.list.push(p);
     for (const k in this.mesh) {
-      const per = k === 'leg' || k === 'arm' ? 2 : 1;
+      const per = PER[k] ?? 1;
       for (let j = 0; j < per; j++) this.mesh[k].setColorAt(i * per + j, _c.set(colours[k] ?? 0x222222));
       this.mesh[k].count = this.list.length * per;
     }
@@ -344,7 +363,7 @@ export class People {
     for (let i = 0; i < this.list.length; i++) {
       const p = this.list[i];
       if (p.state === 'gone' || p.hidden) {
-        for (const k in M) { const per = k === 'leg' || k === 'arm' ? 2 : 1; for (let j = 0; j < per; j++) set(M[k], i * per + j, hide); }
+        for (const k in M) { const per = PER[k] ?? 1; for (let j = 0; j < per; j++) set(M[k], i * per + j, hide); }
         continue;
       }
       const s = p.height;
@@ -358,17 +377,23 @@ export class People {
       const part = (mesh, i, x, y, z, rx, rz = 0) => {
         _m.compose(_v.set(x, y, z), _q.setFromEuler(_e.set(rx, 0, rz)), _s.set(1, 1, 1));
         set(mesh, i, _m.premultiply(root));
+        return _m;
       };
-      part(M.leg, i * 2, -0.1, hip, 0, swing);
-      part(M.leg, i * 2 + 1, 0.1, hip, 0, -swing);
+      // Something at the end of a limb: in the limb's frame.
+      const end = (mesh, i, limb, y, z = 0) => set(mesh, i, _n.copy(limb).multiply(_o.makeTranslation(0, y, z)));
+      end(M.shoe, i * 2, part(M.leg, i * 2, -0.1, hip, 0, swing), -0.88);
+      end(M.shoe, i * 2 + 1, part(M.leg, i * 2 + 1, 0.1, hip, 0, -swing), -0.88);
       part(M.hips, i, 0, hip, 0, 0);
       part(M.body, i, 0, hip + 0.06, 0, lean);
-      part(M.arm, i * 2, -0.25, hip + 0.6, lean * 0.5, -swing * 0.8, 0.06);
+      end(M.hand, i * 2, part(M.arm, i * 2, -0.25, hip + 0.6, lean * 0.5, -swing * 0.8, 0.06), -0.68);
       // The right arm raised — pointing, shouting into a radio, filming on a phone.
       const up = p.armUp ?? 0;
-      part(M.arm, i * 2 + 1, 0.25, hip + 0.6, lean * 0.5, swing * 0.8 * (1 - up) - 1.9 * up, -0.06);
+      end(M.hand, i * 2 + 1, part(M.arm, i * 2 + 1, 0.25, hip + 0.6, lean * 0.5, swing * 0.8 * (1 - up) - 1.9 * up, -0.06), -0.68);
       part(M.head, i, 0, hip + 0.83, lean * 0.4, 0);
-      part(M.hair, i, 0, hip + 0.86, lean * 0.4 - 0.01, -0.15);
+      part(M.eyes, i, 0, hip + 0.85, lean * 0.4 + 0.112, 0);
+      if (p.capped) { part(M.cap, i, 0, hip + 0.93, lean * 0.4, -0.05); set(M.hair, i, hide); }
+      else { part(M.hair, i, 0, hip + 0.86, lean * 0.4 - 0.01, -0.15); set(M.cap, i, hide); }
+      if (p.long) part(M.long, i, 0, hip + 0.8, lean * 0.4 - 0.09, 0.05); else set(M.long, i, hide);
       if (p.woman) part(M.skirt, i, 0, hip + 0.12, 0, swing * 0.15);
       else set(M.skirt, i, hide);
     }
