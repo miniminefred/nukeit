@@ -173,12 +173,13 @@ export function cafe(P, cx, y, cz, yaw, w, d, { name = 'BAKER & BEAN', seats = t
       place('seat', fr, left + 1.45, z, -Math.PI / 2);
       place('seat', fr, -w / 2 + 0.38, z, Math.PI / 2);
     }
-    if (room > 2.2) for (let z = -d / 2 + 1.6; z < d / 2 - 1.6; z += 1.9) {
-      put(P, fr, S.woodTable, left + room - 0.5, z, 0);
-      put(P, fr, S.woodChair, left + room - 0.5, z - 0.62, 0);
-      put(P, fr, S.woodChair, left + room - 0.5, z + 0.62, Math.PI);
-      place('seat', fr, left + room - 0.5, z - 0.62, 0);
-      place('seat', fr, left + room - 0.5, z + 0.62, Math.PI);
+    // Tables for two in rows across the rest of the room, a walkway between rows.
+    for (let x = left + 2.6; x < left + room - 0.4; x += 2.2) for (let z = -d / 2 + 1.6; z < d / 2 - 1.6; z += 1.9) {
+      put(P, fr, S.woodTable, x, z, 0);
+      put(P, fr, S.woodChair, x, z - 0.62, 0);
+      put(P, fr, S.woodChair, x, z + 0.62, Math.PI);
+      place('seat', fr, x, z - 0.62, 0);
+      place('seat', fr, x, z + 0.62, Math.PI);
     }
   }
   // The till staff and the barista stand here; customers queue here and sit there.

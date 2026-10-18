@@ -1,4 +1,7 @@
-import { assembly } from './kit.js';
+import { assembly, block } from './kit.js';
+import { CAFES } from '../scenery/city.js';
+import { cafe } from './shops.js';
+import * as F from './furniture.js';
 
 // Fifth Avenue's furniture, along both kerbs in front of the job: street
 // lamps, a crossing with its traffic lights in front of the tower, fire
@@ -25,6 +28,25 @@ export function buildStreet(P) {
   for (const x of [-46, -38, 38, 46, 56]) tree(S, x, OUR - 1);
   for (const x of [-50, -34, 30, 44]) tree(S, x, FAR + 1);
   shelter(S, -22, OUR - 1.2);
+  // The cafés in the ground floors of the blocks nearest the job: a tiled
+  // floor, the café, and a ceiling over it on its walls for the lamps to hang from.
+  const names = ['BAKER & BEAN', 'CRUMB', 'THE DAILY LOAF', 'CORNER CAFE', 'MORNING BREAD'];
+  CAFES.forEach((c, i) => {
+    const c0 = Math.cos(c.yaw), s0 = Math.sin(c.yaw);
+    const hx = Math.abs(c0) * c.w / 2 + Math.abs(s0) * c.d / 2, hz = Math.abs(s0) * c.w / 2 + Math.abs(c0) * c.d / 2;
+    block(S, 'ceramic', c.x - hx, 0, c.z - hz, c.x + hx, 0.02, c.z + hz, 'carpet', { structural: false, tint: 0xd8d2c8 });
+    block(S, 'plaster', c.x - hx, c.h, c.z - hz, c.x + hx, c.h + 0.08, c.z + hz, 'ceiling', { structural: false, tint: 0xf2ece2 });
+    // A wide frontage is several shops side by side, as a real street is —
+    // not one hall of tables. Each a café of its own, eight to ten metres wide,
+    // lit from its ceiling.
+    const n = Math.max(1, Math.round(c.w / 9)), uw = c.w / n;
+    for (let k = 0; k < n; k++) {
+      const lx = -c.w / 2 + uw * (k + 0.5);
+      const ux = c.x + lx * c0, uz = c.z - lx * s0;
+      cafe(S, ux, 0.02, uz, c.yaw, uw, c.d, { name: names[(i * 2 + k) % names.length], seats: true, h: c.h - 0.02 });
+      for (const lz of [-c.d / 4, c.d / 4]) F.ceilingLight(S, ux + lz * s0, c.h, uz + lz * c0);
+    }
+  });
 }
 
 function lamp(P, x, z, yaw) {

@@ -22,7 +22,7 @@ export function createWorld(scene, physics) {
     // A city block becomes a building of pieces: the box goes, and in its
     // place a frame, a core, floors and a curtain wall of its size.
     wakeBlock(b) {
-      if (b.built) return null;
+      if (b.built || b.noWake) return null;
       b.built = true;
       b.show(false);
       if (b.collider) { physics.removeCollider(b.collider); b.collider = null; }

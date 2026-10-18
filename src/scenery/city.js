@@ -16,6 +16,11 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 // piece: until it is woken, rubble lies on it as on the street.
 export const CITY = { role: 'city' };
 
+// The street cafés in the ground floors of the blocks nearest the job, as
+// { x, z, w, d, yaw, h } — built as pieces with the job (building/street.js).
+export const CAFES = [];
+const CAFE_H = 4.6, CAFE_D = 9;
+
 export function buildCity(scene, physics) {
   const group = new THREE.Group();
   group.name = 'city';
@@ -59,14 +64,20 @@ export function buildCity(scene, physics) {
   const cornices = boxes(group, new THREE.MeshStandardMaterial({ color: 0xcfc6b4, roughness: 0.85 }), 200, true);
   const awnings = boxes(group, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }), 120, true);
   const fronts = [0, 1, 2, 3].map((k) => boxes(group, new THREE.MeshStandardMaterial({ map: shopfronts(mulberry(11 + k)), roughness: 0.5 }), 60, false));
-  const tower = (x, z, w, d, h, tint, facing = 0) => {
+  const tower = (x, z, w, d, h, tint, facing = 0, cafe = false) => {
     const st = styles[(rand() * styles.length) | 0];
     const tex = st.map.clone();
     tex.needsUpdate = true;
     tex.repeat.set(Math.max(1, Math.round(w / 3)) / 4, Math.max(1, Math.round(h / 3.6)) / 4);
     tex.offset.set(rand(), rand());
     const mat = new THREE.MeshStandardMaterial({ color: st.glass ? 0xffffff : tint, map: tex, roughness: st.rough, metalness: st.metal });
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    // A block with a café on the street has a real ground floor there: the box
+    // stands on a lower box set back by the café's depth, and the café is
+    // pieces (building/street.js). Such a block is not woken whole.
+    const geo = cafe
+      ? mergeGeometries([new THREE.BoxGeometry(w, h - CAFE_H, d).translate(0, CAFE_H / 2, 0), new THREE.BoxGeometry(w, CAFE_H, d - CAFE_D).translate(0, CAFE_H / 2 - h / 2, -facing * CAFE_D / 2)])
+      : new THREE.BoxGeometry(w, h, d);
+    const m = new THREE.Mesh(geo, mat);
     m.position.set(x, h / 2, z);
     m.castShadow = m.receiveShadow = true;
     group.add(m);
@@ -74,22 +85,29 @@ export function buildCity(scene, physics) {
     // meshes (one draw call each for the whole city), hidden when it wakes.
     const extras = [];
     extras.push([cornices, cornices.add(x, h - 0.55, z, w + 0.8, 1.1, d + 0.8)]);
-    if (facing) {
+    if (facing && !cafe) {
       extras.push([fronts[(rand() * fronts.length) | 0], null]);
       const f = extras[1][0];
       extras[1][1] = f.add(x, 2.1, z + facing * (d / 2 + 0.15), w - 0.4, 4.2, 0.3);
       extras.push([awnings, awnings.add(x, 3.6, z + facing * (d / 2 + 0.9), w - 1, 0.08, 1.6, facing * 0.25, AWNINGS[(rand() * AWNINGS.length) | 0])]);
     }
-    const block = { role: 'city', id: blocks.length, x, z, w, d, h, tint, mesh: m, collider: null, built: false };
+    if (cafe) extras.push([awnings, awnings.add(x, 3.9, z + facing * (d / 2 + 0.9), w - 1, 0.08, 1.6, facing * 0.25, AWNINGS[(rand() * AWNINGS.length) | 0])]);
+    const block = { role: 'city', id: blocks.length, x, z, w, d, h, tint, mesh: m, collider: null, built: false, noWake: cafe };
+    if (cafe) CAFES.push({ x, z: z + facing * (d / 2 - CAFE_D / 2), w: w - 0.4, d: CAFE_D - 0.4, yaw: facing > 0 ? 0 : Math.PI, h: CAFE_H - 0.2 });
     // Shown as a box, or not (woken into a building of pieces: world.js).
     block.show = (on) => { m.visible = on; for (const [set, i] of extras) set.show(i, on); };
     block.solid = () => {
       if (!physics || block.collider) return;
-      const c = physics.world.createCollider(
-        physics.R.ColliderDesc.cuboid(w / 2, h / 2, d / 2).setTranslation(x, h / 2, z).setFriction(0.35).setCollisionGroups(G_CITY),
-        physics.fixed);
-      physics.owner.set(c.handle, block);
-      block.collider = c;
+      const box = (hx, hy, hz, cy, cz) => {
+        const c = physics.world.createCollider(physics.R.ColliderDesc.cuboid(hx, hy, hz).setTranslation(x, cy, cz).setFriction(0.35).setCollisionGroups(G_CITY), physics.fixed);
+        physics.owner.set(c.handle, block);
+        return c;
+      };
+      if (!cafe) block.collider = box(w / 2, h / 2, d / 2, h / 2, z);
+      else {
+        block.collider = box(w / 2, (h - CAFE_H) / 2, d / 2, (h + CAFE_H) / 2, z);
+        block.under = box(w / 2, CAFE_H / 2, (d - CAFE_D) / 2, CAFE_H / 2, z - facing * CAFE_D / 2);
+      }
     };
     block.solid();
     blocks.push(block);
@@ -102,7 +120,7 @@ export function buildCity(scene, physics) {
     while (Math.abs(x) < 300) {
       const w = 14 + rand() * 18;
       const h = 30 + rand() * 120;
-      tower(x + side * w / 2, -4, w, 36, h, tints[(rand() * tints.length) | 0], 1);
+      tower(x + side * w / 2, -4, w, 36, h, tints[(rand() * tints.length) | 0], 1, Math.abs(x) < 37);
       x += side * (w + 2);
     }
   }
@@ -118,7 +136,7 @@ export function buildCity(scene, physics) {
   // Across the avenue.
   for (let x = -280; x < 280;) {
     const w = 14 + rand() * 20;
-    tower(x + w / 2, 70, w, 40, 25 + rand() * 110, tints[(rand() * tints.length) | 0], -1);
+    tower(x + w / 2, 70, w, 40, 25 + rand() * 110, tints[(rand() * tints.length) | 0], -1, Math.abs(x + w / 2) < 22);
     x += w + 2;
   }
 
