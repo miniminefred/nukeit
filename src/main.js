@@ -24,6 +24,7 @@ import { Traffic } from './sim/traffic.js';
 import { Fear } from './sim/fear.js';
 import { Wanted } from './sim/wanted.js';
 import { Achieve } from './sim/achieve.js';
+import { Body } from './body.js';
 import { settings } from './data/settings.js';
 import { signs, places } from './building/shops.js';
 import { Topple } from './sim/topple.js';
@@ -153,6 +154,8 @@ damage.fx.onPuncture = (p, point, normal) => {
 };
 structure.onCrushPlayer = () => player.damage(500, 'crushed');
 
+// Your own legs and boots, and your shadow (body.js).
+const body = new Body(scene);
 const lift = new Lift(scene, physics);
 const doors = new Doors();
 const people = new People(scene, physics);
@@ -256,6 +259,7 @@ function openMenu() {
   hud.show(false);
   screens.hidePause();
   audio.silence();
+  body.root.visible = false;
   menu.show('mode');
   // Behind the menu: the city, from the avenue.
   camera.position.set(19, 2.2, 31);
@@ -477,6 +481,7 @@ function frame(dt) {
       liftTip = player.dead ? null : spareTip() ?? lift.control(input, player);
       lift.update(dt, player, { collapsing: structure.collapsing || topple.active });
       player.update(dt);
+      body.update(player, !rig);
       // A camera held somewhere else — the collapse bench's, over the avenue.
       if (rig) { camera.position.copy(rig.at); camera.lookAt(rig.look); }
     } else lift.update(dt, null, { collapsing: structure.collapsing || topple.active });
@@ -634,7 +639,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, body, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.
