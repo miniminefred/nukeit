@@ -220,6 +220,15 @@ export class Audio {
     if (S.ring) this._tone(out, { f: S.ring, len: 0.18, gain: 0.05, type: 'triangle' });
   }
 
+  // A flock going up: a clatter of wings, many small soft beats.
+  flutter(x, y, z, n = 8) {
+    if (!this.ctx) return;
+    const { gain, pan } = this._place(x, y, z, 25);
+    for (let i = 0; i < Math.min(14, n * 1.5); i++) {
+      setTimeout(() => { if (this.ctx) this._noise(this._out(gain * 0.25, pan), { f: 500 + Math.random() * 700, q: 0.8, len: 0.05, gain: 0.7 }); }, i * 35 + Math.random() * 30);
+    }
+  }
+
   // Out of breath: one breath, in or out, harder the more winded.
   breath(k, inward) {
     if (!this.ctx) return;

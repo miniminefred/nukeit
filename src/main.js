@@ -26,6 +26,7 @@ import { Wanted } from './sim/wanted.js';
 import { Achieve } from './sim/achieve.js';
 import { Body } from './body.js';
 import { Senses } from './fx/senses.js';
+import { Pigeons } from './sim/pigeons.js';
 import { settings } from './data/settings.js';
 import { signs, places } from './building/shops.js';
 import { Topple } from './sim/topple.js';
@@ -157,6 +158,8 @@ structure.onCrushPlayer = () => player.damage(500, 'crushed');
 
 // Your own legs and boots, and your shadow (body.js).
 const body = new Body(scene);
+// Pigeons on the pavements (sim/pigeons.js).
+const pigeons = new Pigeons(scene, audio);
 const lift = new Lift(scene, physics);
 const doors = new Doors();
 const people = new People(scene, physics);
@@ -172,6 +175,7 @@ fire.fx.heatGlass = (p, at, dir) => damage.hit(p, at, dir.clone().negate(), dir,
 const bang = blast.explode.bind(blast);
 blast.explode = (at, r, power) => {
   people.alarm(at, Math.max(26, r * 9));
+  pigeons.scare(at, Math.max(40, r * 15));
   world.wakeNear(at, Math.max(6, r * 3));     // a city block near a blast is a building now
   return bang(at, r, power);
 };
@@ -293,6 +297,7 @@ async function start(jobId, toolIds, levelId = 'normal') {
   water.attach();
   smoke.attach();
   people.populate(pieces);
+  pigeons.populate();
   security.start(difficulty);
   fear.reset();
   wanted.reset(difficulty);
@@ -340,6 +345,7 @@ function unloadJob() {
   damage.clear();
   chips.clear();
   rubble.clear();
+  pigeons.clear();
   security.clear();
   traffic.clear();
   people.clear();
@@ -513,6 +519,7 @@ function frame(dt) {
     people.spectacle = topple.active || structure.collapsing ? _spectacle : null;
     toppling = topple.active;
     people.update(dt);
+    pigeons.update(dt, player);
     structure.update(dt);
     impacts.update(dt);
     damage.update();
@@ -652,7 +659,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, body, senses, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, body, senses, pigeons, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.
