@@ -26,7 +26,7 @@ export function createWorld(scene, physics) {
     setCity(build = buildCity) {
       if (build === cityOf) return;
       this.unload();
-      for (const b of city.blocks) for (const c of [b.collider, b.under]) if (c) physics.removeCollider(c);
+      for (const b of city.blocks) for (const c of [b.collider, b.under, b.over]) if (c) physics.removeCollider(c);
       city.group.removeFromParent();
       city.group.traverse((o) => { o.geometry?.dispose(); if (o.material) for (const m of [].concat(o.material)) { m.map?.dispose(); m.dispose(); } });
       city.dispose?.();
@@ -43,6 +43,7 @@ export function createWorld(scene, physics) {
       b.built = true;
       b.show(false);
       if (b.collider) { physics.removeCollider(b.collider); b.collider = null; }
+      if (b.over) { physics.removeCollider(b.over); b.over = null; }
       const storeys = Math.max(2, Math.round(b.h / 3.6));
       const added = this.addBuilding((P) => buildBlock(P, {
         x0: b.x - b.w / 2, x1: b.x + b.w / 2, z0: b.z - b.d / 2, z1: b.z + b.d / 2,

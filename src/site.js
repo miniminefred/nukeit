@@ -52,3 +52,25 @@ export const FIFTH_AVENUE = {
 };
 
 useSite(FIFTH_AVENUE);
+
+// Wall Street, in front of Big Boy Bank (scenery/wallstreet.js): one way, a
+// parking lane on our side where the getaway van waits.
+export const WALL_STREET = {
+  name: 'Wall Street',
+  entry: { x: 0, z: 21, yaw: 0 },
+  street: { z: 28, width: 10, lanes: [27.5, 30.5], kerbs: [23, 33], pavements: [21, 35], stop: -999, walkers: 22 },
+  // Up the bank's steps and in at the bronze doors.
+  doors: { x: [-1.1, 1.1], approach: 14.6, outside: 14.4, through: 13.0, inside: 12.4, exit: 14.8 },
+  stairOut: { x: -3.3, z: 4.6 },
+  liftCrowd: { x: 1.2, z: 4.8 },
+  posts: [[0, -8, 10], [0, 8, 10], ['lower', -12, -3], [0, -18, 0], [1, -18, -6], [3, 18, 0], ['hq', 0, 6], [7, -8, -1], [0, 18, 11]],
+  police: { lane: 24.5, park: -16, out: 22.4, from: 140 },
+  swat: { from: 160, lane: 27.5, turn: 18, stop: [2, 21.2], kerb: [22.6, 23.4], heli: { z: 28, y: 112, reach: 40 } },
+  evacuate: { out: 19.8, watch: { x0: -16, x1: 16, z0: 33.6, z1: 36.4 }, look: [0, 0] },
+  spectacle: [0, 60, -2],
+  pigeons: [[-10, 21], [12, 21.5], [-32, 21], [34, 20.5], [-55, 21], [50, 21], [-24, 35], [20, 35.5], [-45, 35], [42, 34.5]],
+  menuCamera: { at: [26, 2.2, 31], look: [0, 70, 0] },
+  respawn: [0, 1, 21],
+  // The getaway van, parked in the bay east of the bank, its back doors open.
+  van: { x: 34, z: 24.6, yaw: -Math.PI / 2 },
+};

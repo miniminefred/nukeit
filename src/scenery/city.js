@@ -22,7 +22,10 @@ export const CITY = { role: 'city' };
 export const CAFES = [];
 const CAFE_H = 4.6, CAFE_D = 9;
 
-export function buildCity(scene, physics) {
+// A city, built by a layout (Fifth Avenue's is below; Wall Street's is
+// scenery/wallstreet.js) from the kit here: ground surfaces, and blocks in one
+// of three dresses with their cornices, shopfronts, awnings and roofs.
+export function makeCity(scene, physics, layout) {
   CAFES.length = 0;
   const group = new THREE.Group();
   group.name = 'city';
@@ -44,16 +47,14 @@ export function buildCity(scene, physics) {
     return m;
   };
 
-  // Ground, the plot itself, the avenue in front and pavement between.
+  // The ground.
   flat(1200, 1200, 0x77736c, 0, 0, -0.02, 'paving', 8);
-  flat(60, 44, 0xffffff, 0, 0, 0.001, 'paving', 4);        // the plot
-  flat(600, 16, 0xffffff, 0, 34, 0.002, 'asphalt', 6);     // Fifth Avenue
-  flat(600, 8, 0xe8e2d8, 0, 22, 0.003, 'paving', 2);       // pavement, our side
-  flat(600, 8, 0xe8e2d8, 0, 46, 0.003, 'paving', 2);       // pavement, far side
-  // The centre line: one mesh of dashes, not a hundred.
-  const dashes = [];
-  for (let x = -300; x < 300; x += 6) dashes.push(new THREE.PlaneGeometry(3, 0.18).rotateX(-Math.PI / 2).translate(x, 0.004, 34));
-  group.add(new THREE.Mesh(mergeGeometries(dashes), new THREE.MeshStandardMaterial({ color: 0xd8d2c0, roughness: 0.7 })));
+  // A road's centre line: one mesh of dashes, not a hundred.
+  const centreLine = (z) => {
+    const dashes = [];
+    for (let x = -300; x < 300; x += 6) dashes.push(new THREE.PlaneGeometry(3, 0.18).rotateX(-Math.PI / 2).translate(x, 0.004, z));
+    group.add(new THREE.Mesh(mergeGeometries(dashes), new THREE.MeshStandardMaterial({ color: 0xd8d2c0, roughness: 0.7 })));
+  };
 
   // City blocks, kept clear of the job site (x +/-32, z +/-24) so nothing here
   // stands in anything you can break. Each in one of three dresses — stone with
@@ -61,14 +62,15 @@ export function buildCity(scene, physics) {
   // with their blinds down, a cornice on top, and along the avenue shops at
   // street level under awnings.
   const styles = facadeStyles();
-  const rand = mulberry(7);
+  const rand = mulberry(layout.seed ?? 7);
   const blocks = [];
   const cornices = boxes(group, new THREE.MeshStandardMaterial({ color: 0xcfc6b4, roughness: 0.85 }), 200, true);
   const awnings = boxes(group, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }), 120, true);
   const fronts = [0, 1, 2, 3].map((k) => boxes(group, new THREE.MeshStandardMaterial({ map: shopfronts(mulberry(11 + k)), roughness: 0.5 }), 60, false));
   // Water tanks, rooftop plant, aerials, fire escapes (scenery/details.js).
   const dress = details(group, mulberry(23));
-  const tower = (x, z, w, d, h, tint, facing = 0, cafe = false) => {
+  // `top`: { h, inset } — a new glass top on the old block, set back from its edges.
+  const tower = (x, z, w, d, h, tint, facing = 0, cafe = false, top = null) => {
     const st = styles[(rand() * styles.length) | 0];
     const tex = st.map.clone();
     tex.needsUpdate = true;
@@ -85,6 +87,16 @@ export function buildCity(scene, physics) {
     m.position.set(x, h / 2, z);
     m.castShadow = m.receiveShadow = true;
     group.add(m);
+    let topMesh = null;
+    if (top) {
+      const gt = styles.find((q) => q.glass).map.clone();
+      gt.needsUpdate = true;
+      gt.repeat.set(Math.max(1, Math.round((w - 2 * top.inset) / 3)) / 4, Math.max(1, Math.round(top.h / 3.6)) / 4);
+      topMesh = new THREE.Mesh(new THREE.BoxGeometry(w - 2 * top.inset, top.h, d - 2 * top.inset), new THREE.MeshStandardMaterial({ map: gt, roughness: 0.12, metalness: 0.45, color: 0xcfe0ea }));
+      topMesh.position.set(x, h + top.h / 2, z);
+      topMesh.castShadow = topMesh.receiveShadow = true;
+      group.add(topMesh);
+    }
     // Its cornice, awning and shopfront are instances in the city's shared
     // meshes (one draw call each for the whole city), hidden when it wakes.
     const extras = [];
@@ -96,11 +108,11 @@ export function buildCity(scene, physics) {
       extras.push([awnings, awnings.add(x, 3.6, z + facing * (d / 2 + 0.9), w - 1, 0.08, 1.6, facing * 0.25, AWNINGS[(rand() * AWNINGS.length) | 0])]);
     }
     if (cafe) extras.push([awnings, awnings.add(x, 3.9, z + facing * (d / 2 + 0.9), w - 1, 0.08, 1.6, facing * 0.25, AWNINGS[(rand() * AWNINGS.length) | 0])]);
-    extras.push(...dress({ x, z, w, d, h }, st, facing));
-    const block = { role: 'city', id: blocks.length, x, z, w, d, h, tint, mesh: m, collider: null, built: false, noWake: cafe };
+    extras.push(...(top ? dress({ x, z, w: w - 2 * top.inset, d: d - 2 * top.inset, h: h + top.h }, { glass: true }, facing) : dress({ x, z, w, d, h }, st, facing)));
+    const block = { role: 'city', id: blocks.length, x, z, w, d, h: h + (top?.h ?? 0), tint, mesh: m, collider: null, built: false, noWake: cafe };
     if (cafe) CAFES.push({ x, z: z + facing * (d / 2 - CAFE_D / 2), w: w - 0.4, d: CAFE_D - 0.4, yaw: facing > 0 ? 0 : Math.PI, h: CAFE_H - 0.2 });
     // Shown as a box, or not (woken into a building of pieces: world.js).
-    block.show = (on) => { m.visible = on; for (const [set, i] of extras) set.show(i, on); };
+    block.show = (on) => { m.visible = on; if (topMesh) topMesh.visible = on; for (const [set, i] of extras) set.show(i, on); };
     block.solid = () => {
       if (!physics || block.collider) return;
       const box = (hx, hy, hz, cy, cz) => {
@@ -108,6 +120,7 @@ export function buildCity(scene, physics) {
         physics.owner.set(c.handle, block);
         return c;
       };
+      if (top) block.over = box(w / 2 - top.inset, top.h / 2, d / 2 - top.inset, h + top.h / 2, z);
       if (!cafe) block.collider = box(w / 2, h / 2, d / 2, h / 2, z);
       else {
         block.collider = box(w / 2, (h - CAFE_H) / 2, d / 2, (h + CAFE_H) / 2, z);
@@ -117,6 +130,32 @@ export function buildCity(scene, physics) {
     block.solid();
     blocks.push(block);
   };
+
+  // Scenery that is solid but not a block (a temple front's columns): its
+  // colliders, owned by the city, and taken away with it.
+  const extra = [];
+  const solid = (x, y, z, hx, hy, hz) => {
+    if (!physics) return;
+    const c = physics.world.createCollider(physics.R.ColliderDesc.cuboid(hx, hy, hz).setTranslation(x, y, z).setFriction(0.5).setCollisionGroups(G_CITY), physics.fixed);
+    physics.owner.set(c.handle, CITY);
+    extra.push(c);
+  };
+  layout({ flat, tower, rand, group, physics, centreLine, solid, styles });
+
+  scene.add(group);
+  return { group, blocks, dispose: () => { for (const c of extra) physics.removeCollider(c); } };
+}
+
+// Fifth Avenue: the avenue in front of the plot, a row of blocks either side
+// of it, a row behind leaving the office block next door its plot, a row
+// across the avenue.
+export const buildCity = (scene, physics) => makeCity(scene, physics, fifthAvenue);
+function fifthAvenue({ flat, tower, rand, centreLine }) {
+  flat(60, 44, 0xffffff, 0, 0, 0.001, 'paving', 4);        // the plot
+  flat(600, 16, 0xffffff, 0, 34, 0.002, 'asphalt', 6);     // Fifth Avenue
+  flat(600, 8, 0xe8e2d8, 0, 22, 0.003, 'paving', 2);       // pavement, our side
+  flat(600, 8, 0xe8e2d8, 0, 46, 0.003, 'paving', 2);       // pavement, far side
+  centreLine(34);
 
   const tints = [0xb9b2a6, 0x9ea3a8, 0xc7b89c, 0x8f9499, 0xa89586];
   // The tower is the one you look at: what stands near it is lower than it,
@@ -149,8 +188,6 @@ export function buildCity(scene, physics) {
     x += w + 2;
   }
 
-  scene.add(group);
-  return { group, blocks };
 }
 
 const AWNINGS = [0x1f4d3a, 0x7a1e22, 0x22344f, 0x3a3a3a, 0x6b4a1e];

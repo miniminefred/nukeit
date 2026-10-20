@@ -168,7 +168,8 @@ function columns(P, f) {
     }
 }
 
-function core(P, f) {
+// Shared with the bank, whose core is this one in the same place.
+export function core(P, f) {
   const { x0, x1, z0, z1, t } = CORE;
   // Full storey height, through the slab line: there is no slab inside the core
   // for a wall to stand on, so each storey's walls stand on the ones below.
@@ -204,7 +205,7 @@ function core(P, f) {
 
 // A switchback of twenty 20 cm risers per storey. One piece per storey, with
 // a collider per step so the character can climb it.
-function stair(P, f) {
+export function stair(P, f) {
   const y = T(f);
   const boxes = [];
   for (let n = 1; n <= 10; n++) {

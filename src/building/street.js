@@ -54,6 +54,30 @@ export function buildStreet(P) {
   });
 }
 
+// Wall Street's furniture, round Big Boy Bank: lamps along both kerbs, the
+// steel bollards that line the street in front of the bank and the exchange,
+// hydrants and bins. No crossing: the street is narrow, and one way.
+export function buildWallStreetFurniture(P) {
+  const S = { add: (spec) => P.add({ ...spec, building: 'street' }) };
+  const OURS = 23.2, THEIRS = 32.8;
+  for (let x = -60; x <= 60; x += 16) {
+    lamp(S, x + 4, OURS - 0.4, 0);
+    lamp(S, x - 4, THEIRS + 0.4, Math.PI);
+  }
+  // Bollards along the kerb in front of the bank, a gap at the van's bay.
+  for (let x = -20; x <= 20; x += 1.6) bollard(S, x, OURS - 0.6);
+  for (let x = -18; x <= 18; x += 1.6) bollard(S, x, THEIRS + 0.6);
+  for (const [x, z] of [[-24, OURS - 0.4], [26, THEIRS + 0.4]]) hydrant(S, x, z);
+  for (const [x, z] of [[-12, OURS - 0.8], [14, OURS - 0.8], [-22, THEIRS + 0.8]]) bin(S, x, z);
+}
+
+// A security bollard: a steel post, black, a cap.
+function bollard(P, x, z) {
+  return assembly(P, x, 0, z, 0, [
+    { kind: 'steel', boxes: [{ cyl: [0, 0.45, 0], r: 0.13, h: 0.9, seg: 12 }, { ball: [0, 0.9, 0], s: [0.13, 0.06, 0.13] }], tint: 0x1c1d1f },
+  ], 'furniture', opts({ colliders: [[-0.13, 0, -0.13, 0.13, 0.95, 0.13]] }));
+}
+
 // The street, unit by unit along it. About one in five a café.
 const STREET = [
   [deli, 'MIDTOWN DELI'], [boutique, 'LINEA'], [cafe, 'BAKER & BEAN', { seats: true }], [bank, 'FIFTH NATIONAL'],

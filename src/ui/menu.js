@@ -95,17 +95,23 @@ export class Menu {
     page.append(el('h2', null, 'Choose a job'));
     const grid = el('div', 'job-grid');
     for (const j of JOBS) {
-      const card = el('button', `job-card${j.locked ? ' locked' : ''}${j.id === this.jobId ? ' picked' : ''}`);
+      // A job that needs another finished first stays shut until it is (Creative opens them all).
+      const shut = j.requires && !progress.done(j.requires) && !this.creative;
+      const card = el('button', `job-card${j.locked || shut ? ' locked' : ''}${j.id === this.jobId ? ' picked' : ''}`);
       if (j.locked) {
         card.append(el('div', 'job-art locked-art', '<i>&#128274;</i>'));
         card.append(el('div', 'job-body', `<b>${j.title}</b><span>More jobs are on the way.</span>`));
         card.disabled = true;
+      } else if (shut) {
+        card.append(el('div', 'job-art locked-art', '<i>&#128274;</i>'));
+        card.append(el('div', 'job-body', `<b>${j.title}</b><span>${j.where}</span><span>Finish ${jobById(j.requires)?.title} to open this job.</span>`));
+        card.disabled = true;
       } else {
         const art = el('div', 'job-art');
-        art.append(towerArt());
+        art.append(j.id === 'bank' ? bankArt() : towerArt());
         card.append(art);
         const done = progress.done(j.id) ? '<em class="done">Completed</em>' : '';
-        card.append(el('div', 'job-body', `<b>${j.title}</b><span>${j.where}</span><span class="stat">${j.storeys} storeys · ${j.height} m · bring below ${levelById(this.level).target} m</span>${done}`));
+        card.append(el('div', 'job-body', `<b>${j.title}</b><span>${j.where}</span><span class="stat">${j.storeys} storeys · ${j.height} m · bring below ${j.heist ? j.target : levelById(this.level).target} m</span>${done}`));
         card.onclick = () => { this.jobId = j.id; this.onClick?.(); this.render(); };
       }
       grid.append(card);
@@ -193,6 +199,32 @@ export class Menu {
     page.append(bar);
     return page;
   }
+}
+
+// Big Boy Bank for its card: the stone hall with its columns, the glass tower
+// out of the middle of it, at dusk.
+function bankArt() {
+  const c = document.createElement('canvas');
+  c.width = 320; c.height = 200;
+  const g = c.getContext('2d');
+  const sky = g.createLinearGradient(0, 0, 0, 200);
+  sky.addColorStop(0, '#2e4560'); sky.addColorStop(1, '#d2a87c');
+  g.fillStyle = sky; g.fillRect(0, 0, 320, 200);
+  g.fillStyle = '#4a5260';
+  for (let x = 0; x < 320; x += 24) g.fillRect(x, 110 - ((x * 29) % 40), 20, 100);
+  // The tower: blue-green glass in bands.
+  g.fillStyle = '#5f8296'; g.fillRect(122, 8, 76, 140);
+  g.fillStyle = 'rgba(220,240,250,0.25)';
+  for (let y = 12; y < 148; y += 5) g.fillRect(124, y, 72, 1);
+  // The hall: limestone, a temple front.
+  g.fillStyle = '#d6ccba'; g.fillRect(70, 140, 180, 60);
+  g.fillStyle = '#c4b9a4'; g.fillRect(94, 146, 132, 8);
+  g.fillStyle = '#e6ddcc';
+  for (let i = 0; i < 6; i++) g.fillRect(100 + i * 22, 154, 8, 40);
+  g.fillStyle = '#b8ad98'; g.fillRect(90, 194, 140, 6);
+  g.fillStyle = '#c9a043'; g.font = 'bold 9px sans-serif';
+  g.fillText('BIG BOY BANK', 128, 152);
+  return c;
 }
 
 // A small drawing of the tower for its card: dusk sky, the stepped podium, the

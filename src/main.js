@@ -282,7 +282,9 @@ async function start(jobId, toolIds, levelId = 'normal') {
   state = 'loading';
   difficulty = levelById(levelId);
   // The job as this difficulty has it: its own target height.
-  job = { ...jobById(jobId), target: difficulty.target };
+  // A height job's target is the difficulty's; a heist's is its own (below the hall's roof).
+  const base = jobById(jobId);
+  job = { ...base, target: base.heist ? base.target : difficulty.target };
   pieces.strength = difficulty.strength;
   player.immortal = !!difficulty.creative;
   screens.loading('Clearing the site', 0.05);

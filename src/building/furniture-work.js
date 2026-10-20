@@ -116,3 +116,19 @@ export function hiVis(P, x, y, z, yaw) {
     { kind: 'plastic', boxes: [{ ball: [0.12, 0.98, 0.05], s: [0.15, 0.09, 0.17], rough: 0 }, [-0.02, 0.92, -0.12, 0.26, 0.935, 0.22]], tint: 0xf4f4f0 },
   ], 'furniture', { tag: 'disguise', structural: false, colliders: [[-0.4, 0, -0.25, 0.4, 1.05, 0.25]] });
 }
+
+// Money: a pallet of banded notes, shrink-wrapped, a bag's worth (tag 'money':
+// sim/heist.js fills a bag from it, and it goes).
+export function moneyStack(P, x, y, z, yaw) {
+  const bricks = [], bands = [];
+  for (let i = 0; i < 4; i++) for (let k = 0; k < 3; k++) for (let j = 0; j < 4; j++) {
+    const bx = -0.45 + i * 0.24, bz = -0.3 + k * 0.21, by = 0.14 + j * 0.13;
+    bricks.push([bx, by, bz, bx + 0.22, by + 0.12, bz + 0.19]);
+    bands.push([bx + 0.09, by - 0.002, bz - 0.002, bx + 0.13, by + 0.122, bz + 0.192]);
+  }
+  return assembly(P, x, y, z, yaw, [
+    { kind: 'wood', boxes: [[-0.5, 0, -0.35, 0.5, 0.14, 0.35]], tint: 0x9a7a52 },
+    { kind: 'paper', boxes: bricks, tint: 0x7a9a6a },
+    { kind: 'paper', boxes: bands, tint: 0xe8e0c8 },
+  ], 'furniture', { tag: 'money', colliders: [[-0.5, 0, -0.35, 0.5, 0.68, 0.35]] });
+}

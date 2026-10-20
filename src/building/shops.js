@@ -57,7 +57,7 @@ function text(lines, style, aspect) {
   } else {
     g.fillStyle = 'rgba(0,0,0,0)';
     g.fillRect(0, 0, c.width, c.height);
-    g.fillStyle = style === 'gold' ? '#d8b25a' : '#f2ece0';
+    g.fillStyle = style === 'gold' ? '#d8b25a' : style === 'bronze' ? '#4a3a24' : '#f2ece0';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.font = `600 ${Math.round(c.height * 0.55)}px Georgia, serif`;
