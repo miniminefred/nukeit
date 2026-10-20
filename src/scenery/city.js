@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { surface } from '../render/textures.js';
 import { G_CITY } from '../physics.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { details } from './details.js';
 
 // The city round the job: a street, pavements and the blocks on either side.
 //
@@ -64,6 +65,8 @@ export function buildCity(scene, physics) {
   const cornices = boxes(group, new THREE.MeshStandardMaterial({ color: 0xcfc6b4, roughness: 0.85 }), 200, true);
   const awnings = boxes(group, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9 }), 120, true);
   const fronts = [0, 1, 2, 3].map((k) => boxes(group, new THREE.MeshStandardMaterial({ map: shopfronts(mulberry(11 + k)), roughness: 0.5 }), 60, false));
+  // Water tanks, rooftop plant, aerials, fire escapes (scenery/details.js).
+  const dress = details(group, mulberry(23));
   const tower = (x, z, w, d, h, tint, facing = 0, cafe = false) => {
     const st = styles[(rand() * styles.length) | 0];
     const tex = st.map.clone();
@@ -92,6 +95,7 @@ export function buildCity(scene, physics) {
       extras.push([awnings, awnings.add(x, 3.6, z + facing * (d / 2 + 0.9), w - 1, 0.08, 1.6, facing * 0.25, AWNINGS[(rand() * AWNINGS.length) | 0])]);
     }
     if (cafe) extras.push([awnings, awnings.add(x, 3.9, z + facing * (d / 2 + 0.9), w - 1, 0.08, 1.6, facing * 0.25, AWNINGS[(rand() * AWNINGS.length) | 0])]);
+    extras.push(...dress({ x, z, w, d, h }, st, facing));
     const block = { role: 'city', id: blocks.length, x, z, w, d, h, tint, mesh: m, collider: null, built: false, noWake: cafe };
     if (cafe) CAFES.push({ x, z: z + facing * (d / 2 - CAFE_D / 2), w: w - 0.4, d: CAFE_D - 0.4, yaw: facing > 0 ? 0 : Math.PI, h: CAFE_H - 0.2 });
     // Shown as a box, or not (woken into a building of pieces: world.js).
@@ -196,7 +200,7 @@ function facadeStyles() {
   return [
     { map: stone, rough: 0.85, metal: 0 },
     { map: glass, rough: 0.15, metal: 0.4, glass: true },
-    { map: brick, rough: 0.9, metal: 0 },
+    { map: brick, rough: 0.9, metal: 0, brick: true },
   ];
 }
 
