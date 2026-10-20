@@ -70,7 +70,7 @@ export const JOBS = [
 export const TOOLS = [
   { id: 'sledge', name: 'Sledgehammer', kind: 'demolition', desc: 'Twelve pounds on a yard of hickory. Splinters wood, crumbles plaster, chips concrete — slowly.' },
   { id: 'bomb', name: 'Remote charges', kind: 'demolition', desc: 'A dozen charges and a detonator. Left click to stick one on, right click to set them all off.', unlockedBy: 'trump' },
-  { id: 'jackhammer', name: 'Jackhammer', kind: 'demolition', desc: 'Breaks concrete properly.', unlockedBy: 'bank', soon: true },
+  { id: 'jackhammer', name: 'Jackhammer', kind: 'demolition', desc: 'Hold it down on concrete and it chews through: columns, slabs, walls. Loud, and slow to walk with.', unlockedBy: 'bank' },
   { id: 'torch', name: 'Cutting torch', kind: 'demolition', desc: 'Cuts through steel.', unlockedBy: 'job3', soon: true },
   { id: 'spray', name: 'Spray can', kind: 'helper', desc: 'Mark what comes down first. Right click changes colour.' },
   { id: 'extinguisher', name: 'Fire extinguisher', kind: 'helper', desc: 'Puts out fires before they reach the gas.' },

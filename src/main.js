@@ -31,6 +31,10 @@ import { Senses } from './fx/senses.js';
 import { Pigeons } from './sim/pigeons.js';
 import { Heist } from './sim/heist.js';
 import { BankSecurity } from './sim/bank-security.js';
+import { wallet, dollars } from './data/wallet.js';
+import { FEE, HALL_BONUS } from './data/shop.js';
+import { COLOURS } from './damage/paint.js';
+import { PODIUM_FLOORS } from './building/plan.js';
 import { settings } from './data/settings.js';
 import { signs, places } from './building/shops.js';
 import { Topple } from './sim/topple.js';
@@ -244,6 +248,7 @@ const bang2 = blast.explode;
 blast.explode = (at, r, power) => { senses.blast(at, r); if (state === 'play') { wanted.offend(7, at); achieve.event('blast', power ?? 1); } security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); fear.scare(at, 25 * (power ?? 1), 0.8); return bang2(at, r, power); };
 let liftTip = null;
 let heistTip = null;
+let hallStart = 0;
 // The money, on a heist job (sim/heist.js): bags from the vault to the van, and
 // the van ends the job.
 const heist = new Heist({ scene, vmScene, pieces, player, input, hud, audio, onEscape: () => finish() });
@@ -337,7 +342,20 @@ async function start(jobId, toolIds, levelId = 'normal') {
   for (const t of tools) { t.model.visible = false; vmScene.add(t.model); }
   hud.setJob(job, difficulty.creative);
   player.revive();
-  player.disguised = false;
+  // What you have bought (data/shop.js): upgrades for the tools, a disguise worn
+  // from the start, the golden sledge, the paint.
+  const owns = (id) => wallet.owns(id);
+  ctx.upgrades = { heavySledge: owns('heavySledge'), bigCharges: owns('bigCharges'), horn: owns('horn') };
+  player.disguised = !difficulty.creative && !!wallet.wear;
+  heist.speeds = owns('strongBack') ? [1, 0.65, 0.35] : null;
+  for (const t of tools) {
+    if (t.id === 'bomb' && owns('moreCharges')) t.left += 4;
+    if (t.id === 'extinguisher' && owns('bigExtinguisher')) t.discharge *= 1.5;
+    if (t.id === 'spray' && owns('paints')) t.colours = [...COLOURS, { name: 'Gold', hex: 0xd8a830 }, { name: 'Hot pink', hex: 0xff3aa0 }, { name: 'Cyan', hex: 0x30d0e0 }, { name: 'Lime', hex: 0x90e020 }];
+    if (t.id === 'sledge') t.model.traverse((m) => { if (m.isMesh && m.geometry.type === 'BoxGeometry' && m.material.metalness > 0.3) { m.material = m.material.clone(); m.material.color.set(owns('goldSledge') ? 0xd8a830 : 0x3c3a38); m.material.metalness = owns('goldSledge') ? 0.9 : 0.6; m.material.roughness = owns('goldSledge') ? 0.25 : 0.65; } });
+  }
+  // The bank's stone hall, as it stands: kept, it earns a bonus.
+  hallStart = job.id === 'bank' ? pieces.list.filter((p) => p.building === 'tower' && p.floor >= 0 && p.floor < PODIUM_FLOORS && p.structural).length : 0;
   thrownT = -1;
   player.teleport(job.entry.x, 0.05, job.entry.z, job.entry.yaw);
   // Every shader the first blast needs, compiled now rather than in its frame.
@@ -457,6 +475,30 @@ function failed(why) {
   achieve.finish(false);
 }
 
+// What the job pays you, into your wallet (data/wallet.js): the fee; on a
+// heist, everything in the van over what the client wanted, and what you found
+// on the way; at the bank, a bonus for leaving the stone hall standing.
+function pay() {
+  if (difficulty.creative) return [];
+  const rows = [], fee = FEE[difficulty.id] ?? 100000;
+  let total = fee;
+  rows.push(['Your fee', dollars(fee)]);
+  if (heist.on) {
+    const cut = Math.max(0, heist.delivered - heist.need) + heist.found;
+    if (cut) { rows.push(['Your cut', dollars(cut)]); total += cut; }
+    for (const [what, n] of heist.bonuses) { rows.push([what, dollars(n)]); total += n; }
+    if (wallet.took(heist.delivered)) rows.push(['Most ever taken', dollars(heist.delivered)]);
+  }
+  if (job.id === 'bank' && hallStart) {
+    const left = pieces.list.filter((p) => p.building === 'tower' && p.floor >= 0 && p.floor < PODIUM_FLOORS && p.structural && p.state === 'static').length;
+    if (left >= hallStart * 0.8) { rows.push(['The stone hall kept', dollars(HALL_BONUS)]); total += HALL_BONUS; }
+    else rows.push(['The stone hall kept', 'no — the client is not pleased']);
+  }
+  wallet.earn(total);
+  rows.push(['Paid', dollars(total)], ['In your wallet', dollars(wallet.cash)]);
+  return rows;
+}
+
 function finish() {
   state = 'done';
   input.unlock();
@@ -474,6 +516,7 @@ function finish() {
       ['Still burning', `${fire.count}`],
       ...(heist.on ? [['Money taken', `$${heist.money(heist.delivered)} of $${heist.money(heist.total)} in the vault`]] : []),
       ...(wanted.on ? [['Wanted for', wanted.report().wantedFor]] : []),
+      ...pay(),
     ],
     unlocked: unlockedTool,
     extra: wanted.reportHtml(),
@@ -513,6 +556,8 @@ const SMOKE_AIR = { far: 4, colour: new THREE.Color(0x1d1b19) };
 function frame(dt) {
   const playing = state === 'play';
   if (playing && !player.dead) {
+    // The party horn, if you bought one: everyone looks, the pigeons go.
+    if (ctx.upgrades?.horn && input.pressed('KeyH')) { audio.horn?.(player.pos.x, player.pos.y + 1.5, player.pos.z); people.witness(player.pos); pigeons.scare(player.pos, 30); }
     // Tools: 1-5, or the wheel.
     for (let i = 0; i < tools.length; i++) if (input.pressed(`Digit${i + 1}`)) select(i);
     const w = input.takeWheel();

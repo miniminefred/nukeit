@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { sledgeModel, sprayModel, extinguisherModel, chargeModel, detonatorModel } from './viewmodels.js';
+import { sledgeModel, sprayModel, extinguisherModel, chargeModel, detonatorModel, jackhammerModel } from './viewmodels.js';
 import { spray, COLOURS } from '../damage/paint.js';
 
 // The things you can carry onto a job.
@@ -107,7 +107,7 @@ export class Sledge {
     const p = hit.owner;
     const sound = p.parts[ctx.damage.partAt(p, ctx.damage.toLocal(p, hit.point))]?.kind?.sound;
     this.feel = sound === 'concrete' || sound === 'marble' ? 'hard' : sound === 'steel' || sound === 'brass' || sound === 'mullion' ? 'ring' : 'soft';
-    const kind = ctx.damage.hit(p, hit.point, hit.normal, dir, 1);
+    const kind = ctx.damage.hit(p, hit.point, hit.normal, dir, ctx.upgrades?.heavySledge ? 1.4 : 1);
     this.lastHit = kind?.name ?? null;
     ctx.security?.noise(hit.point, 1, true);
     ctx.wanted?.struck(p, hit.point);
@@ -130,13 +130,15 @@ export class SprayCan {
     this.spraying = false;
   }
 
-  get colourName() { return COLOURS[this.colour].name; }
+  // The colours it has: the usual, and more if you bought them (main.js).
+  get palette() { return this.colours ?? COLOURS; }
+  get colourName() { return this.palette[this.colour].name; }
 
   update(dt, ctx) {
     const { input } = ctx;
     if (input.pressed('Mouse2')) {
-      this.colour = (this.colour + 1) % COLOURS.length;
-      this.model.userData.band.material.color.set(COLOURS[this.colour].hex);
+      this.colour = (this.colour + 1) % this.palette.length;
+      this.model.userData.band.material.color.set(this.palette[this.colour].hex);
       ctx.audio?.click();
     }
     const on = input.mouse.left && input.mouse.locked;
@@ -144,7 +146,7 @@ export class SprayCan {
     this.model.position.set(0.26, -0.26 + (on ? 0.02 : 0), -0.45);
     this.model.rotation.set(on ? 0.1 : 0.25, 0, 0.1);
     if (!on) return;
-    const hex = COLOURS[this.colour].hex;
+    const hex = this.palette[this.colour].hex;
     const { hit, dir, origin } = aim(ctx, 3.2);
     // Mist from the nozzle.
     const nozzle = origin.clone().addScaledVector(dir, 0.5).add(new THREE.Vector3(0.12, -0.12, 0).applyQuaternion(ctx.camera.quaternion));
@@ -282,7 +284,7 @@ export class Charges {
       if (this._t <= 0) {
         const c = this._chain.shift();
         c.mesh.removeFromParent();
-        ctx.blast.explode(c.at, 2.8);
+        ctx.blast.explode(c.at, 2.8 * (ctx.upgrades?.bigCharges ? 1.25 : 1), ctx.upgrades?.bigCharges ? 1.3 : 1);
         this._t = 0.12;
       }
     }
@@ -296,7 +298,7 @@ export class Charges {
     if (this._t <= 0) {
       const c = this._chain.shift();
       c.mesh.removeFromParent();
-      ctx.blast.explode(c.at, 2.8);
+      ctx.blast.explode(c.at, 2.8 * (ctx.upgrades?.bigCharges ? 1.25 : 1), ctx.upgrades?.bigCharges ? 1.3 : 1);
       this._t = 0.12;
     }
   }
@@ -309,4 +311,51 @@ export class Charges {
   }
 }
 
-export const TOOL_CLASSES = { sledge: Sledge, spray: SprayCan, extinguisher: Extinguisher, bomb: Charges };
+// ---------------------------------------------------------------- jackhammer
+
+// Hold it down on what is in front of you, low: it hammers away, shaking you
+// and the view, throwing grit and dust; every third of a second the bit bites
+// — concrete and stone it breaks far faster than a sledge, anything else it
+// only chips. You walk at a crawl while it runs, and it is loud.
+const BITE = 0.32;                   // s between bites
+export class Jackhammer {
+  constructor() {
+    this.id = 'jackhammer';
+    this.name = 'Jackhammer';
+    this.model = jackhammerModel();
+    this._t = 0;
+    this.running = false;
+  }
+
+  update(dt, ctx) {
+    const { input, player, particles } = ctx;
+    const on = input.mouse.left && input.mouse.locked;
+    const m = this.model;
+    m.position.set(0.05, -0.62 + (on ? 0.0 : 0.04), -0.9);
+    m.rotation.set(on ? 0.65 : 0.45, 0, 0);
+    if (on !== this.running) { this.running = on; player.burden = on ? 0.8 : 0; }
+    if (!on) return;
+    // The shudder.
+    m.position.x += (Math.random() - 0.5) * 0.02; m.position.y += (Math.random() - 0.5) * 0.02;
+    ctx.shake?.add(dt * 0.6);
+    const { hit, dir } = aim(ctx, 2.0);
+    if (hit && Math.random() < dt * 30) {
+      particles.spawn('dust', hit.point.x, hit.point.y, hit.point.z, (Math.random() - 0.5) * 1.5, Math.random() * 1.2, (Math.random() - 0.5) * 1.5, 0xb8b2a8);
+      if (Math.random() < 0.5) particles.spawn('spark', hit.point.x, hit.point.y, hit.point.z, (Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3, 0xffd8a0);
+    }
+    if ((this._t -= dt) > 0) return;
+    this._t = BITE;
+    ctx.audio?.hit(hit?.owner?.parts ? hit.owner.parts[0].kind.sound : 'concrete', ctx.camera.position.x, ctx.camera.position.y, ctx.camera.position.z, 0.7);
+    if (!hit || !hit.owner || !hit.owner.parts) return;
+    const p = hit.owner;
+    const sound = p.parts[ctx.damage.partAt(p, ctx.damage.toLocal(p, hit.point))]?.kind?.sound;
+    const hard = sound === 'concrete' || sound === 'marble';
+    ctx.damage.hit(p, hit.point, hit.normal, dir, hard ? 1.2 : 0.3);
+    ctx.security?.noise(hit.point, 1.5, true);
+    ctx.wanted?.struck(p, hit.point);
+  }
+
+  unequip(ctx) { this.running = false; ctx.player.burden = 0; }
+}
+
+export const TOOL_CLASSES = { sledge: Sledge, spray: SprayCan, extinguisher: Extinguisher, bomb: Charges, jackhammer: Jackhammer };

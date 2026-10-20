@@ -1,4 +1,5 @@
 import { tool } from './catalog.js';
+import { wallet } from './wallet.js';
 
 // Which jobs are done, kept in this browser. Storage can be missing or refuse
 // (a private window, blocked site data), so every access is guarded and the
@@ -27,6 +28,7 @@ export const progress = {
   earned: (jobId) => state.done.includes(`${jobId}:normal`) || state.done.includes(`${jobId}:hard`),
   unlocked(toolId) {
     const t = tool(toolId);
-    return !!t && !t.soon && (!t.unlockedBy || state.done.includes(t.unlockedBy));
+    // Bought in the shop, or earned by finishing the job that unlocks it.
+    return !!t && (wallet.owns(toolId) || (!t.soon && (!t.unlockedBy || state.done.includes(t.unlockedBy))));
   },
 };

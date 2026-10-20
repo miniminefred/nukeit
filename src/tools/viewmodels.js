@@ -139,3 +139,27 @@ export function detonatorModel() {
   g.add(body, btn, ant, charge, h);
   return g;
 }
+
+// A jackhammer: the yellow body, the T handle you hold it by with both hands,
+// the steel bit down to the floor.
+export function jackhammerModel() {
+  const g = new THREE.Group();
+  const yellow = new THREE.MeshStandardMaterial({ color: 0xe0b020, roughness: 0.5, metalness: 0.2 });
+  const body = new THREE.Mesh(new RoundedBoxGeometry(0.16, 0.42, 0.16, 2, 0.03), yellow);
+  body.position.y = -0.1;
+  const bar = new THREE.Mesh(cylinder(0.02, 0.6, 10), mat('metal', 0x2a2a2a));
+  bar.rotation.z = Math.PI / 2;
+  bar.position.y = 0.16;
+  const grips = [-0.28, 0.28].map((x) => { const m = new THREE.Mesh(cylinder(0.026, 0.14, 10), mat('leather', 0x222222)); m.rotation.z = Math.PI / 2; m.position.set(x, 0.16, 0); return m; });
+  const bit = new THREE.Mesh(cylinder(0.018, 0.5, 8), mat('metal', 0x8a8c8e));
+  bit.position.y = -0.55;
+  g.add(body, bar, ...grips, bit);
+  for (const x of [-0.27, 0.27]) {
+    const h = hand(0.026, new THREE.Vector3(x > 0 ? 0.2 : -0.2, -0.75, 0.6));
+    h.position.set(x, 0.16, 0);
+    h.rotation.z = Math.PI / 2;
+    g.add(h);
+  }
+  g.userData.bit = bit;
+  return g;
+}

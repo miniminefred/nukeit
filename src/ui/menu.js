@@ -3,6 +3,9 @@ import { progress } from '../data/progress.js';
 import { LEVELS, level as levelById } from '../data/difficulty.js';
 import { openSettings } from './settings.js';
 import { openAchievements } from './achievements.js';
+import { openShop } from './shop.js';
+import { wallet, dollars } from '../data/wallet.js';
+import { SHOP } from '../data/shop.js';
 
 // The menu you arrive in. Three pages:
 //
@@ -62,6 +65,10 @@ export class Menu {
     const st = el('button', 'quality', 'Settings');
     st.style.marginLeft = '8px';
     st.onclick = () => { this.onClick?.(); openSettings(this.onClick); };
+    const sh = el('button', 'quality', `Shop · ${dollars(wallet.cash)}`);
+    sh.style.marginLeft = '8px';
+    sh.onclick = () => { this.onClick?.(); openShop(this.onClick, () => this.render()); };
+    head.append(sh);
     const ac = el('button', 'quality', 'Achievements');
     ac.style.marginLeft = '8px';
     ac.onclick = () => { this.onClick?.(); openAchievements(this.onClick); };
@@ -179,6 +186,21 @@ export class Menu {
       grid.append(card);
     }
     page.append(grid);
+    // A disguise you own, worn from the start of the job.
+    const disguises = SHOP.filter((i) => i.kind === 'disguises' && wallet.owns(i.id));
+    if (disguises.length) {
+      page.append(el('h3', null, 'Wear'));
+      const row = el('div', null);
+      row.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px';
+      for (const d of [{ id: null, name: 'Your own clothes' }, ...disguises]) {
+        const on = wallet.wear === d.id;
+        const b = el('button', null, d.name);
+        b.style.cssText = `padding:8px 14px;border-radius:8px;border:1px solid ${on ? '#c9a043' : '#ffffff33'};background:${on ? '#c9a04333' : '#00000044'};color:#fff;cursor:pointer`;
+        b.onclick = () => { wallet.setWear(d.id); this.onClick?.(); this.render(); };
+        row.append(b);
+      }
+      page.append(row);
+    }
     page.append(el('h3', null, 'Helpers'));
     const help = el('div', 'tool-grid');
     for (const t of TOOLS.filter((x) => x.kind === 'helper')) {

@@ -51,7 +51,7 @@ export class Heist {
     this._carry.visible = this.bags > 0;
     this._carry.children[1].visible = this.bags > 1;
     if (!this.on) { player.cargo = 1; return null; }
-    player.cargo = SPEED[this.bags];
+    player.cargo = (this.speeds ?? SPEED)[this.bags];
     if (player.dead) { if (this.bags) this._drop(this.bags); return null; }
     let tip = null;
     // A pallet, or a bag on the floor, in reach.
@@ -173,6 +173,8 @@ export class Heist {
     if (this.van) { this.van.removeFromParent(); this.van = null; }
     this.bags = 0;
     this.delivered = 0;
+    this.found = 0;              // money picked up on the way: stashes, the safe (yours, not the client's)
+    this.bonuses = [];           // [what, dollars]: the books handed in, the statue
     this.down = false;
     this.on = false;
     if (this.fx.player) this.fx.player.cargo = 1;
