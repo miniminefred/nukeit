@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SITE } from './site.js';
 import { G_PLAYER } from './physics.js';
 
 // First person: look, walk, run, jump, climb stairs, get hurt.
@@ -150,7 +151,7 @@ export class Player {
       this.vel.y = 0;
     }
     this.pos.x += got.x; this.pos.y += got.y; this.pos.z += got.z;
-    if (this.pos.y < -5) { this.pos.set(0, 1, 20); this.vel.set(0, 0, 0); }
+    if (this.pos.y < -5) { this.pos.set(...SITE.respawn); this.vel.set(0, 0, 0); }
     this.body.setNextKinematicTranslation({ x: this.pos.x, y: this.pos.y, z: this.pos.z });
 
     this._hurt += dt;

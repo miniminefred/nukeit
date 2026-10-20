@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SITE } from '../site.js';
 
 // Pigeons: flocks on the pavements and the plaza in front of the tower,
 // walking about and pecking. Come within a few metres — or run at them — and
@@ -6,10 +7,8 @@ import * as THREE from 'three';
 // comes down somewhere else; a bang anywhere near puts every flock in the air.
 // Two instanced meshes, bodies and wings, for all of them.
 
-const SPOTS = [
-  [-12, 17], [9, 18], [-26, 22], [24, 21], [-50, 22], [46, 23], [-80, 22], [75, 21],
-  [-18, 46], [14, 45], [-42, 46], [38, 47], [-70, 45], [66, 46],
-];
+// Where flocks gather: the site's (site.js).
+const spots = () => SITE.pigeons;
 const FLOCK = [6, 12];
 const SCARE = 3.5, SCARE_RUN = 7;
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _s = new THREE.Vector3(1, 1, 1);
@@ -33,7 +32,7 @@ export class Pigeons {
   populate() {
     this.birds.length = 0;
     this.flocks.length = 0;
-    for (const [x, z] of SPOTS) {
+    for (const [x, z] of spots()) {
       if (Math.random() < 0.3) continue;
       const flock = { home: new THREE.Vector3(x, 0, z), up: false, t: 0, birds: [] };
       const n = FLOCK[0] + ((Math.random() * (FLOCK[1] - FLOCK[0])) | 0);
@@ -55,7 +54,7 @@ export class Pigeons {
     f.up = true;
     f.t = 6 + Math.random() * 6;
     // Somewhere else to come down.
-    const [x, z] = SPOTS[(Math.random() * SPOTS.length) | 0];
+    const S = spots(), [x, z] = S[(Math.random() * S.length) | 0];
     f.next = new THREE.Vector3(x, 0, z);
     f.centre = f.home.clone().lerp(f.next, 0.5).setY(14 + Math.random() * 10);
     for (const b of f.birds) {

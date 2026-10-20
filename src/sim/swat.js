@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { T, ROOF, TOP_FLOOR, FLOOR_H } from '../building/plan.js';
+import { SITE } from '../site.js';
 
 // SWAT, called for a threat to New York City (sim/wanted.js, law 8).
 //
@@ -20,9 +21,9 @@ import { T, ROOF, TOP_FLOOR, FLOOR_H } from '../building/plan.js';
 
 const SWAT = { leg: 0x15171c, hips: 0x15171c, body: 0x262a31, arm: 0x1c1f25, head: 0xc98f6a, hair: 0x0c0d10, skirt: 0x15171c };
 const SKIN = [0xf1d3bd, 0xe2b594, 0xc98f6a, 0x9c6a4a, 0x6e4a33];
-const VAN_STOP = new THREE.Vector3(1.5, 0, 17.5);   // on the pavement, at the doors
-const HOVER = new THREE.Vector3(0, T(ROOF) + 13, 0);
-const AVENUE = { z: 36, y: 80, reach: 45 };          // where it patrols, over the avenue
+// On the pavement at the doors; over the roof; the street to patrol (the site's).
+const vanStop = () => new THREE.Vector3(SITE.swat.stop[0], 0, SITE.swat.stop[1]);
+const hover = () => new THREE.Vector3(0, T(ROOF) + 13, 0);
 const SEE_BEAM = 0.075;   // rad: the beam's half-width, as you see it from the helicopter
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion();
@@ -83,10 +84,10 @@ export class Swat {
     g.add(body, screen, band, red, blue, ...doors, ...wheels);
     for (const m of g.children) m.castShadow = true;
     // Down the avenue the way the traffic goes (−x), nose first.
-    g.position.set(160, 0, 27.8);
+    g.position.set(SITE.swat.from, 0, SITE.swat.lane);
     g.rotation.y = -Math.PI / 2;
     this.fx.scene.add(g);
-    this.van = { g, red, blue, doors, x: 160, phase: 'drive', t: 0, out: 0 };
+    this.van = { g, red, blue, doors, x: SITE.swat.from, phase: 'drive', t: 0, out: 0 };
   }
 
   _driveVan(dt) {
@@ -99,20 +100,21 @@ export class Swat {
       // Flat out down the avenue, then a hard swing in towards the doors.
       v.x -= dt * 26;
       g.position.x = v.x;
-      if (v.x <= 16) { v.phase = 'turn'; v.t = 0; v.from = g.position.clone(); this.fx.audio?.horn?.(g.position.x, 1, g.position.z); }
+      if (v.x <= SITE.swat.turn) { v.phase = 'turn'; v.t = 0; v.from = g.position.clone(); this.fx.audio?.horn?.(g.position.x, 1, g.position.z); }
     } else if (v.phase === 'turn') {
       v.t = Math.min(1, v.t + dt / 1.6);
       const k = v.t, e = 1 - (1 - k) * (1 - k);
       // A curve from the lane, over the kerb, to the pavement by the doors.
-      const p0 = v.from, p1 = new THREE.Vector3(VAN_STOP.x + 4, 0, 27.8), p2 = VAN_STOP;
+      const p2 = vanStop(), p0 = v.from, p1 = new THREE.Vector3(p2.x + 4, 0, SITE.swat.lane);
       const a = _v.copy(p0).lerp(p1, e), b = _w.copy(p1).lerp(p2, e);
       g.position.copy(a.lerp(b, e));
       // Facing along the way it is going: from the avenue round to the doors.
       g.rotation.y = -Math.PI / 2 + (Math.PI / 2) * e;
       // Over the kerb: a jolt as it crosses.
       const z = g.position.z;
-      g.position.y = z < 26 && z > 24.4 ? Math.sin(((26 - z) / 1.6) * Math.PI) * 0.22 : 0;
-      g.rotation.x = z < 26 && z > 24.4 ? Math.cos(((26 - z) / 1.6) * Math.PI) * 0.06 : 0;
+      const [k0, k1] = SITE.swat.kerb, over = z < k1 && z > k0 ? (k1 - z) / (k1 - k0) : -1;
+      g.position.y = over >= 0 ? Math.sin(over * Math.PI) * 0.22 : 0;
+      g.rotation.x = over >= 0 ? Math.cos(over * Math.PI) * 0.06 : 0;
       if (k >= 1) { v.phase = 'stop'; v.t = 0; this.fx.audio?.thud?.(g.position.x, 0.5, g.position.z); this.fx.shake?.add(0.05); }
     } else if (v.phase === 'stop') {
       v.t += dt;
@@ -209,8 +211,9 @@ export class Swat {
     const pool = new THREE.Mesh(new THREE.CircleGeometry(1, 24), new THREE.MeshBasicMaterial({ color: 0xfff2c8, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.fx.scene.add(g, beam, pool);
     // In from the west along the avenue, then over the roof.
-    g.position.set(-320, 95, AVENUE.z);
-    const path = [new THREE.Vector3(0, 95, AVENUE.z), HOVER];
+    const A = SITE.swat.heli;
+    g.position.set(-320, A.y + 15, A.z);
+    const path = [new THREE.Vector3(0, A.y + 15, A.z), hover()];
     this.heli = { g, rotor, tail, beam, pool, phase: 'in', path, t: 0, ang: 0, sweep: 0, lit: 0, lock: 0, roped: 0, ropes: [] };
   }
 
@@ -226,13 +229,14 @@ export class Swat {
       goal = h.path[0];
       if (g.position.distanceTo(goal) < 1.5) { h.path.shift(); if (!h.path.length) { h.phase = 'rope'; h.t = 0; } }
     } else if (h.phase === 'rope') {
-      goal = HOVER;
+      goal = hover();
       this._rope(dt);
       if (h.t > 12) { h.phase = 'patrol'; h.t = 0; for (const r of h.ropes) r.removeFromParent(); h.ropes.length = 0; }
     } else {
       // Up and down the avenue, slowly, nose to the tower.
       h.ang += dt * 0.12;
-      goal = _w.set(Math.sin(h.ang) * AVENUE.reach, AVENUE.y + Math.sin(h.t * 0.3) * 4, AVENUE.z);
+      const A = SITE.swat.heli;
+      goal = _w.set(Math.sin(h.ang) * A.reach, A.y + Math.sin(h.t * 0.3) * 4, A.z);
     }
     const to = _v.copy(goal).sub(g.position);
     const d = to.length();
@@ -251,7 +255,7 @@ export class Swat {
     const roof = T(ROOF);
     if (!h.ropes.length) {
       for (const s of [-1, 1]) {
-        const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(s * 1.0, -1.3, 0), new THREE.Vector3(s * 1.0, roof - HOVER.y, 0)]);
+        const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(s * 1.0, -1.3, 0), new THREE.Vector3(s * 1.0, roof - hover().y, 0)]);
         const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x2a2a2a }));
         h.g.add(line);
         h.ropes.push(line);
@@ -260,9 +264,9 @@ export class Swat {
     if (h.roped < this.ropers && h.t > 1 + h.roped * 2.2) {
       const side = h.roped % 2 ? 1 : -1;
       const fig = new THREE.Mesh(new THREE.CapsuleGeometry(0.25, 1.1, 4, 8), new THREE.MeshStandardMaterial({ color: 0x1c1f25, roughness: 0.7 }));
-      fig.position.set(h.g.position.x + side, HOVER.y - 2.2, h.g.position.z);
+      fig.position.set(h.g.position.x + side, hover().y - 2.2, h.g.position.z);
       this.fx.scene.add(fig);
-      this.sliders.push({ fig, y: HOVER.y - 2.2, x: fig.position.x, z: fig.position.z });
+      this.sliders.push({ fig, y: hover().y - 2.2, x: fig.position.x, z: fig.position.z });
       h.roped++;
     }
     for (const s of this.sliders) {

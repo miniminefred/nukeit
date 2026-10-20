@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { T, FLOOR_H, CORE, PODIUM_FLOORS, TOP_FLOOR, LOWER, HQ } from '../building/plan.js';
+import { T, FLOOR_H, PODIUM_FLOORS, TOP_FLOOR, LOWER, HQ, STAIR_DOOR } from '../building/plan.js';
 import { BREAK_ROOM } from '../building/interiors.js';
+import { SITE } from '../site.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Swat } from './swat.js';
 
@@ -35,8 +36,9 @@ const GUARD = { leg: 0x1a1f2b, hips: 0x1a1f2b, body: 0x1d2a44, arm: 0x1d2a44, he
 const COP = { leg: 0x101624, hips: 0x101624, body: 0x16213a, arm: 0x16213a, head: 0xc98f6a, hair: 0x0b1020, skirt: 0x101624 };
 const SKIN = [0xf1d3bd, 0xe2b594, 0xc98f6a, 0x9c6a4a, 0x6e4a33];
 
-// Where guards stand their shift.
-const POSTS = [[0, -8, 8], [0, 8, -4], [LOWER, -14, 4], [1, -10, 0], [2, -6, -9], [HQ, -2, 6], [3, 6, -8], [4, -12, -6], [0, 16, 6]];
+// Where guards stand their shift: the site's posts, floors by number or by
+// name ('lower', 'hq').
+const posts = () => SITE.posts.map(([f, x, z]) => [f === 'lower' ? LOWER : f === 'hq' ? HQ : f, x, z]);
 
 const _v = new THREE.Vector3(), _w = new THREE.Vector3();
 
@@ -59,6 +61,7 @@ export class Security {
     this.clear();
     this.level = level;
     const { people } = this.fx;
+    const POSTS = posts();
     for (let n = 0; n < level.guards && n < POSTS.length; n++) {
       const [f, x, z] = POSTS[n];
       const at = people._spot(f, new THREE.Vector3(x, T(f), z), 1) ?? people._spot(f);
@@ -256,12 +259,13 @@ export class Security {
           // the first two search the lobby and the rest go up, a floor each.
           // Straight to the front of a revolving door, then through it — no
           // stepping round the glass beside it, which left them stuck outside.
-          const dx = a.id % 2 ? 1.4 : -1.4;
+          const D = SITE.doors;
+          const dx = D.x[a.id % D.x.length];
           a.state = 'running';
           a.speed = COP_RUN * 0.8;
           a.target ??= new THREE.Vector3();
-          if (a.pos.z > 13.4) a.target.set(dx, a.pos.y, 12.8);
-          else if (a.pos.z > 10.6) a.target.set(dx, T(0), 9.8);
+          if (a.pos.z > D.approach) a.target.set(dx, a.pos.y, D.outside);
+          else if (a.pos.z > D.through) a.target.set(dx, T(0), D.inside);
           else { a.mode = 'search'; a.target = null; if (a.id > 1) this._toFloor(a, Math.min(TOP_FLOOR, a.id - 1)); }
           break;
         }
@@ -480,7 +484,7 @@ export class Security {
     a.last = this.fx.player.pos.clone();
   }
 
-  _door(f) { return new THREE.Vector3(-3.3, T(f), CORE.z1 + 0.8); }
+  _door(f) { return new THREE.Vector3(STAIR_DOOR.x, T(f), STAIR_DOOR.z); }
 
   // Sirens on the avenue: the cars come down Fifth Avenue with their lights
   // going, pull in at the kerb in front of the tower, and the officers get out,
@@ -511,7 +515,7 @@ export class Security {
       car.add(body, door, cabin, red, blue);
       for (const m of car.children) m.castShadow = true;
       // In from up the avenue, one behind the other, nose first (traffic goes −x).
-      const c = { car, red, blue, x: 140 + k * 16, tx: -10 + k * 6.5, z: 27.8, v: 16, crew: Math.min(2, crew), parked: false };
+      const c = { car, red, blue, x: SITE.police.from + k * 16, tx: SITE.police.park + k * 6.5, z: SITE.police.lane, v: 16, crew: Math.min(2, crew), parked: false };
       crew -= c.crew;
       car.position.set(c.x, 0, c.z);
       car.rotation.y = -Math.PI / 2;
@@ -532,7 +536,7 @@ export class Security {
         c.parked = true;
         this.fx.audio?.thud?.(c.x, 0.5, c.z);
         for (let i = 0; i < c.crew; i++) {
-          const at = new THREE.Vector3(c.x + (i ? 1.0 : -1.0), 0.02, 25.6);
+          const at = new THREE.Vector3(c.x + (i ? 1.0 : -1.0), 0.02, SITE.police.out);
           const a = this.fx.people.agent(0, at, { ...COP, head: SKIN[(Math.random() * SKIN.length) | 0] }, 1 + Math.random() * 0.06);
           const id = this.agents.filter((b) => b.kind === 'cop').length;
           Object.assign(a, { kind: 'cop', arm: 'catch', mode: 'enter', cool: 0, seen: -99, last: null, daze: 0, angry: 0, id, yaw: Math.PI });

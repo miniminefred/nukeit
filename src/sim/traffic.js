@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SITE } from '../site.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { BATCH_DEPTH } from '../render/materials.js';
@@ -14,9 +15,10 @@ import { BATCH_DEPTH } from '../render/materials.js';
 // the whole avenue is three draw calls. The signals' lamps are drawn here, over
 // the signal heads that building/street.js put on the kerbs.
 
-const LANES = [28.3, 31.8, 35.6, 39.2];
+// The lanes and the stop line are the site's (site.js); LANES is read when cars are made.
+let LANES = [];
 const X0 = 160, X1 = -160;                 // they come in at X0 and leave at X1
-const STOP = 8;                            // x of the stop line before the crossing (traffic goes −x)
+let STOP = 8;                              // x of the stop line before the crossing (traffic goes −x)
 const CYCLE = [22, 4, 14];                 // s green, amber, red — for the cars
 const GAP = 2.5;                           // m kept to the one ahead, stopped
 const COUNT = 26;
@@ -109,6 +111,8 @@ export class Traffic {
   // After a job loads: the signal heads, and the avenue filled.
   attach(pieces) {
     this.clear();
+    LANES = SITE.street.lanes;
+    STOP = SITE.street.stop;
     this.signals = pieces.list.filter((p) => p.tag === 'signal');
     const kinds = Object.entries(KINDS).flatMap(([n, k]) => Array(k.weight).fill(n));
     for (let i = 0; i < COUNT; i++) {

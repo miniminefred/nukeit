@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SITE } from './site.js';
 import { Timer } from 'three';
 import { createRenderer, createScene, createCamera, createLights, createPost, handleResize, followShadow } from './scene.js';
 import { Physics } from './physics.js';
@@ -270,8 +271,8 @@ function openMenu() {
   senses.clear();
   menu.show('mode');
   // Behind the menu: the city, from the avenue.
-  camera.position.set(19, 2.2, 31);
-  camera.lookAt(0, 42, 0);
+  camera.position.set(...SITE.menuCamera.at);
+  camera.lookAt(...SITE.menuCamera.look);
 }
 
 async function start(jobId, toolIds, levelId = 'normal') {
@@ -516,7 +517,7 @@ function frame(dt) {
     rubble.update(dt);
     if (topple.active && !toppling) people.alarm(camera.position.clone().set(0, 20, 0), 90);
     // A building coming down is something people stop to watch from the street.
-    people.spectacle = topple.active || structure.collapsing ? _spectacle : null;
+    people.spectacle = topple.active || structure.collapsing ? _spectacle.set(...SITE.spectacle) : null;
     toppling = topple.active;
     people.update(dt);
     pigeons.update(dt, player);
@@ -637,7 +638,7 @@ function spareTip() {
   return ext.charge < 0.98 ? 'E — take the extinguisher' : 'A spare extinguisher (yours is still full)';
 }
 const _look = new THREE.Vector3();
-const _spectacle = new THREE.Vector3(0, 30, -4);
+const _spectacle = new THREE.Vector3();
 
 function tipFor(t) {
   if (!t) return '';

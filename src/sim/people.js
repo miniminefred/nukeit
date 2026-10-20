@@ -3,7 +3,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { G_LAND } from '../physics.js';
 import { INSTANCE_DEPTH } from '../render/materials.js';
 import { places } from '../building/shops.js';
-import { T, PODIUM_FLOORS, podiumFront, OUTLINE, inPoly, inCore, inAtrium, TOWER_COLUMNS, PODIUM_COLUMNS, clearOf } from '../building/plan.js';
+import { T, PODIUM_FLOORS, podiumFront, OUTLINE, inPoly, inCore, inAtrium, TOWER_COLUMNS, PODIUM_COLUMNS, clearOf, PODIUM, SHAFT, STAIR_DOOR, CROWD } from '../building/plan.js';
+import { SITE } from '../site.js';
 
 // The people in the building: shoppers in the boutiques and among the
 // jewellers' cases, diners at the Grill, a few in the offices, the family in
@@ -26,7 +27,7 @@ const G = 9.81;
 const HEAR = 26;                  // m: a blast this close sends people running
 const STEPS = 4;                  // m: how far ahead they check the way is clear
 const PER = { leg: 2, arm: 2, hand: 2, shoe: 2, shin: 2 };    // of each part a figure has; one of the rest
-const STREET = 26;
+// How many on the pavements, and where the pavements are: the site's (site.js).
 const MAX_PEOPLE = 420;           // the instanced meshes are made for this many
 const CIVILIANS = 330;            // at most this many in the building and on the street;
                                   // the rest of the room is for guards and police. Past what
@@ -44,7 +45,6 @@ function bang() {
   g.fillStyle = '#d8402a'; g.font = 'bold 38px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('!', 32, 32);
   return new THREE.CanvasTexture(c);
 }           // the instanced meshes are made for this many                // people on the avenue's pavements
-const PAVEMENTS = [21.5, 46.5];   // z down the middle of our pavement and the far one
 
 const SKIN = [0xf1d3bd, 0xe2b594, 0xc98f6a, 0x9c6a4a, 0x6e4a33];
 const HAIR = [0x1d1612, 0x3b2a1e, 0x6e4b2e, 0xb08a52, 0xd9c7a2, 0x8a8a8a];
@@ -54,7 +54,7 @@ const SHIRT = [0xf2f0ea, 0xdfe6ee, 0xe8dcc8];
 const SHOES = [0x111111, 0x2a1c12, 0x3a2a1e, 0x1a1a22, 0x6a2a20];
 
 // Where people are, by floor: how many, and whether they dress for it.
-const CROWD = { [-1]: 4, 0: 16, 1: 12, 2: 10, 3: 14, 4: 12, 5: 6, 6: 5, 7: 5, 8: 5, 9: 5, 10: 2, 11: 2, 12: 2, 13: 2, 14: 2, 15: 2, 16: 2 };
+// How many on each floor: the plan's CROWD.
 
 const _n = new THREE.Matrix4(), _o = new THREE.Matrix4();
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _w = new THREE.Vector3(), _s = new THREE.Vector3(1, 1, 1), _c = new THREE.Color();
@@ -127,7 +127,7 @@ export class People {
     this.physics.world.step(this.physics.events);
     for (const [f, n] of Object.entries(CROWD)) for (let i = 0; i < n; i++) this._spawn(+f);
     // And people on the pavements of the avenue, both sides, walking by.
-    for (let i = 0; i < STREET; i++) this._spawn(0, true);
+    for (let i = 0; i < SITE.street.walkers; i++) this._spawn(0, true);
     // And in the shops: staff at their posts, customers queuing, looking at
     // the shelves, sitting at the café tables.
     const want = { staff: 1, queue: 0.6, browse: 0.5, seat: 0.45 };
@@ -147,7 +147,7 @@ export class People {
 
   _spawn(f, street = false, fixed = null) {
     const side = Math.random() < 0.5 ? 0 : 1;
-    const at = fixed ?? (street ? new THREE.Vector3(-110 + Math.random() * 220, 0.003, PAVEMENTS[side] + (Math.random() - 0.5) * 4) : this._spot(f));
+    const at = fixed ?? (street ? new THREE.Vector3(-110 + Math.random() * 220, 0.003, SITE.street.pavements[side] + (Math.random() - 0.5) * 4) : this._spot(f));
     if (!at) return;
     const woman = Math.random() < 0.5;
     const pick = (a) => a[(Math.random() * a.length) | 0];
@@ -218,8 +218,8 @@ export class People {
       if (near) {
         const a = Math.random() * Math.PI * 2, d = far > 0 ? far + Math.random() * far : 2 + Math.random() * 7;
         x = near.x + Math.cos(a) * d; z = near.z + Math.sin(a) * d;
-      } else if (f < PODIUM_FLOORS) { x = -19 + Math.random() * 38; z = -11 + Math.random() * (podiumFront(f) - 11.5 + 11); }
-      else { x = -13 + Math.random() * 22; z = -8.5 + Math.random() * 15; }
+      } else if (f < PODIUM_FLOORS) { x = PODIUM.x0 + 1 + Math.random() * (PODIUM.x1 - PODIUM.x0 - 2); z = PODIUM.z0 + 1 + Math.random() * (podiumFront(f) - 0.5 - PODIUM.z0 - 1); }
+      else { x = SHAFT.x0 + 1 + Math.random() * (SHAFT.x1 - SHAFT.x0 - 2); z = SHAFT.z0 + 0.5 + Math.random() * (SHAFT.z1 - SHAFT.z0 - 1); }
       if (!this._inside(f, x, z)) continue;
       // Clear of whatever stands there: nothing between the floor and head height.
       const top = this._under(x, z, y + 1.8);
@@ -232,7 +232,7 @@ export class People {
   _inside(f, x, z) {
     if (inCore(x, z, 0.6)) return false;
     if (f < PODIUM_FLOORS) {
-      if (x < -19.3 || x > 19.3 || z < -11.3 || z > podiumFront(f) - 0.7) return false;
+      if (x < PODIUM.x0 + 0.7 || x > PODIUM.x1 - 0.7 || z < PODIUM.z0 + 0.7 || z > podiumFront(f) - 0.7) return false;
       if (f > 0 && inAtrium(x, z, 0.5)) return false;
       return clearOf(PODIUM_COLUMNS(f), x, z, 0.8);
     }
@@ -306,7 +306,7 @@ export class People {
       p.t += dt;
       if (p.stairT > 0) {
         p.stairT -= dt;
-        if (p.stairT <= 0) { p.hidden = false; p.f = 0; p.pos.set(-3.3 + Math.random() * 0.6, 0.3, 4.6); p.floorY = 0.3; p.wait = 0; }
+        if (p.stairT <= 0) { p.hidden = false; p.f = 0; p.pos.set(SITE.stairOut.x + Math.random() * 0.6, 0.3, SITE.stairOut.z); p.floorY = 0.3; p.wait = 0; }
         continue;
       }
       for (const a of alarms) {
@@ -412,8 +412,8 @@ export class People {
     if (p.panic === 'hide') { p.hide = true; p.target = null; return true; }
     if (p.panic === 'film') { p.armUp = 1; p.target = null; if (this._focus) p.yaw = Math.atan2(this._focus.at.x - p.pos.x, this._focus.at.z - p.pos.z); return true; }
     let goal;
-    if (p.panic === 'lifts') goal = _w.set(1.2 + (p.phase % 2), y, 4.8 + (p.phase % 1.5));
-    else goal = p.f === 0 ? _w.set((p.phase % 3) - 1.5, y, 13.5) : _w.set(-3.3, y, 4.4);   // the front doors; the stair door
+    if (p.panic === 'lifts') goal = _w.set(SITE.liftCrowd.x + (p.phase % 2), y, SITE.liftCrowd.z + (p.phase % 1.5));
+    else goal = p.f === 0 ? _w.set((p.phase % 3) - 1.5, y, SITE.doors.exit) : _w.set(STAIR_DOOR.x, y, STAIR_DOOR.z + 0.1);   // the front doors; the stair door
     const to = _v.copy(goal).sub(p.pos).setY(0), d = to.length();
     if (d < 0.5) {
       if (p.panic === 'exit') {
@@ -421,7 +421,7 @@ export class People {
         else {
           // Out of the front doors: across the avenue to watch from the far pavement.
           p.street = true; p.side = 1; p.watchTower = true; p.panic = null; p.handsUp = false;
-          p.pos.set(p.pos.x, 0.003, 14); p.floorY = 0;
+          p.pos.set(p.pos.x, 0.003, SITE.evacuate.out); p.floorY = 0;
           this.evacuated = (this.evacuated ?? 0) + 1;
         }
       }
@@ -446,7 +446,8 @@ export class People {
     if (p.watchTower) {
       // Got out: across the avenue to a spot on the far pavement, then turn and
       // watch the tower — some of them filming it.
-      p.spot ??= new THREE.Vector3(-14 + Math.random() * 28, 0.003, 44.5 + Math.random() * 3);
+      const W = SITE.evacuate.watch;
+      p.spot ??= new THREE.Vector3(W.x0 + Math.random() * (W.x1 - W.x0), 0.003, W.z0 + Math.random() * (W.z1 - W.z0));
       const to = _v.copy(p.spot).sub(p.pos).setY(0), d = to.length();
       if (d > 0.4) {
         to.divideScalar(d);
@@ -456,7 +457,7 @@ export class People {
         p.target = p.spot;
       } else {
         p.target = null;
-        p.yaw = Math.atan2(0 - p.pos.x, 0 - p.pos.z);
+        p.yaw = Math.atan2(SITE.evacuate.look[0] - p.pos.x, SITE.evacuate.look[1] - p.pos.z);
         p.filming ??= Math.random() < 0.45;
         p.armUp = p.filming ? 1 : 0;
       }
@@ -475,7 +476,7 @@ export class People {
     }
     p.armUp = Math.max(0, (p.armUp ?? 0) - dt * 2);
     const speed = running ? RUN : p.speed;
-    const z = PAVEMENTS[p.side] + Math.sin(p.phase * 0.05 + p.side) * 1.2;
+    const z = SITE.street.pavements[p.side] + Math.sin(p.phase * 0.05 + p.side) * 1.2;
     p.target = _w.set(p.pos.x + p.dir * 10, p.pos.y, z);
     const to = _v.copy(p.target).sub(p.pos).setY(0), d = to.length();
     to.divideScalar(d);

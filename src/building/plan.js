@@ -37,6 +37,9 @@ export let podiumFront = (f) => 12;
 export const CORE = { x0: -5, x1: 5, z0: -3.5, z1: 3.5, t: 0.4 };
 export const LIFT = { x0: 0.2, x1: 4.6, z0: -3.1, z1: 3.1, door0: 0.9, door1: 3.4 };
 export const ATRIUM = { x0: 10, x1: 15, z0: -7, z1: 7, top: 4 };
+// The stair's door out of the core, on every floor: where anyone taking the
+// stairs goes in and comes out.
+export const STAIR_DOOR = { x: -3.3, z: 4.3 };
 export const OUTLINE = [];
 export const TOWER_COLUMNS = [];
 export let PODIUM_COLUMNS = (f) => [];
@@ -46,6 +49,8 @@ export let RESIDENCES = 10;
 export let PENTHOUSE = 15;
 export let PROGRAMME = {};
 export let floorUse = (f) => PROGRAMME[f] ?? '';
+// How many people on each floor.
+export let CROWD = {};
 
 // Where the ground is under (x, z): the pit's floor under the podium, the
 // street everywhere else. What stands on the ground stands on this.
@@ -76,6 +81,7 @@ export function usePlan(p) {
   Object.assign(CORE, p.core);
   Object.assign(LIFT, p.lift);
   Object.assign(ATRIUM, p.atrium);
+  Object.assign(STAIR_DOOR, p.stairDoor);
   OUTLINE.length = 0;
   OUTLINE.push(...p.outline.map(([x, z]) => new THREE.Vector3(x, 0, z)));
   TOWER_COLUMNS.length = 0;
@@ -85,6 +91,7 @@ export function usePlan(p) {
   RESIDENCES = p.residences ?? RESIDENCES;
   PENTHOUSE = p.penthouse ?? p.topFloor - 1;
   PROGRAMME = p.programme;
+  CROWD = p.crowd;
   floorUse = p.floorUse ?? ((f) => PROGRAMME[f] ?? '');
 }
 
@@ -114,6 +121,7 @@ export const TRUMP = {
   core: T_CORE,
   lift: { x0: 0.2, x1: 4.6, z0: -3.1, z1: 3.1, door0: 0.9, door1: 3.4 },
   atrium: T_ATRIUM,
+  stairDoor: { x: -3.3, z: T_CORE.z1 + 0.8 },
   outline: (() => {
     const pts = [[-14, -9], [10, -9]];
     for (const b of [-9, -5, -1, 3]) pts.push([12, b + 2], [10, b + 4]);
@@ -138,6 +146,7 @@ export const TRUMP = {
       }
     return out;
   },
+  crowd: { [LOWER]: 4, 0: 16, 1: 12, 2: 10, 3: 14, 4: 12, 5: 6, 6: 5, 7: 5, 8: 5, 9: 5, 10: 2, 11: 2, 12: 2, 13: 2, 14: 2, 15: 2, 16: 2 },
   hq: T_HQ,
   residences: T_RES,
   penthouse: T_PENT,
