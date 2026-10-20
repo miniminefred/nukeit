@@ -23,6 +23,7 @@ export const CAFES = [];
 const CAFE_H = 4.6, CAFE_D = 9;
 
 export function buildCity(scene, physics) {
+  CAFES.length = 0;
   const group = new THREE.Group();
   group.name = 'city';
 

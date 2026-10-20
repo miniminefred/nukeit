@@ -6,11 +6,13 @@ import { buildBlock } from './building/block.js';
 // The world: a city that is scenery, and one job site in the middle of it made
 // of pieces you can break.
 //
-// The city is built once. The building is built when a job starts and thrown
-// away when you leave, so taking the job again gives it back to you standing.
+// Each job has its own city (Fifth Avenue's is scenery/city.js), built when the
+// job is first taken and kept while the same city is wanted. The building is
+// built when a job starts and thrown away when you leave, so taking the job
+// again gives it back to you standing.
 
 export function createWorld(scene, physics) {
-  const city = buildCity(scene, physics);
+  let city = buildCity(scene, physics), cityOf = buildCity;
   const pieces = new Pieces(scene, physics);
   const woken = [];
 
@@ -18,6 +20,21 @@ export function createWorld(scene, physics) {
     pieces,
     physics,
     blocks: city.blocks,
+
+    // The job's city: the one standing if it is the same, else the old one
+    // taken down — its meshes, its colliders — and the new one put up.
+    setCity(build = buildCity) {
+      if (build === cityOf) return;
+      this.unload();
+      for (const b of city.blocks) for (const c of [b.collider, b.under]) if (c) physics.removeCollider(c);
+      city.group.removeFromParent();
+      city.group.traverse((o) => { o.geometry?.dispose(); if (o.material) for (const m of [].concat(o.material)) { m.map?.dispose(); m.dispose(); } });
+      city.dispose?.();
+      city = build(scene, physics);
+      cityOf = build;
+      this.blocks = city.blocks;
+      physics.world.step(physics.events);
+    },
 
     // A city block becomes a building of pieces: the box goes, and in its
     // place a frame, a core, floors and a curtain wall of its size.

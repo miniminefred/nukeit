@@ -51,6 +51,10 @@ export let PROGRAMME = {};
 export let floorUse = (f) => PROGRAMME[f] ?? '';
 // How many people on each floor.
 export let CROWD = {};
+// The building's parts as its people call them, by floor (sim/fear.js), and
+// the floors with the lounge music on (main.js).
+export let ZONES = [];
+export let LOUNGE = (f) => false;
 
 // Where the ground is under (x, z): the pit's floor under the podium, the
 // street everywhere else. What stands on the ground stands on this.
@@ -92,6 +96,8 @@ export function usePlan(p) {
   PENTHOUSE = p.penthouse ?? p.topFloor - 1;
   PROGRAMME = p.programme;
   CROWD = p.crowd;
+  ZONES = p.zones;
+  LOUNGE = p.lounge;
   floorUse = p.floorUse ?? ((f) => PROGRAMME[f] ?? '');
 }
 
@@ -147,6 +153,17 @@ export const TRUMP = {
     return out;
   },
   crowd: { [LOWER]: 4, 0: 16, 1: 12, 2: 10, 3: 14, 4: 12, 5: 6, 6: 5, 7: 5, 8: 5, 9: 5, 10: 2, 11: 2, 12: 2, 13: 2, 14: 2, 15: 2, 16: 2 },
+  zones: [
+    { name: 'the lower level', floors: (f) => f < 0 },
+    { name: 'the lobby', floors: (f) => f === 0 },
+    { name: 'the shops', floors: (f) => f >= 1 && f <= 2 },
+    { name: 'the food court', floors: (f) => f === 3 },
+    { name: 'the Grill', floors: (f) => f === 4 },
+    { name: 'the offices', floors: (f) => f >= 5 && f < T_RES },
+    { name: 'the apartments', floors: (f) => f >= T_RES },
+  ],
+  // The public floors (but the food court) and the apartments are warm.
+  lounge: (f) => (f >= 0 && f <= 4 && f !== 3) || f >= T_HQ,
   hq: T_HQ,
   residences: T_RES,
   penthouse: T_PENT,

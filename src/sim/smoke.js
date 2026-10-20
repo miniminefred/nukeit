@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FLOOR_H, PODIUM_FLOORS, TOP_FLOOR, LOWER, U, ATRIUM, CORE, OUTLINE, inPoly, podiumFront } from '../building/plan.js';
+import { FLOOR_H, PODIUM_FLOORS, TOP_FLOOR, LOWER, U, ATRIUM, CORE, OUTLINE, inPoly, podiumFront, PODIUM, BASEMENT } from '../building/plan.js';
 
 // Smoke that fills a building.
 //
@@ -16,8 +16,9 @@ import { FLOOR_H, PODIUM_FLOORS, TOP_FLOOR, LOWER, U, ATRIUM, CORE, OUTLINE, inP
 // your head in it you can barely see; crouch, and you are under it.
 
 const C = 2;                                 // m, a cell
-const X0 = -20, Z0 = -12, NX = 20, NZ = 12;  // the podium's plan; the tower's is inside it
-const FLOORS = TOP_FLOOR - LOWER + 1;
+// The grid covers the podium's plan (the tower's is inside it), every floor:
+// set for each job's building (`_grid`).
+let X0 = -20, Z0 = -12, NX = 20, NZ = 12, FLOORS = 18;
 const SPREAD = 0.55;                         // of the difference with its neighbours evened out per second
 const VENT = 0.6;                            // per second, out of a cell open to the air
 const RISE = 0.5;                            // per second, up a shaft to the floor above
@@ -30,21 +31,9 @@ export class Smoke {
   constructor(scene, pieces, fx) {
     this.pieces = pieces;
     this.fx = fx;                            // { particles }
-    this.d = new Float32Array(FLOORS * NX * NZ);
-    this.inside = new Uint8Array(FLOORS * NX * NZ);   // 0 outside, 1 floor, 2 shaft (stair, atrium)
     this.active = new Set();                 // storeys with any smoke
     this._tick = 0;
-    for (let f = LOWER; f <= TOP_FLOOR; f++) for (let i = 0; i < NX; i++) for (let k = 0; k < NZ; k++) {
-      const x = X0 + (i + 0.5) * C, z = Z0 + (k + 0.5) * C;
-      const n = this._n(f, i, k);
-      let inside;
-      if (f === LOWER || f < PODIUM_FLOORS) inside = z < (f === LOWER ? 12 : podiumFront(f));
-      else inside = inPoly(OUTLINE, x, z);
-      if (!inside) continue;
-      const stair = x > CORE.x0 && x < 0 && z > CORE.z0 && z < CORE.z1;
-      const atrium = f >= 0 && f < PODIUM_FLOORS - 1 && x > ATRIUM.x0 && x < ATRIUM.x1 && z > ATRIUM.z0 && z < ATRIUM.z1;
-      this.inside[n] = stair || atrium ? 2 : 1;
-    }
+    this._grid();
     this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({
       color: 0x26231f, transparent: true, opacity: 0.78, depthWrite: false, side: THREE.DoubleSide, fog: true,
     }), MAX_BOXES);
@@ -56,8 +45,32 @@ export class Smoke {
 
   // After a job loads: which window panes open each cell to the air when they
   // break. A pane belongs to the cell just inside it.
+  // The grid for the building in force (building/plan.js): which cells are
+  // inside it, and which are a shaft smoke rises up (the stair, the atrium).
+  _grid() {
+    let front = BASEMENT.z1;
+    for (let f = 0; f < PODIUM_FLOORS; f++) front = Math.max(front, podiumFront(f));
+    X0 = PODIUM.x0; Z0 = PODIUM.z0;
+    NX = Math.ceil((PODIUM.x1 - PODIUM.x0) / C); NZ = Math.ceil((front - PODIUM.z0) / C);
+    FLOORS = TOP_FLOOR - LOWER + 1;
+    this.d = new Float32Array(FLOORS * NX * NZ);
+    this.inside = new Uint8Array(FLOORS * NX * NZ);   // 0 outside, 1 floor, 2 shaft (stair, atrium)
+    for (let f = LOWER; f <= TOP_FLOOR; f++) for (let i = 0; i < NX; i++) for (let k = 0; k < NZ; k++) {
+      const x = X0 + (i + 0.5) * C, z = Z0 + (k + 0.5) * C;
+      const n = this._n(f, i, k);
+      let inside;
+      if (f === LOWER || f < PODIUM_FLOORS) inside = z < (f === LOWER ? BASEMENT.z1 : podiumFront(f));
+      else inside = inPoly(OUTLINE, x, z);
+      if (!inside) continue;
+      const stair = x > CORE.x0 && x < (CORE.x0 + CORE.x1) / 2 && z > CORE.z0 && z < CORE.z1;
+      const atrium = f >= 0 && f <= ATRIUM.top && x > ATRIUM.x0 && x < ATRIUM.x1 && z > ATRIUM.z0 && z < ATRIUM.z1;
+      this.inside[n] = stair || atrium ? 2 : 1;
+    }
+  }
+
   attach() {
     this.clear();
+    this._grid();
     this.panes = new Map();
     for (const p of this.pieces.list) {
       if (p.role !== 'glass' || p.building !== 'tower' || p.kind.name !== 'glass') continue;

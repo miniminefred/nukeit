@@ -1,5 +1,8 @@
 import { ACHIEVEMENTS, TIERS, record } from '../data/achievements.js';
-import { T, ROOF, TOP_FLOOR, PODIUM_FLOORS } from '../building/plan.js';
+import { T, ROOF, TOP_FLOOR, PODIUM_FLOORS, PODIUM, BASEMENT } from '../building/plan.js';
+
+// Over the building's plot.
+const onSite = (p) => p.x > PODIUM.x0 - 2 && p.x < PODIUM.x1 + 2 && p.z > PODIUM.z0 - 2 && p.z < BASEMENT.z1 + 2;
 import { progress } from '../data/progress.js';
 
 // Watching for the achievements (data/achievements.js) while you play, in
@@ -94,7 +97,7 @@ export class Achieve {
     if (lift?.inside(player.pos) && Math.abs(lift.y - T(TOP_FLOOR)) < 0.3) this.flags.rodeTop = true;
     // Inside the tower when it starts to come down; alive when it has.
     const falling = topple.active || structure.collapsing;
-    if (falling && !this.flags.wasFalling) this.flags.inside = Math.abs(player.pos.x) < 22 && Math.abs(player.pos.z) < 14 && player.pos.y > 1 && !player.dead;
+    if (falling && !this.flags.wasFalling) this.flags.inside = onSite(player.pos) && player.pos.y > 1 && !player.dead;
     if (!falling && this.flags.wasFalling && this.flags.inside && !player.dead) this.earn('survivor');
     if (topple.active) this.flags.toppled = true;
     if (structure.collapsing) this.flags.pancaked = true;
@@ -108,7 +111,7 @@ export class Achieve {
     if (gone('waterfall')) this.earn('waterfall');
     if (gone('oven') && gone('freezer')) this.earn('lunch');
     if (this.flags.rodeTop && gone('penthousepiano')) this.earn('penthouse');
-    if (player.pos.y > T(ROOF) - 0.5 && !player.dead && Math.abs(player.pos.x) < 22 && Math.abs(player.pos.z) < 14) this.earn('sightseer');
+    if (player.pos.y > T(ROOF) - 0.5 && !player.dead && onSite(player.pos)) this.earn('sightseer');
     if (this.flags.main && water.heads.filter((h) => h.open).length >= 20) this.earn('flood');
     // The tower alone below 10 m.
     let top = 0;

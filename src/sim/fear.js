@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FLOOR_H, T, PODIUM_FLOORS, HQ, RESIDENCES } from '../building/plan.js';
+import { FLOOR_H, T, ZONES } from '../building/plan.js';
 
 // How scared the people in the tower are: one meter for the whole building,
 // 0 (calm) to 100 (panic), and a line under it that sums up the tower's mood.
@@ -18,15 +18,7 @@ import { FLOOR_H, T, PODIUM_FLOORS, HQ, RESIDENCES } from '../building/plan.js';
 // the police sooner, and the guards out of their break room (sim/security.js).
 // A children's game: nobody cries or screams.
 
-const ZONES = [
-  { name: 'the lower level', floors: (f) => f < 0 },
-  { name: 'the lobby', floors: (f) => f === 0 },
-  { name: 'the shops', floors: (f) => f >= 1 && f <= 2 },
-  { name: 'the food court', floors: (f) => f === 3 },
-  { name: 'the Grill', floors: (f) => f === 4 },
-  { name: 'the offices', floors: (f) => f >= 5 && f < RESIDENCES },
-  { name: 'the apartments', floors: (f) => f >= RESIDENCES },
-];
+// The building's parts, by floor, as its people call them: the plan's ZONES.
 const zoneOf = (y) => { const f = Math.floor((y - 0.3) / FLOOR_H); return Math.max(0, ZONES.findIndex((z) => z.floors(f))); };
 
 const BANDS = ['Calm', 'Nervous', 'Scared', 'Panic'];
@@ -80,7 +72,7 @@ export class Fear {
   }
 
   reset() {
-    this.zone.fill(0); this.level = 0; this.quiet = 0; this._lineT = 0; this._pa = 30; this._fires = 0;
+    this.zone = ZONES.map(() => 0); this.level = 0; this.quiet = 0; this._lineT = 0; this._pa = 30; this._fires = 0;
     this.whole = null; this.wreck = 0; this._wreckT = 0;
   }
 

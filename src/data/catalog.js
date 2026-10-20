@@ -1,6 +1,9 @@
-import { buildTower, ENTRY as TOWER_ENTRY, SITE as TOWER_SITE } from '../building/tower.js';
+import { buildTower, ENTRY as TOWER_ENTRY } from '../building/tower.js';
 import { buildNeighbour } from '../building/neighbour.js';
 import { buildStreet } from '../building/street.js';
+import { TRUMP } from '../building/plan.js';
+import { FIFTH_AVENUE } from '../site.js';
+import { buildCity } from '../scenery/city.js';
 
 // Trump Tower, and the office block next door that it can be felled into.
 function trumpAndNeighbour(P) {
@@ -23,8 +26,10 @@ export const JOBS = [
     storeys: 17,
     height: 72,
     build: trumpAndNeighbour,
+    plan: TRUMP,              // the building's floor plan (building/plan.js)
+    site: FIFTH_AVENUE,       // where things are on the map (site.js)
+    city: buildCity,          // the city round it
     entry: TOWER_ENTRY,
-    site: TOWER_SITE,
     unlocks: 'bomb',
   },
   { id: 'job2', title: 'Coming soon', locked: true },

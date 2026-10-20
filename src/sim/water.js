@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FLOOR_H, PODIUM_FLOORS, TOP_FLOOR, LOWER, T, U, ATRIUM, OUTLINE, inPoly, inCore, podiumFront } from '../building/plan.js';
+import { FLOOR_H, PODIUM_FLOORS, TOP_FLOOR, LOWER, T, U, ATRIUM, OUTLINE, inPoly, inCore, podiumFront, PODIUM, BASEMENT } from '../building/plan.js';
 import { interiorEnvironment } from '../render/materials.js';
 
 // Sprinklers, the pipes that feed them, the water they let go, and the alarm.
@@ -30,8 +30,8 @@ const UP = new THREE.Vector3(0, 1, 0);
 function onFloor(f, x, z) {
   if (inCore(x, z, 0.6)) return false;
   if (f < PODIUM_FLOORS) {
-    if (x < -19.5 || x > 19.5 || z < -11.5 || z > podiumFront(f) - 0.5) return false;
-    if (f >= 1 && x > ATRIUM.x0 - 0.3 && x < ATRIUM.x1 + 0.3 && z > ATRIUM.z0 - 0.3 && z < ATRIUM.z1 + 0.3) return false;
+    if (x < PODIUM.x0 + 0.5 || x > PODIUM.x1 - 0.5 || z < PODIUM.z0 + 0.5 || z > podiumFront(f) - 0.5) return false;
+    if (f >= 1 && f <= ATRIUM.top && x > ATRIUM.x0 - 0.3 && x < ATRIUM.x1 + 0.3 && z > ATRIUM.z0 - 0.3 && z < ATRIUM.z1 + 0.3) return false;
     return true;
   }
   return inPoly(OUTLINE, x, z) && inPoly(OUTLINE, x + 0.6, z) && inPoly(OUTLINE, x - 0.6, z) && inPoly(OUTLINE, x, z + 0.6) && inPoly(OUTLINE, x, z - 0.6);
@@ -81,7 +81,7 @@ export class Water {
     const slabOver = (x, y, z) => slabs.find((s) => Math.abs(s.box.min.y - y) < 0.12 && x > s.box.min.x && x < s.box.max.x && z > s.box.min.z && z < s.box.max.z);
     for (let f = LOWER; f <= TOP_FLOOR && this.heads.length < MAX_HEADS; f++) {
       const top = U(f);
-      for (let x = -19; x <= 19; x += HEAD_GAP) for (let z = -11; z <= 11; z += HEAD_GAP) {
+      for (let x = PODIUM.x0 + 1; x <= PODIUM.x1 - 1; x += HEAD_GAP) for (let z = PODIUM.z0 + 1; z <= BASEMENT.z1 - 1 + Math.max(0, podiumFront(0) - BASEMENT.z1); z += HEAD_GAP) {
         const hx = x + ((f & 1) ? HEAD_GAP / 2 : 0);
         if (!onFloor(f, hx, z)) continue;
         const under = slabOver(hx, top, z);

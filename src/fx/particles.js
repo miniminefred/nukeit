@@ -224,7 +224,7 @@ class Pool {
 // air altogether, which thickens the fog so that the far side of the city
 // fades out behind a collapse. Pieces hidden in the cloud are not redrawn
 // (sim/rubble.js): the cloud is an occluder, the way a wall is.
-const CELL = 4, NX = 48, NY = 18, NZ = 48;          // 192 x 72 x 192 m
+const CELL = 4, NX = 48, NY = 34, NZ = 48;          // 192 x 136 x 192 m: a tower of 120 m and its dust
 const OX = -NX * CELL / 2, OZ = -NZ * CELL / 2;
 const HIDDEN = 0.12;                                  // transmittance below which a point is hidden
 

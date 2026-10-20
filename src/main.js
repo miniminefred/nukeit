@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { SITE } from './site.js';
+import { SITE, useSite } from './site.js';
+import { usePlan, PODIUM, BASEMENT, LOUNGE } from './building/plan.js';
 import { Timer } from 'three';
 import { createRenderer, createScene, createCamera, createLights, createPost, handleResize, followShadow } from './scene.js';
 import { Physics } from './physics.js';
@@ -287,6 +288,11 @@ async function start(jobId, toolIds, levelId = 'normal') {
   screens.loading('Clearing the site', 0.05);
   await frames(2);
   unloadJob();
+  // The job's plan, its map and its city, and the ground cut for its pit.
+  usePlan(job.plan);
+  useSite(job.site);
+  world.setCity(job.city);
+  physics.pit();
   screens.loading(`Building ${job.title}`, 0.3);
   await frames(2);
   signs.clear();
@@ -579,8 +585,8 @@ function frame(dt) {
   // Inside, on the floors where money is spent, there is music and talk.
   if (state === 'play' && job) {
     const at = player.pos, f = Math.floor((at.y + 0.5) / 4);
-    const inside = Math.abs(at.x) < 20 && at.z > -12 && at.z < 12;
-    const lounge = inside && ((f >= 0 && f <= 4 && f !== 3) || f >= 9) && !structure.collapsing && !topple.active;
+    const inside = at.x > PODIUM.x0 && at.x < PODIUM.x1 && at.z > PODIUM.z0 && at.z < BASEMENT.z1;
+    const lounge = inside && LOUNGE(f) && !structure.collapsing && !topple.active;
     lounging = lounge;
     audio.ambience(inside ? people.crowdAt(at) : 0, lounge ? 1 : 0);
   } else audio.ambience(0, 0);

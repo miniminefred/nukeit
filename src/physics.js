@@ -114,12 +114,23 @@ export class Physics {
         if (x >= -40 && x < 40 && z >= -40 && z < 40) continue;
         slab(x, x + 40, z, z + 40, 0);
       }
-    const B = BASEMENT;
+    this._slab = slab;
+    this.pit();
+  }
+
+  // The middle of the ground, cut round the job's pit (plan.js BASEMENT): again
+  // for each job, whose building has its own.
+  pit() {
+    for (const h of this._pit ?? []) { const c = this.world.getCollider(h); if (c) this.world.removeCollider(c, false); this.ground.delete(h); }
+    const n = this.ground.size;
+    const B = BASEMENT, slab = this._slab;
     slab(-40, 40, -40, B.z0, 0);
     slab(-40, 40, B.z1, 40, 0);
     slab(-40, B.x0, B.z0, B.z1, 0);
     slab(B.x1, 40, B.z0, B.z1, 0);
     slab(B.x0, B.x1, B.z0, B.z1, -B.depth);
+    this._pit = [...this.ground].slice(n);
+    this.dirty = true;
   }
 
   // --------------------------------------------------------- colliders
