@@ -27,6 +27,10 @@ export const HALL_XS = [-24, -18, -12, -5, 0, 5, 12, 18, 24];
 export const HALL_ZS = [-16, -10, -3.5, 3.5, 8, 14];
 export const TOWER_XS = [-12, -5, 0, 5, 12];
 export const TOWER_ZS = [-10, -3.5, 3.5, 8];
+// The tower's columns: the slab grid's, and more between — a stiffer frame
+// than Trump Tower's, so it takes more charges to cut a storey.
+export const TOWER_COL_XS = [-12, -8.5, -5, 0, 5, 8.5, 12];
+export const TOWER_COL_ZS = [-10, -6.75, -3.5, 3.5, 8];
 
 export const BANK = {
   podiumFloors: 7,
@@ -42,7 +46,7 @@ export const BANK = {
   outline: [[-12, -10], [12, -10], [12, 8], [-12, 8]],
   towerColumns: () => {
     const out = [];
-    for (const x of TOWER_XS) for (const z of TOWER_ZS) if (!inR(CORE, x, z, 0.5)) out.push([x, z]);
+    for (const x of TOWER_COL_XS) for (const z of TOWER_COL_ZS) if (!inR(CORE, x, z, 0.5)) out.push([x, z]);
     return out;
   },
   podiumColumns: (f) => {

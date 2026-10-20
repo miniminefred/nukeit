@@ -29,6 +29,7 @@ import { Achieve } from './sim/achieve.js';
 import { Body } from './body.js';
 import { Senses } from './fx/senses.js';
 import { Pigeons } from './sim/pigeons.js';
+import { Heist } from './sim/heist.js';
 import { settings } from './data/settings.js';
 import { signs, places } from './building/shops.js';
 import { Topple } from './sim/topple.js';
@@ -241,6 +242,10 @@ rubble.fx.onLand = (q, blows, at, by) => { if (by) traffic.landed(at, by.volume 
 const bang2 = blast.explode;
 blast.explode = (at, r, power) => { senses.blast(at, r); if (state === 'play') { wanted.offend(7, at); achieve.event('blast', power ?? 1); } security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); fear.scare(at, 25 * (power ?? 1), 0.8); return bang2(at, r, power); };
 let liftTip = null;
+let heistTip = null;
+// The money, on a heist job (sim/heist.js): bags from the vault to the van, and
+// the van ends the job.
+const heist = new Heist({ scene, vmScene, pieces, player, input, hud, audio, onEscape: () => finish() });
 let rig = null;           // dev: { at, look } to hold the camera there
 let toppling = false;
 let waterfall = null;     // the sheet of water down the atrium wall, while it stands
@@ -285,7 +290,9 @@ async function start(jobId, toolIds, levelId = 'normal') {
   // A height job's target is the difficulty's; a heist's is its own (below the hall's roof).
   const base = jobById(jobId);
   job = { ...base, target: base.heist ? base.target : difficulty.target };
-  pieces.strength = difficulty.strength;
+  // How hard the building is to break: the difficulty's, times the job's own
+  // (the bank's steel and concrete are much stronger than Trump Tower's).
+  pieces.strength = difficulty.strength * (job.strength ?? 1);
   player.immortal = !!difficulty.creative;
   screens.loading('Clearing the site', 0.05);
   await frames(2);
@@ -307,6 +314,7 @@ async function start(jobId, toolIds, levelId = 'normal') {
   smoke.attach();
   people.populate(pieces);
   pigeons.populate();
+  heist.reset(job, difficulty);
   security.start(difficulty);
   fear.reset();
   wanted.reset(difficulty);
@@ -317,7 +325,7 @@ async function start(jobId, toolIds, levelId = 'normal') {
   await frames(2);
   tools = toolIds.filter((id) => TOOL_CLASSES[id]).map((id) => new TOOL_CLASSES[id]());
   for (const t of tools) {
-    if (t.id === 'bomb') t.left = difficulty.charges;
+    if (t.id === 'bomb') t.left = difficulty.charges + (job.charges ?? 0);
     if (t.id === 'extinguisher') t.discharge = difficulty.discharge;
   }
   current = 0;
@@ -355,6 +363,7 @@ function unloadJob() {
   chips.clear();
   rubble.clear();
   pigeons.clear();
+  heist.clear();
   security.clear();
   traffic.clear();
   people.clear();
@@ -457,6 +466,7 @@ function finish() {
       ['Time on site', `${Math.floor(secs / 60)} min ${secs % 60} s`],
       ['Explosions', `${blast.count}`],
       ['Still burning', `${fire.count}`],
+      ...(heist.on ? [['Money taken', `$${heist.money(heist.delivered)} of $${heist.money(heist.total)} in the vault`]] : []),
       ...(wanted.on ? [['Wanted for', wanted.report().wantedFor]] : []),
     ],
     unlocked: unlockedTool,
@@ -505,6 +515,7 @@ function frame(dt) {
   if (state === 'play' || state === 'paused' || state === 'done') {
     if (playing) {
       // A spare extinguisher in reach comes first; then the lift.
+      heistTip = state === 'play' ? heist.update(dt, height !== null && height < job.target) : null;
       liftTip = player.dead ? null : spareTip() ?? lift.control(input, player);
       lift.update(dt, player, { collapsing: structure.collapsing || topple.active });
       player.update(dt);
@@ -561,7 +572,8 @@ function frame(dt) {
     if (heightT <= 0 && state === 'play') {
       heightT = 0.25;
       height = measure();
-      if (!difficulty.creative && height < job.target && !structure.collapsing && !topple.active && !rubble.active && doneT < 0) { doneT = 3.5; hud.flash('Target reached'); }
+      if (job.heist && !heist.down && height < job.target && !structure.collapsing && !topple.active) { heist.down = true; hud.flash('The tower is down. Now the money, and the van', 3); }
+      if (!difficulty.creative && !job.heist && height < job.target && !structure.collapsing && !topple.active && !rubble.active && doneT < 0) { doneT = 3.5; hud.flash('Target reached'); }
     }
     if (doneT > 0 && state === 'play') { doneT -= dt; if (doneT <= 0) finish(); }
     if (downT > 0) {
@@ -605,7 +617,7 @@ function frame(dt) {
     hud.setSlots(tools, current);
     hud.update(dt, {
       health: player.health, height, fires: fire.count, done: doneT >= 0,
-      tip: liftTip ?? tipFor(t), alert: security.status,
+      tip: heistTip ?? liftTip ?? tipFor(t), alert: [security.status, heist.status].filter(Boolean).join(' · '),
     });
   }
   input.endFrame();
@@ -668,7 +680,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, body, senses, pigeons, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, body, senses, pigeons, heist, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.

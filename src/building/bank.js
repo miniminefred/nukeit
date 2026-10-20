@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { block, panel, plate, assembly } from './kit.js';
 import { FLOOR_H, SLAB, PODIUM_FLOORS, TOP_FLOOR, ROOF, LOWER, BASEMENT, ATRIUM, T, U, OUTLINE, inPoly, inCore } from './plan.js';
-import { HALL_XS, HALL_ZS, TOWER_XS, TOWER_ZS } from './bank-plan.js';
+import { HALL_XS, HALL_ZS, TOWER_XS, TOWER_ZS, TOWER_COL_XS, TOWER_COL_ZS } from './bank-plan.js';
 import { core, stair } from './tower.js';
 import { signs } from './shops.js';
 import { furnishBank } from './bank-interiors.js';
@@ -96,7 +96,7 @@ function slabs(P, f) {
 
 function columns(P, f) {
   const tower = f >= PODIUM_FLOORS;
-  const xs = tower ? TOWER_XS : HALL_XS, zs = tower ? TOWER_ZS : HALL_ZS;
+  const xs = tower ? TOWER_COL_XS : HALL_XS, zs = tower ? TOWER_COL_ZS : HALL_ZS;
   const s = tower ? 0.45 : 0.5;
   const lo = (v, a) => Math.min(a[a.length - 1] - s - 0.05, Math.max(a[0] + s + 0.05, v));
   for (const x0 of xs)

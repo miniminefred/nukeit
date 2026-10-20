@@ -138,6 +138,7 @@ function privateBanking(P, f, y) {
 // ticker hung under the ceiling along the back, prices running.
 function trading(P, f, y) {
   for (const z of [-8, 6]) for (let x = -10.5; x <= 10.6; x += 2.1) {
+    if (Math.abs(Math.abs(x) - 8.5) < 0.8) continue;          // the column lines at x = ±8.5
     const s = z < 0 ? 1 : -1;
     F.desk(P, x, y, z, s > 0 ? 0 : Math.PI);
     F.monitor(P, x, y + 0.74, z - 0.18 * s, s > 0 ? 0 : Math.PI);
@@ -148,7 +149,7 @@ function trading(P, f, y) {
 }
 
 function offices(P, f, y) {
-  for (const z of [-8, 6]) for (const x of [-9, -4.5, 4.5, 9]) {
+  for (const z of [-8, 6]) for (const x of [-10.4, -3.6, 3.6, 10.4]) {
     const s = z < 0 ? 1 : -1;
     F.desk(P, x, y, z, s > 0 ? 0 : Math.PI);
     F.officeChair(P, x, y, z + 0.9 * s, s > 0 ? Math.PI : 0);

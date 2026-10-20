@@ -119,7 +119,7 @@ export class Player {
       const speed = crouching ? CROUCH
         : input.down('ShiftLeft') || input.down('ShiftRight') ? RUN : WALK;
       const m = this._move.set(r, 0, -f);
-      const heavy = (1 - 0.45 * this.burden) * (this._slow > 0 ? 0.3 : 1);
+      const heavy = (1 - 0.45 * this.burden) * (this._slow > 0 ? 0.3 : 1) * (this.cargo ?? 1);
       if (m.lengthSq() > 0) m.normalize().multiplyScalar((this._tangle > 0 ? speed * 0.25 : speed) * heavy).applyAxisAngle(THREE.Object3D.DEFAULT_UP, this.yaw);
       // On a wet floor your feet hardly grip: you slide on into a turn, and
       // take a while to stop.
