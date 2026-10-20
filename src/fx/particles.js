@@ -258,6 +258,14 @@ class Veil {
     this.thick = total;
   }
 
+  // How thick the dust is at (x, y, z): optical depth per metre.
+  at(x, y, z) {
+    if (!this._any) return 0;
+    const i = Math.floor((x - OX) / CELL), j = Math.floor(y / CELL), k = Math.floor((z - OZ) / CELL);
+    if (i < 0 || j < 0 || k < 0 || i >= NX || j >= NY || k >= NZ) return 0;
+    return this.d[(j * NZ + k) * NX + i];
+  }
+
   // Can (x, y, z) be seen from the camera through the dust?
   seen(cam, x, y, z) {
     if (!this._any) return true;

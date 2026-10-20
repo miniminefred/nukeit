@@ -25,6 +25,7 @@ import { Fear } from './sim/fear.js';
 import { Wanted } from './sim/wanted.js';
 import { Achieve } from './sim/achieve.js';
 import { Body } from './body.js';
+import { Senses } from './fx/senses.js';
 import { settings } from './data/settings.js';
 import { signs, places } from './building/shops.js';
 import { Topple } from './sim/topple.js';
@@ -209,6 +210,8 @@ const wanted = new Wanted({
   seen: () => !player.dead && (security.seesYou || people.witnesses(player.pos)),
 });
 security.fx.onOffence = (n, at) => wanted.offend(n, at);
+// Being there (fx/senses.js): dust in your eyes, ringing ears, heat, a trembling floor.
+const senses = new Senses({ camera, player, particles, fire, structure, topple, audio, shake });
 // The achievements (sim/achieve.js), told what happens.
 const achieve = new Achieve({
   player, security, wanted, fire, water, lift, topple, structure, pieces, audio, camera, smoke, veil: particles.veil,
@@ -230,7 +233,7 @@ const traffic = new Traffic(scene, { physics, player, audio, onCrush: () => achi
 const landed = rubble.fx.onLand;
 rubble.fx.onLand = (q, blows, at, by) => { if (by) traffic.landed(at, by.volume * by.kind.density * 0.6); return landed(q, blows, at, by); };
 const bang2 = blast.explode;
-blast.explode = (at, r, power) => { if (state === 'play') { wanted.offend(7, at); achieve.event('blast', power ?? 1); } security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); fear.scare(at, 25 * (power ?? 1), 0.8); return bang2(at, r, power); };
+blast.explode = (at, r, power) => { senses.blast(at, r); if (state === 'play') { wanted.offend(7, at); achieve.event('blast', power ?? 1); } security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); fear.scare(at, 25 * (power ?? 1), 0.8); return bang2(at, r, power); };
 let liftTip = null;
 let rig = null;           // dev: { at, look } to hold the camera there
 let toppling = false;
@@ -260,6 +263,7 @@ function openMenu() {
   screens.hidePause();
   audio.silence();
   body.root.visible = false;
+  senses.clear();
   menu.show('mode');
   // Behind the menu: the city, from the avenue.
   camera.position.set(19, 2.2, 31);
@@ -555,6 +559,7 @@ function frame(dt) {
   }
   chips.update(dt);
   achieve.badges(dt);
+  senses.update(dt, state === 'play');
   // Water down the atrium wall, as long as the wall and the sheet are there.
   if (waterfall && waterfall.state === 'static') {
     const b = waterfall.box;
@@ -647,7 +652,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, body, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, body, senses, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.

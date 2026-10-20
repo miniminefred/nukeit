@@ -36,7 +36,11 @@ export class Audio {
     this.master = ctx.createGain();
     this.master.gain.value = 0.7;
     const comp = ctx.createDynamicsCompressor();
-    this.master.connect(comp).connect(ctx.destination);
+    // Deafened by a blast: everything muffled through this, for a while.
+    this.deaf = ctx.createBiquadFilter();
+    this.deaf.type = 'lowpass'; this.deaf.frequency.value = 20000; this.deaf.Q.value = 0.5;
+    this.master.connect(this.deaf).connect(comp).connect(ctx.destination);
+    this._comp = comp;
     const len = ctx.sampleRate * 2;
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = this.noise.getChannelData(0);
@@ -176,6 +180,26 @@ export class Audio {
     this._noise(out, { f: s.f, q: s.q, len: s.len, gain: s.gain });
     this._noise(out, { type: 'lowpass', f: 220, q: 0.7, len: 0.12, gain: 0.7 });
     if (s.ring) this._tone(out, { f: s.ring * (0.95 + Math.random() * 0.1), len: s.len * 1.6, gain: 0.12, type: 'triangle' });
+  }
+
+  // Ears ringing after a blast, k 0..1: a high whine, and the world muffled
+  // under it, clearing over a few seconds.
+  ears(k) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime, f = this.deaf.frequency;
+    f.cancelScheduledValues(t);
+    if (k <= 0) { f.setValueAtTime(20000, t); return; }
+    const secs = 2 + 5 * k;
+    f.setValueAtTime(Math.max(350, 2500 * (1 - k)), t);
+    f.exponentialRampToValueAtTime(20000, t + secs);
+    // The whine goes straight out, past the muffling.
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.frequency.value = 3600 + Math.random() * 600;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.05 * k, t + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + secs);
+    o.connect(g).connect(this._comp);
+    o.start(t); o.stop(t + secs + 0.1);
   }
 
   // A footstep, by what is underfoot (a material's sound class), louder running;
