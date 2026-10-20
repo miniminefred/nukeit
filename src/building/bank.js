@@ -231,6 +231,12 @@ function helipad(P) {
   plate(P, 'roofing', pts, y, y + 0.06, 'carpet', { floor: ROOF, structural: false, tint: 0x2a2c30 });
   for (const box of [[-2.2, -4, -1.7, 2], [1.7, -4, 2.2, 2], [-1.7, -1.25, 1.7, -0.75]])
     block(P, 'plaster', box[0], y + 0.06, box[1], box[2], y + 0.08, box[3], 'carpet', { floor: ROOF, structural: false, tint: 0xf2f0e8 });
+  // The bank's helicopter, parked on the pad: it comes down with the tower.
+  assembly(P, 0, y + 0.06, -1, 0.4, [
+    { kind: 'metal', round: 0.2, boxes: [{ ball: [0, 1.4, 0], s: [1.1, 0.95, 1.9] }, { cylZ: [0, 1.55, 3.0], r: 0.22, r2: 0.12, h: 3.2 }], tint: 0x1c2638 },
+    { kind: 'glass', boxes: [{ ball: [0, 1.6, -1.1], s: [0.85, 0.6, 0.8] }], tint: 0x203040 },
+    { kind: 'steel', boxes: [{ cylZ: [-0.8, 0.06, 0], r: 0.05, h: 3.0 }, { cylZ: [0.8, 0.06, 0], r: 0.05, h: 3.0 }, [-0.84, 0.06, -0.8, -0.76, 0.6, -0.72], [0.76, 0.06, -0.8, 0.84, 0.6, -0.72], [-0.84, 0.06, 0.7, -0.76, 0.6, 0.78], [0.76, 0.06, 0.7, 0.84, 0.6, 0.78], { cyl: [0, 2.45, 0], r: 0.08, h: 0.3 }, [-4.6, 2.6, -0.12, 4.6, 2.64, 0.12], [-0.12, 2.6, -4.6, 0.12, 2.64, 4.6]], tint: 0x16181a },
+  ], 'furniture', { floor: ROOF, tag: 'helicopter', colliders: [[-1.1, 0, -1.9, 1.1, 2.4, 1.9]] });
   const o = { floor: ROOF, structural: false, tint: 0x8a9298 };
   const [x0, z0] = [OUTLINE[0].x, OUTLINE[0].z], [x1, z1] = [OUTLINE[2].x, OUTLINE[2].z];
   block(P, 'steel', x0, y, z0, x1, y + 1.1, z0 + 0.08, 'wall', o);

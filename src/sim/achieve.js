@@ -63,6 +63,7 @@ export class Achieve {
       case 'thrown': this.n.thrown++; break;
       case 'zapped': this.flags.zapped = true; break;
       case 'busted': this.earn('busted'); break;
+      case 'books': this.earn('books'); break;
       case 'gaveup': this.earn('nothere'); break;
       case 'main': this.flags.main = true; break;
       case 'lost': {

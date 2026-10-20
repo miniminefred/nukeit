@@ -4,6 +4,7 @@ import * as F from './furniture.js';
 import * as E from './furniture-food.js';
 import * as H2 from './furniture-home.js';
 import * as L2 from './furniture-lobby.js';
+import * as W from './furniture-work.js';
 import { shell, frame, look, put, place, menu, styled, onWall, rugAt, SHOP_H as H } from './shops.js';
 
 // The street's own kinds of shop, for the ground floors of the blocks along
@@ -186,3 +187,36 @@ export function officeLobby(P, cx, y, cz, yaw, w, d, { name = '510 FIFTH AVENUE'
   });
 }
 
+
+// ---------------------------------------------------------------- a locked office
+
+// An old firm's office on the ground floor of a building along Wall Street:
+// the front door locked (break it, or the glass beside it), a desk, filing,
+// a picture — and a cash box under the desk (tag 'stash': sim/heist.js).
+export function lockedOffice(P, cx, y, cz, yaw, w, d, { name = 'MERRIT & HALE', h = H } = {}) {
+  const L = look(cx, cz, y);
+  const fr = frame(cx, y, cz, yaw, L.mirror);
+  return styled(L, () => {
+    const door = w / 2 - 1.1;
+    shell(P, fr, w, d, { name, h, door, wallTint: 0xe8e0d0, fascia: 0x1e1a16, style: 'gold' });
+    // The door, shut and locked.
+    put(P, fr, (P2, x, yy, z, a) => assembly(P2, x, yy, z, a, [
+      { kind: 'wood', boxes: [[-0.8, 0, -0.03, 0.8, 2.55, 0.03]], tint: 0x3a2418 },
+      { kind: 'brass', boxes: [{ ball: [0.6, 1.05, 0.05], s: [0.04, 0.04, 0.04] }] },
+    ], 'wall', { structural: false, tag: 'lockeddoor' }), door, d / 2 - 0.06, 0);
+    const back = -d / 2 + 0.1;
+    put(P, fr, W.executiveDesk, -0.5, back + 2.2, 0);
+    put(P, fr, F.officeChair, -0.5, back + 1.4, 0);
+    for (let k = 0; k < 3; k++) put(P, fr, F.filingCabinet, -w / 2 + 0.4, back + 0.6 + k * 0.6, Math.PI / 2);
+    put(P, fr, F.bookshelf, w / 2 - 0.5, back + 1.0, -Math.PI / 2);
+    onWall(P, fr, S.picture, -0.5, back + 0.02, 0, 1.6, 1.0, 0.7, L.art);
+    // The cash box, on the floor by the desk.
+    put(P, fr, (P2, x, yy, z, a) => assembly(P2, x, yy, z, a, [
+      { kind: 'steel', round: 0.01, boxes: [[-0.22, 0, -0.15, 0.22, 0.18, 0.15]], tint: 0x2a5a3a },
+      { kind: 'brass', boxes: [[-0.05, 0.18, -0.02, 0.05, 0.21, 0.02]] },
+    ], 'furniture', { tag: 'stash' }), 0.9, back + 2.3, 0.3);
+    put(P, fr, F.plant, w / 2 - 0.6, d / 2 - 0.6, 0, true);
+    place('staff', fr, -0.5, back + 1.4, Math.PI);
+    return { yaw: fr.yaw() };
+  });
+}

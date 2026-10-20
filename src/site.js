@@ -77,4 +77,6 @@ export const WALL_STREET = {
   breakRoom: [[12.6, -9, Math.PI / 2], [15.4, -9, -Math.PI / 2], [14, -10.3, 0], [14, -7.7, Math.PI]],
   // The getaway van, parked in the bay east of the bank, its back doors open.
   van: { x: 34, z: 24.6, yaw: -Math.PI / 2 },
+  // The money cart, hidden behind the crates in goods receiving on the lower level.
+  cart: { x: 20.6, z: 9.4 },
 };

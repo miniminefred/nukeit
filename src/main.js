@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SITE, useSite } from './site.js';
-import { usePlan, PODIUM, BASEMENT, LOUNGE } from './building/plan.js';
+import { usePlan, PODIUM, BASEMENT, LOUNGE, T, U } from './building/plan.js';
 import { Timer } from 'three';
 import { createRenderer, createScene, createCamera, createLights, createPost, handleResize, followShadow } from './scene.js';
 import { Physics } from './physics.js';
@@ -245,21 +245,25 @@ const traffic = new Traffic(scene, { physics, player, audio, onCrush: () => achi
 const landed = rubble.fx.onLand;
 rubble.fx.onLand = (q, blows, at, by) => { if (by) traffic.landed(at, by.volume * by.kind.density * 0.6); return landed(q, blows, at, by); };
 const bang2 = blast.explode;
-blast.explode = (at, r, power) => { senses.blast(at, r); if (state === 'play') { wanted.offend(7, at); achieve.event('blast', power ?? 1); } security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); fear.scare(at, 25 * (power ?? 1), 0.8); return bang2(at, r, power); };
+blast.explode = (at, r, power) => {
+  senses.blast(at, r);
+  // A blast on a trading floor: a blizzard of paper out of its windows.
+  if (job?.id === 'bank' && at.y > T(7) - 1 && at.y < U(14)) for (let i = 0; i < 160; i++) { const a = Math.random() * Math.PI * 2, v = 2 + Math.random() * 6; particles.spawn('paper', at.x, at.y + Math.random() * 2, at.z, Math.cos(a) * v, Math.random() * 2, Math.sin(a) * v); } if (state === 'play') { wanted.offend(7, at); achieve.event('blast', power ?? 1); } security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); fear.scare(at, 25 * (power ?? 1), 0.8); return bang2(at, r, power); };
 let liftTip = null;
 let heistTip = null;
 let hallStart = 0;
 // The money, on a heist job (sim/heist.js): bags from the vault to the van, and
 // the van ends the job.
-const heist = new Heist({ scene, vmScene, pieces, player, input, hud, audio, onEscape: () => finish() });
+const heist = new Heist({ scene, vmScene, pieces, physics, player, input, hud, audio, onEscape: () => finish(), onBooks: () => achieve.event('books') });
 // The bank's cameras, lasers and lockdown (sim/bank-security.js).
-const bankSecurity = new BankSecurity({ scene, world, pieces, physics, player, camera, security, water, hud, audio, shake });
+const bankSecurity = new BankSecurity({ scene, world, pieces, physics, player, camera, security, water, hud, audio, shake, fear, people, structure, topple });
 let rig = null;           // dev: { at, look } to hold the camera there
 let toppling = false;
 let waterfall = null;     // the sheet of water down the atrium wall, while it stands
 
 const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene, world, powder, security, wanted, achieve };
 ctx.bankSecurity = bankSecurity;     // the spray can blinds its cameras
+heist.fx.bankSecurity = bankSecurity; // the vault's code opens its door
 
 // ---------------------------------------------------------------- state
 

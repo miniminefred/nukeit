@@ -35,6 +35,7 @@ export const ACHIEVEMENTS = [
   { id: 'inferno', name: 'Inferno', tier: 'silver', hint: 'Have 30 things burning at once' },
   { id: 'taser', name: 'Taser proof', tier: 'silver', hint: 'Get tasered or netted and still finish the job' },
   { id: 'survivor', name: 'Survivor', tier: 'silver', hint: 'Be inside the tower when it comes down, and live' },
+  { id: 'books', name: 'Paper trail', tier: 'silver', hint: 'Hand the bank’s secret books in at the van', secret: true },
   // Gold
   { id: 'ghost', name: 'Ghost', tier: 'gold', hint: 'Finish the job without anyone ever seeing you at it' },
   { id: 'hammer', name: 'Hammer only', tier: 'gold', hint: 'Finish the job with the sledgehammer alone, no charges' },

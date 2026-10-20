@@ -76,6 +76,18 @@ export class BankSecurity {
       scene.add(m);
       this.beams.push({ mesh: m, z, y: y0 + h, x0: VAULT.x0 + 0.55, x1: VAULT.x1 - 0.55 });
     }
+    // The tickers on the trading floors: prices running along each, green —
+    // red, and falling, when the building panics.
+    this.tickers = [];
+    this._tape = tape(false);
+    for (const p of pieces.list.filter((q) => q.tag === 'ticker')) {
+      const b = p.box, w = b.max.x - b.min.x, h = b.max.y - b.min.y;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.1, h - 0.06), new THREE.MeshBasicMaterial({ map: this._tape.texture, transparent: true }));
+      m.position.set((b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, b.max.z + 0.006);
+      scene.add(m);
+      this.tickers.push({ piece: p, mesh: m });
+    }
+    this.crashed = false;
     this.fuse = pieces.list.find((p) => p.tag === 'fusebox');
     this.door = pieces.list.find((p) => p.tag === 'vault');
     this.lasers = true;
@@ -102,6 +114,7 @@ export class BankSecurity {
     if (!this.on) return;
     this.time += dt;
     const { player, camera, physics, security, hud } = this.fx;
+    this._trading(dt);
     const eye = camera.position;
     for (const c of this.cams) {
       const live = c.piece.state === 'static' && !c.blind;
@@ -155,6 +168,19 @@ export class BankSecurity {
     if (this.locked > 0 && (this.locked -= dt) <= 0) this._lift();
   }
 
+  // The trading floors: the tape runs; when the building panics it goes red
+  // and the prices fall, and the traders are all on their phones.
+  _trading(dt) {
+    const { fear, people, structure, topple } = this.fx;
+    const panic = (fear?.level ?? 0) > 50 || structure?.collapsing || topple?.active;
+    if (panic && !this.crashed) { this.crashed = true; tape(true, this._tape); this.fx.hud?.flash('The market crashes: the tickers go red', 2); }
+    this._tape.texture.offset.x = (this._tape.texture.offset.x + dt * (this.crashed ? 0.09 : 0.05)) % 1;
+    for (const t of this.tickers) t.mesh.visible = t.piece.state === 'static';
+    if ((fear?.level ?? 0) > 35 || this.crashed) {
+      for (const p of people?.list ?? []) if (!p.agent && !p.street && p.f >= 7 && p.f <= 14 && p.state !== 'down') p.armUp = 1;
+    }
+  }
+
   _alarm(text) {
     const { security, water, hud, audio } = this.fx;
     hud?.flash(text, 2.5);
@@ -195,6 +221,8 @@ export class BankSecurity {
   }
 
   clear() {
+    for (const t of this.tickers ?? []) t.mesh.removeFromParent();
+    this.tickers = [];
     for (const c of this.cams) c.group.removeFromParent();
     for (const b of this.beams) b.mesh.removeFromParent();
     this.cams = [];
@@ -202,4 +230,30 @@ export class BankSecurity {
     this._blown = false;
     this.on = false;
   }
+}
+
+// The ticker tape: symbols and prices on black, green and rising, or red and
+// falling. Drawn twice as wide as it shows, and scrolled.
+const SYMBOLS = ['BBB', 'ACME', 'GLDN', 'NYCX', 'FIFT', 'HRLD', 'MRCH', 'WALL', 'BULL', 'TWRS', 'BRDS', 'CRNR'];
+function tape(red, into = null) {
+  const c = into?.canvas ?? document.createElement('canvas');
+  c.width = 2048; c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#05070a'; g.fillRect(0, 0, c.width, c.height);
+  g.font = 'bold 34px monospace'; g.textBaseline = 'middle';
+  let x = 10;
+  for (let i = 0; x < c.width; i++) {
+    const s = SYMBOLS[i % SYMBOLS.length], p = (20 + ((i * 37) % 180) + ((i * 13) % 100) / 100).toFixed(2);
+    const ch = red ? -(2 + ((i * 7) % 14) + ((i * 3) % 10) / 10) : 0.2 + ((i * 5) % 9) / 10;
+    g.fillStyle = '#e8e8e0'; g.fillText(s, x, 33); x += g.measureText(s).width + 14;
+    g.fillStyle = red ? '#ff4a3a' : '#4af07a';
+    const t = `${p} ${red ? '▼' : '▲'}${Math.abs(ch).toFixed(1)}%`;
+    g.fillText(t, x, 33); x += g.measureText(t).width + 40;
+  }
+  const texture = into?.texture ?? new THREE.CanvasTexture(c);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.repeat.x = 0.5;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return { canvas: c, texture };
 }

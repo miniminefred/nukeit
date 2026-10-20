@@ -225,8 +225,19 @@ function boardroom(P, y) {
 }
 
 // The CEO's office, the whole top floor: the desk looking down Wall Street, a
-// sofa, books.
+// sofa, books; a gold statue of the CEO on a plinth, and a safe in the
+// corner. (The vault's code and the illegal trading books lie on the desk:
+// sim/heist.js puts them there.)
 function ceo(P, y) {
+  assembly(P, -10.4, y, 4.5, HALF, [
+    { kind: 'concrete', boxes: [[-0.45, 0, -0.45, 0.45, 0.9, 0.45]], tint: 0x2a2a2a },
+    { kind: 'gold', boxes: [{ ball: [0, 1.35, 0], s: [0.26, 0.45, 0.2] }, { ball: [0, 1.95, 0], s: [0.13, 0.15, 0.13] }, { cyl: [0, 1.0, 0], r: 0.2, r2: 0.12, h: 0.2 }] },
+  ], 'furniture', { tag: 'statue', colliders: [[-0.45, 0, -0.45, 0.45, 2.1, 0.45]] });
+
+  assembly(P, 10.6, y, -7.6, -HALF, [
+    { kind: 'steel', round: 0.02, boxes: [[-0.4, 0, -0.35, 0.4, 0.9, 0.35]], tint: 0x3a3e44 },
+    { kind: 'brass', boxes: [{ cylZ: [0.05, 0.55, 0.36], r: 0.08, h: 0.04 }, [-0.25, 0.2, 0.35, -0.2, 0.75, 0.38]] },
+  ], 'furniture', { tag: 'safe', colliders: [[-0.4, 0, -0.35, 0.4, 0.9, 0.38]] });
   W.executiveDesk(P, 0, y, 6, Math.PI);
   F.officeChair(P, 0, y, 5.1, 0);
   H.rug(P, -8, y, -6.5, 5, 3.4, 0x4a2a22);

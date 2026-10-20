@@ -30,18 +30,20 @@ function wallStreet({ flat, tower, rand, group, centreLine, solid }) {
   const below = (x, z, h) => Math.min(h, Math.max(24, 48 + Math.max(0, Math.hypot(x, z) - 40) * 1.2));
   // An old building, often with a new top: the old part stone or brick, the
   // top glass, set back from its edges.
-  const old = (x, z, w, d, facing) => {
+  // `office`: a real ground floor at the front, a locked office in it
+  // (building/street.js puts a stash of cash in it).
+  const old = (x, z, w, d, facing, office = false) => {
     const hOld = 22 + rand() * 30;
     const total = below(x, z, hOld + (rand() < 0.65 ? 18 + rand() * 70 : 0));
     const top = total - hOld > 8 ? { h: total - hOld, inset: 1.5 + rand() * 3 } : null;
-    tower(x, z, w, d, top ? hOld : total, TINTS[(rand() * TINTS.length) | 0], facing, false, top);
+    tower(x, z, w, d, top ? hOld : total, TINTS[(rand() * TINTS.length) | 0], facing, office, top);
   };
   // Our side, either side of the bank's plot, with narrow streets between.
   for (const side of [-1, 1]) {
     let x = side * 29;
     while (Math.abs(x) < 300) {
       const w = 12 + rand() * 16;
-      old(x + side * w / 2, -1, w, 36, 1);
+      old(x + side * w / 2, -1, w, 36, 1, Math.abs(x) < 30);
       x += side * (w + (rand() < 0.3 ? 8 : 1.5));
     }
   }
@@ -56,7 +58,7 @@ function wallStreet({ flat, tower, rand, group, centreLine, solid }) {
     let x = side * (EXCHANGE.w / 2 + 6);
     while (Math.abs(x) < 300) {
       const w = 12 + rand() * 18;
-      old(x + side * w / 2, 58, w, 38, -1);
+      old(x + side * w / 2, 58, w, 38, -1, side < 0 && Math.abs(x) < EXCHANGE.w / 2 + 7);
       x += side * (w + (rand() < 0.3 ? 8 : 1.5));
     }
   }

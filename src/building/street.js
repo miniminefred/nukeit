@@ -1,7 +1,7 @@
 import { assembly, block } from './kit.js';
 import { CAFES } from '../scenery/city.js';
 import { cafe, boutique, shoes, jeweller, souvenirs } from './shops.js';
-import { deli, pizzeria, bank, hotel, officeLobby } from './shops-street.js';
+import { deli, pizzeria, bank, hotel, officeLobby, lockedOffice } from './shops-street.js';
 import * as F from './furniture.js';
 
 // Fifth Avenue's furniture, along both kerbs in front of the job: street
@@ -69,6 +69,17 @@ export function buildWallStreetFurniture(P) {
   for (let x = -18; x <= 18; x += 1.6) bollard(S, x, THEIRS + 0.6);
   for (const [x, z] of [[-24, OURS - 0.4], [26, THEIRS + 0.4]]) hydrant(S, x, z);
   for (const [x, z] of [[-12, OURS - 0.8], [14, OURS - 0.8], [-22, THEIRS + 0.8]]) bin(S, x, z);
+  // The old firms' offices in the ground floors either side of the bank and
+  // across from it, locked up, a little cash in each (sim/heist.js).
+  const names = ['MERRIT & HALE · ATTORNEYS', 'BRADSHAW INSURANCE', 'CORNER EXCHANGE BUREAU'];
+  CAFES.forEach((c, i) => {
+    const c0 = Math.cos(c.yaw), s0 = Math.sin(c.yaw);
+    const hx = Math.abs(c0) * c.w / 2 + Math.abs(s0) * c.d / 2, hz = Math.abs(s0) * c.w / 2 + Math.abs(c0) * c.d / 2;
+    block(S, 'ceramic', c.x - hx, 0, c.z - hz, c.x + hx, 0.02, c.z + hz, 'carpet', { structural: false, tint: 0xcfc6b6 });
+    block(S, 'plaster', c.x - hx, c.h, c.z - hz, c.x + hx, c.h + 0.08, c.z + hz, 'ceiling', { structural: false, tint: 0xf2ece2 });
+    lockedOffice(S, c.x, 0.02, c.z, c.yaw, c.w, c.d, { name: names[i % names.length], h: c.h - 0.02 });
+    F.ceilingLight(S, c.x, c.h, c.z);
+  });
 }
 
 // A security bollard: a steel post, black, a cap.
