@@ -230,6 +230,24 @@ over 70 brings the off-duty guards out of the **break room behind the lobby desk
 or are carrying the sledgehammer** (`security.spotted`, `fx.armed`); after searching every
 floor without a sighting they leave: "He is not here."
 
+**Jobs are per map.** Each `JOBS` entry in `data/catalog.js` brings its building (`build`),
+its floor plan (`plan`, put in force by `usePlan` in `building/plan.js`, whose exports are
+live), its map's places (`site`, `useSite` in `site.js`: street, lanes, doors, posts,
+police, SWAT, crowd, pigeons, van), its city (`city`, a `makeCity` layout:
+`scenery/city.js` for Fifth Avenue, `scenery/wallstreet.js`), and optionally its own
+`strength`, `charges`, `target`, `requires` and `heist`. Per job, not at startup: the
+ground's pit (`physics.pit`), the city (`world.setCity`), the smoke grid, the sprinklers.
+
+**Big Boy Bank** (job 2, opens after Trump Tower; `building/bank.js`, `bank-plan.js`,
+`bank-interiors.js`): a 1924 limestone hall (seven storeys, temple front) with a glass tower
+to 120 m out of it, its core Trump Tower's in the same place (so the lift and stair code is
+shared). Bring the glass below the hall's roof (31 m) and carry the vault's money to the
+getaway van (`sim/heist.js`: pallets tagged `money`, E fills a bag, one bag half speed, two
+a fifth, G drops one, the van takes them; with the money and the tower down, E in the van
+ends the job — the only way it ends). Much stronger: a denser tower frame, 1.8× durability,
+six extra charges. Stages still to build: security (cameras, lasers, lockdown, the alarm),
+money and the shop, the penthouse's loot, traders, the neighbours' stashes.
+
 **Two modes** on the title screen (`ui/menu.js`): Deconstruction (the jobs, difficulties,
 guards, police, the crime meter, achievements) and Creative (`CREATIVE` in
 `data/difficulty.js`: every tool, endless charges and powder, no guards, police, meter,
