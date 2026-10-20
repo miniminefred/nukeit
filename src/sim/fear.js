@@ -41,7 +41,7 @@ const LINES = [
   ['People in {z} keep looking over their shoulders.', '"Did you hear that?" — {z}.', 'A few shoppers in {z} put their bags down and listen.',
     'Whispers in {z}. Phones come out.', 'The staff in {z} glance at each other.', 'Conversation stops in {z}, then starts again, quieter.',
     'Someone asks a guard what that noise was.', '{q} is still calm. {z} is not.', 'People are walking a little faster in {z}.',
-    'A child in {z} asks what the bang was.'],
+    'A tourist in {z} asks what the bang was.'],
   ['People in {z} are hurrying for the stairs.', '"Something is wrong!" — the word spreads through {z}.', 'Tables left half-finished in {z}.',
     'Shop staff in {z} pull down their shutters.', 'A crowd gathers by the lifts in {z}.', 'Everyone in {z} is on the phone at once.',
     '"Is that smoke?" — {z}.', 'Guards are trying to calm {z} down.', 'People in {q} wonder what is going on in {z}.', 'Bags and coats left behind in {z}.'],
