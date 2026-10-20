@@ -355,6 +355,9 @@ export function souvenirs(P, cx, y, cz, yaw, w, d, { name = 'TOWER GIFTS', h = H
   });
 }
 
+// For the street's own kinds of shop (building/shops-street.js).
+export { shell, frame, look, put, place, menu, styled, onWall, rugAt, H as SHOP_H };
+
 // ---------------------------------------------------------------- the mall floors
 
 // The tower's shop floors as a mall: a row of units along each long side,

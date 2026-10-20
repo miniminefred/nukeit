@@ -1,6 +1,7 @@
 import { assembly, block } from './kit.js';
 import { CAFES } from '../scenery/city.js';
-import { cafe } from './shops.js';
+import { cafe, boutique, shoes, jeweller, souvenirs } from './shops.js';
+import { deli, pizzeria, bank, hotel, officeLobby } from './shops-street.js';
 import * as F from './furniture.js';
 
 // Fifth Avenue's furniture, along both kerbs in front of the job: street
@@ -28,9 +29,12 @@ export function buildStreet(P) {
   for (const x of [-46, -38, 38, 46, 56]) tree(S, x, OUR - 1);
   for (const x of [-50, -34, 30, 44]) tree(S, x, FAR + 1);
   shelter(S, -22, OUR - 1.2);
-  // The cafés in the ground floors of the blocks nearest the job: a tiled
-  // floor, the café, and a ceiling over it on its walls for the lamps to hang from.
-  const names = ['BAKER & BEAN', 'CRUMB', 'THE DAILY LOAF', 'CORNER CAFE', 'MORNING BREAD'];
+  // The shops in the ground floors of the blocks nearest the job: a tiled
+  // floor, the shop, and a ceiling over it on its walls for the lamps to hang
+  // from. A Midtown mix — a café now and then, but delis, pizza, a bank, a
+  // hotel, an office lobby, clothes, shoes, jewellers — never two the same
+  // side by side.
+  let unit = 0;
   CAFES.forEach((c, i) => {
     const c0 = Math.cos(c.yaw), s0 = Math.sin(c.yaw);
     const hx = Math.abs(c0) * c.w / 2 + Math.abs(s0) * c.d / 2, hz = Math.abs(s0) * c.w / 2 + Math.abs(c0) * c.d / 2;
@@ -43,11 +47,20 @@ export function buildStreet(P) {
     for (let k = 0; k < n; k++) {
       const lx = -c.w / 2 + uw * (k + 0.5);
       const ux = c.x + lx * c0, uz = c.z - lx * s0;
-      cafe(S, ux, 0.02, uz, c.yaw, uw, c.d, { name: names[(i * 2 + k) % names.length], seats: true, h: c.h - 0.02 });
+      const [build, name, extra] = STREET[unit++ % STREET.length];
+      build(S, ux, 0.02, uz, c.yaw, uw, c.d, { name, h: c.h - 0.02, ...extra });
       for (const lz of [-c.d / 4, c.d / 4]) F.ceilingLight(S, ux + lz * s0, c.h, uz + lz * c0);
     }
   });
 }
+
+// The street, unit by unit along it. About one in five a café.
+const STREET = [
+  [deli, 'MIDTOWN DELI'], [boutique, 'LINEA'], [cafe, 'BAKER & BEAN', { seats: true }], [bank, 'FIFTH NATIONAL'],
+  [pizzeria, "TONY'S PIZZA"], [shoes, 'STRIDE'], [hotel, 'THE HARLAND'], [jeweller, 'CARAT'],
+  [deli, 'EVERYTHING BAGELS', { bagels: true }], [officeLobby, '510 FIFTH AVENUE'], [cafe, 'CRUMB', { seats: true }],
+  [souvenirs, 'NYC GIFTS'], [boutique, 'VELOUR'], [pizzeria, 'SLICE OF HEAVEN'],
+];
 
 function lamp(P, x, z, yaw) {
   return assembly(P, x, 0, z, yaw, [
