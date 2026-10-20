@@ -178,6 +178,31 @@ export class Audio {
     if (s.ring) this._tone(out, { f: s.ring * (0.95 + Math.random() * 0.1), len: s.len * 1.6, gain: 0.12, type: 'triangle' });
   }
 
+  // A footstep, by what is underfoot (a material's sound class), louder running;
+  // in water, a splash.
+  step(surface, speed, wet) {
+    if (!this.ctx) return;
+    const loud = Math.min(1, 0.25 + speed / 9);
+    const out = this._out(0.22 * loud, (Math.random() - 0.5) * 0.2);
+    if (wet > 0.3) { this._noise(out, { type: 'highpass', f: 1800, q: 0.7, len: 0.16, gain: 0.7, attack: 0.01 }); }
+    const S = {
+      concrete: { f: 1500, q: 1.2, len: 0.06, thud: 140 }, marble: { f: 2600, q: 2, len: 0.05, thud: 160 },
+      glass: { f: 3000, q: 2.5, len: 0.05, thud: 170 }, wood: { f: 700, q: 1.4, len: 0.08, thud: 110 },
+      drywall: { f: 380, q: 0.8, len: 0.09, thud: 90, soft: true }, steel: { f: 2200, q: 6, len: 0.12, thud: 180, ring: 900 },
+      brass: { f: 2400, q: 6, len: 0.1, thud: 180, ring: 1300 }, mullion: { f: 2000, q: 5, len: 0.1, thud: 170 },
+    }[surface] ?? { f: 1300, q: 1, len: 0.06, thud: 130 };
+    this._noise(out, { f: S.f * (0.9 + Math.random() * 0.2), q: S.q, len: S.len, gain: S.soft ? 0.35 : 0.6 });
+    this._noise(out, { type: 'lowpass', f: S.thud, q: 0.7, len: 0.09, gain: 0.8 });
+    if (S.ring) this._tone(out, { f: S.ring, len: 0.18, gain: 0.05, type: 'triangle' });
+  }
+
+  // Out of breath: one breath, in or out, harder the more winded.
+  breath(k, inward) {
+    if (!this.ctx) return;
+    const out = this._out(0.08 * k, 0);
+    this._noise(out, { f: inward ? 1400 : 900, q: 0.9, len: inward ? 0.38 : 0.45, gain: 0.8, attack: inward ? 0.12 : 0.05, drop: inward ? 1.15 : 0.8 });
+  }
+
   swing() {
     if (!this.ctx) return;
     const out = this._out(0.35, 0);

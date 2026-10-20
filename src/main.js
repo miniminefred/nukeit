@@ -361,6 +361,14 @@ input.onLockChange((locked) => {
 });
 
 player.onDamage = (amount) => { hud.hurt(amount); audio.hurt(); };
+// Footsteps by what is underfoot; landing; breathing hard after a run.
+const _down = new THREE.Vector3(0, -1, 0);
+player.onStep = (speed) => {
+  const hit = physics.raycast(player.pos.clone().setY(player.pos.y + 0.3), _down, 0.8);
+  audio.step(hit?.owner?.parts?.[0]?.kind?.sound ?? 'concrete', speed, player.wet);
+};
+player.onLand = (speed) => { audio.thud(player.pos.x, player.pos.y, player.pos.z); shake.add(Math.min(0.3, speed * 0.02)); };
+player.onBreath = (k, inward) => audio.breath(k, inward);
 player.onDeath = (cause) => {
   screens.down(cause);
   wanted.died();

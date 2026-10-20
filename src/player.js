@@ -51,6 +51,12 @@ export class Player {
     this.bob = 0;
     this.burden = 0;            // 0..1: how much a tool in your hands slows you (a sledge mid-swing)
     this.sway = 0;              // rad: the view carried up and down by a heavy swing (the tool sets it)
+    this.wind = 1;              // 1 fresh .. 0 out of breath: running uses it up, walking gives it back
+    this.onStep = null;         // (speed) at each footfall
+    this.onLand = null;         // (speed) landing from a jump or a fall
+    this.onBreath = null;       // (how winded 0..1, in or out)
+    this._stepped = 0;
+    this._breathT = 0;
     this._slow = 0;             // s of a jolt that stops you short
     this._kick = { p: 0, r: 0, vp: 0, vr: 0 };   // the view knocked about by a blow, sprung back
     this._hurt = 0;
@@ -138,6 +144,8 @@ export class Player {
     // Blocked going up: bumped a ceiling.
     if (want.y > 0 && got.y < want.y * 0.5) this.vel.y = 0;
     if (this.grounded && this.vel.y < 0) {
+      // Landing: the knees take it, the view dips, a thump.
+      if (-wasFalling > 4 && !this._wasGrounded) { this.punch(-Math.min(0.12, -wasFalling * 0.008)); this.onLand?.(-wasFalling); }
       if (-wasFalling > SAFE_FALL) this.damage((-wasFalling - SAFE_FALL) * 11, 'fall');
       this.vel.y = 0;
     }
@@ -149,17 +157,31 @@ export class Player {
     if (!this.dead && this._hurt > 5 && this.health < MAX_HEALTH) this.health = Math.min(MAX_HEALTH, this.health + dt * 5);
 
     const moving = this.grounded ? Math.hypot(this.vel.x, this.vel.z) : 0;
-    this.bob += moving * dt * 1.9;
+    // Footfalls a second: about two and a half walking, three and a half running.
+    this.bob += moving > 0.5 ? dt * (1.5 + 0.25 * moving) : 0;
+    this._wasGrounded = this.grounded;
+    // A footfall every half stride.
+    const step = Math.floor(this.bob);
+    if (step !== this._stepped) { this._stepped = step; if (moving > 0.8) this.onStep?.(moving); }
+    // Running winds you; standing and walking get it back. Winded, you breathe
+    // hard and the view heaves with it.
+    this.wind = Math.min(1, Math.max(0, this.wind + (moving > 6 ? -dt / 9 : dt / (moving > 0.5 ? 10 : 5))));
+    const winded = Math.max(0, 0.6 - this.wind) / 0.6;
+    if (winded > 0 && (this._breathT -= dt) <= 0) { this._breathT = 0.42 + 0.35 * (1 - winded); this._inward = !this._inward; this.onBreath?.(winded, this._inward); }
+    this._heave = winded * Math.sin(performance.now() / 1000 * Math.PI / (0.42 + 0.35 * (1 - winded))) * 0.012;
     this._syncCamera(moving);
   }
 
   _syncCamera(moving) {
-    const b = Math.sin(this.bob * Math.PI) * Math.min(1, moving / 5) * 0.035;
+    // Head bob: down at each footfall, a little side to side, more running.
+    const run = Math.min(1, moving / 5) * (moving > 6 ? 1.4 : 1);
+    const b = -Math.abs(Math.cos(this.bob * Math.PI)) * run * 0.04 + (this._heave ?? 0);
+    const sideways = Math.sin(this.bob * Math.PI) * run * 0.006;
     // Stunned: down on the floor, the view tipped over.
     const down = Math.min(1, (this._stun ?? 0) * 2);
     this.camera.position.set(this.pos.x, this.pos.y + EYE - 0.62 * this.crouch - 1.1 * down + b, this.pos.z);
     const K = this._kick;
-    this.camera.rotation.set((this.pitch + K.p + this.sway) * (1 - down), this.yaw, down * 0.9 + K.r);
+    this.camera.rotation.set((this.pitch + K.p + this.sway) * (1 - down), this.yaw, down * 0.9 + K.r + sideways);
     this.camera.updateMatrixWorld();
   }
 
