@@ -60,10 +60,9 @@ export function pizzeria(P, cx, y, cz, yaw, w, d, { name = "TONY'S PIZZA", h = H
     const back = -d / 2 + 0.1;
     const cw = Math.min(w - 3, 4.2);
     const counterZ = back + 2.2;
-    // The oven in the back corner, the slices under the lamp on the counter.
+    // The oven in the back corner, the counter across the shop.
     put(P, fr, S.pizzaOven, w / 2 - 1.1, back + 0.9, 0);
     put(P, fr, S.stallCounter, -0.4, counterZ, 0, cw, 0x8a1c16);
-    put(P, fr, S.pizzaDisplay, -0.6, counterZ, 0, Math.min(cw - 1, 2.4));
     put(P, fr, F.counter, -1.2, back + 0.35, 0, Math.min(cw, 2.6));
     onWall(P, fr, S.menuBox, -1.0, back + 0.13, 0, 1.75, Math.min(cw, 2.8), MENU_TINT.pizza);
     // Tables along the other wall, red chairs.
