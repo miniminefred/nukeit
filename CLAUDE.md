@@ -245,8 +245,24 @@ shared). Bring the glass below the hall's roof (31 m) and carry the vault's mone
 getaway van (`sim/heist.js`: pallets tagged `money`, E fills a bag, one bag half speed, two
 a fifth, G drops one, the van takes them; with the money and the tower down, E in the van
 ends the job — the only way it ends). Much stronger: a denser tower frame, 1.8× durability,
-six extra charges. Stages still to build: security (cameras, lasers, lockdown, the alarm),
-money and the shop, the penthouse's loot, traders, the neighbours' stashes.
+six extra charges, three more guards. Its security (`sim/bank-security.js`): 32 cameras
+(domes and panning swivels, `CAMERAS` from `bank-interiors.js`; seen = guards sent and you
+count as witnessed; spray blinds, a blow kills), lasers across the vault (step over, crouch
+under; the alarm to the police; the `fusebox` piece turns them off), and the lockdown when
+the vault door is blown (steel shutters over the front doors and the lower level's stair
+door for 90 s). On the CEO's desk the vault code (opens the door quietly) and the trading
+books (a bonus at the van); a gold statue, a safe (blown, it drops cash), a helicopter on
+the roof, a money cart hidden downstairs (six bags), locked offices with stashes in the
+old buildings (`lockedOffice`, built in the city's carved ground floors), tickers that go
+red and crash, paper out of the trading floors' windows.
+
+**Money and the shop** (`data/wallet.js`, `data/shop.js`, `ui/shop.js`): a wallet kept
+between jobs — every job's fee, a heist's cut (the van's money over the client's share,
+plus what you found), the bank's bonus for leaving the stone hall standing, the most ever
+taken. The shop sells tools (the charges, the jackhammer: a column in 1.4 s), upgrades
+(applied at job start through `ctx.upgrades`, the tools' palette and discharge, the
+heist's carrying speeds), disguises (worn from the start, chosen on the tools page; they
+work as the vest does) and fun (a golden sledge, more paint, a party horn on H).
 
 **Two modes** on the title screen (`ui/menu.js`): Deconstruction (the jobs, difficulties,
 guards, police, the crime meter, achievements) and Creative (`CREATIVE` in
