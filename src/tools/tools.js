@@ -39,50 +39,82 @@ export class Sledge {
     this.t = -1;             // time into the current swing, or -1
     this.landed = false;
     this.lastHit = null;
+    this.feel = null;        // what the blow met: 'hard' stops it dead, 'ring' throws it back, 'soft' it goes through
   }
 
+  // A swing is heavy: you heave it up and back over your shoulder, your view
+  // tipping up with it, then bring it down. On concrete or stone it stops dead
+  // and the jolt goes through you; on steel it rings and jumps back; through
+  // wood, plaster or glass it carries on; into air it overshoots and drags you
+  // round. You walk slowly while you swing, and it takes a moment to get it
+  // back up.
   update(dt, ctx) {
     const m = this.model;
+    const { player } = ctx;
     const down = ctx.input.mouse.left && ctx.input.mouse.locked;
-    if (this.t < 0 && down) { this.t = 0; this.landed = false; ctx.audio?.swing(); }
+    if (this.t < 0 && down) { this.t = 0; this.landed = false; this.feel = null; }
     // Rest pose: over the right shoulder, head up.
     let rx = -0.35, rz = 0.3, px = 0.42, py = -0.5, pz = -0.75;
     if (this.t >= 0) {
       this.t += dt;
       const t = this.t;
-      if (t < 0.24) {                 // wind up: head goes back over the shoulder
-        const k = ease(t / 0.24);
-        rx += 1.0 * k; py += 0.12 * k; pz += 0.08 * k; rz += 0.15 * k;
-      } else if (t < 0.36) {          // the blow
-        const k = ease((t - 0.24) / 0.12);
-        rx += 1.0 - 2.5 * k; py += 0.12 - 0.12 * k; pz += 0.08 - 0.28 * k; rz += 0.15 - 0.35 * k; px -= 0.14 * k;
-        if (!this.landed && t > 0.32) { this.landed = true; this._strike(ctx); }
-      } else if (t < 0.85) {          // recover
-        const k = ease((t - 0.36) / 0.49);
-        rx += -1.5 * (1 - k); pz += -0.2 * (1 - k); rz += -0.2 * (1 - k); px -= 0.14 * (1 - k);
-      } else this.t = -1;
+      player.burden = 0.55;
+      if (t < 0.42) {                 // the heave: head right back over the shoulder
+        const k = ease(t / 0.42);
+        rx += 2.0 * k; py += 0.24 * k; pz += 0.2 * k; rz += 0.35 * k; px += 0.06 * k;
+        player.sway = 0.07 * k;
+        if (t + dt >= 0.3 && t < 0.3) ctx.audio?.swing();
+      } else if (t < 0.56) {          // the blow
+        const k = ease((t - 0.42) / 0.14);
+        rx += 2.0 - 3.55 * k; py += 0.24 - 0.24 * k; pz += 0.2 - 0.42 * k; rz += 0.35 - 0.57 * k; px += 0.06 - 0.22 * k;
+        player.sway = 0.07 - 0.15 * k;
+        if (!this.landed && t > 0.52) { this.landed = true; this._strike(ctx); }
+      } else if (t < 1.25) {          // what it met, then getting it back up
+        const u = (t - 0.56) / 0.69;
+        let hold = 0, over = 0, jump = 0;
+        if (this.feel === 'hard') hold = Math.max(0, 1 - u * 4);                    // stopped dead, a moment
+        else if (this.feel === 'ring') jump = Math.sin(Math.min(1, u * 3) * Math.PI) * 0.6;   // thrown back up
+        else over = Math.sin(Math.min(1, u * 2.2) * Math.PI) * (this.feel === 'soft' ? 0.35 : 0.6); // through, or into air
+        const k = ease(Math.max(0, (u - 0.15) / 0.85));
+        player.sway = -0.08 * (1 - k) - over * 0.06 * (1 - k);
+        rx += (-1.55 - over + jump) * (1 - k); pz += -0.22 * (1 - k); rz += -0.22 * (1 - k); px += -0.16 * (1 - k);
+        if (hold > 0) rx += 0.02 * Math.sin(t * 90) * hold;       // the shudder up the handle
+      } else { this.t = -1; player.burden = 0; player.sway = 0; }
     } else {
-      // A little sway while you walk.
-      const b = ctx.player.bob;
-      px += Math.sin(b * Math.PI) * 0.01; py += Math.abs(Math.cos(b * Math.PI)) * 0.012;
+      // A little sway while you walk, heavier the faster.
+      const b = player.bob;
+      px += Math.sin(b * Math.PI) * 0.014; py += Math.abs(Math.cos(b * Math.PI)) * 0.018;
+      rz += Math.sin(b * Math.PI) * 0.03;
     }
     m.position.set(px, py, pz);
     m.rotation.set(rx, 0, rz);
   }
 
+  // Put down mid-swing: nothing weighs on you any more.
+  unequip(ctx) { this.t = -1; ctx.player.burden = 0; ctx.player.sway = 0; }
+
   _strike(ctx) {
     const { hit, dir, origin } = aim(ctx, 2.4);
+    const { player } = ctx;
     // A guard or an officer in the way takes it: down, dazed, up again.
-    if (ctx.security?.strike(origin, dir, hit ? Math.min(2.4, hit.distance) : 2.4)) { ctx.shake?.add(0.1); return; }
+    if (ctx.security?.strike(origin, dir, hit ? Math.min(2.4, hit.distance) : 2.4)) { this.feel = 'soft'; ctx.shake?.add(0.1); player.punch?.(-0.03, 0); return; }
     if (!hit || !hit.owner || !hit.owner.parts) {
-      if (hit) ctx.audio?.hit('concrete', hit.point.x, hit.point.y, hit.point.z, 0.6);
+      if (hit) { ctx.audio?.hit('concrete', hit.point.x, hit.point.y, hit.point.z, 0.6); this.feel = 'hard'; player.punch?.(0.06, 0.02); ctx.shake?.add(0.18); }
+      else { this.feel = null; player.punch?.(-0.06, 0.03); }       // nothing there: it drags you round
       return;
     }
-    const kind = ctx.damage.hit(hit.owner, hit.point, hit.normal, dir, 1);
+    // What it is made of, before the blow changes it.
+    const p = hit.owner;
+    const sound = p.parts[ctx.damage.partAt(p, ctx.damage.toLocal(p, hit.point))]?.kind?.sound;
+    this.feel = sound === 'concrete' || sound === 'marble' ? 'hard' : sound === 'steel' || sound === 'brass' || sound === 'mullion' ? 'ring' : 'soft';
+    const kind = ctx.damage.hit(p, hit.point, hit.normal, dir, 1);
     this.lastHit = kind?.name ?? null;
     ctx.security?.noise(hit.point, 1, true);
-    ctx.wanted?.struck(hit.owner, hit.point);
-    ctx.shake?.add(0.12);
+    ctx.wanted?.struck(p, hit.point);
+    // The jolt: a hard stop goes up your arms into your head.
+    if (this.feel === 'hard') { ctx.shake?.add(0.22); player.punch?.(0.08, (Math.random() - 0.5) * 0.04); player.slow?.(0.35); }
+    else if (this.feel === 'ring') { ctx.shake?.add(0.28); player.punch?.(0.1, (Math.random() - 0.5) * 0.06); player.slow?.(0.25); }
+    else { ctx.shake?.add(0.08); player.punch?.(-0.02, 0); }
   }
 }
 

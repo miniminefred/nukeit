@@ -49,6 +49,10 @@ export class Player {
     this.onDamage = null;
     this.onDeath = null;
     this.bob = 0;
+    this.burden = 0;            // 0..1: how much a tool in your hands slows you (a sledge mid-swing)
+    this.sway = 0;              // rad: the view carried up and down by a heavy swing (the tool sets it)
+    this._slow = 0;             // s of a jolt that stops you short
+    this._kick = { p: 0, r: 0, vp: 0, vr: 0 };   // the view knocked about by a blow, sprung back
     this._hurt = 0;
     this._move = new THREE.Vector3();
   }
@@ -73,6 +77,12 @@ export class Player {
   // Tangled in a net: you can barely move.
   tangle(t) { this._tangle = Math.max(this._tangle ?? 0, t); }
 
+  // A blow felt through the arms: the view knocked up (pitch) and over (roll),
+  // springing back.
+  punch(pitch, roll = 0) { this._kick.vp += pitch * 30; this._kick.vr += roll * 30; }
+  // Stopped short for a moment.
+  slow(t) { this._slow = Math.max(this._slow, t); }
+
   damage(amount, cause) {
     if (this.dead || amount <= 0.5 || this.immortal) return;
     this.health = Math.max(0, this.health - amount);
@@ -85,6 +95,11 @@ export class Player {
     const { input } = this;
     if (this._stun > 0) this._stun -= dt;
     if (this._tangle > 0) this._tangle -= dt;
+    if (this._slow > 0) this._slow -= dt;
+    // The knocked view springs back: stiff, a little bounce.
+    const K = this._kick;
+    K.vp += (-K.p * 180 - K.vp * 18) * dt; K.vr += (-K.r * 180 - K.vr * 18) * dt;
+    K.p += K.vp * dt; K.r += K.vr * dt;
     if (input.mouse.locked && !this.dead && this.stunned) { input.takeMouse(); this.vel.x *= 0.8; this.vel.z *= 0.8; }
     else if (input.mouse.locked && !this.dead) {
       const { dx, dy } = input.takeMouse();
@@ -97,7 +112,8 @@ export class Player {
       const speed = crouching ? CROUCH
         : input.down('ShiftLeft') || input.down('ShiftRight') ? RUN : WALK;
       const m = this._move.set(r, 0, -f);
-      if (m.lengthSq() > 0) m.normalize().multiplyScalar(this._tangle > 0 ? speed * 0.25 : speed).applyAxisAngle(THREE.Object3D.DEFAULT_UP, this.yaw);
+      const heavy = (1 - 0.45 * this.burden) * (this._slow > 0 ? 0.3 : 1);
+      if (m.lengthSq() > 0) m.normalize().multiplyScalar((this._tangle > 0 ? speed * 0.25 : speed) * heavy).applyAxisAngle(THREE.Object3D.DEFAULT_UP, this.yaw);
       // On a wet floor your feet hardly grip: you slide on into a turn, and
       // take a while to stop.
       const k = this.grounded ? Math.min(1, dt * 14 * (1 - 0.88 * this.wet)) : Math.min(1, dt * 2);
@@ -142,7 +158,8 @@ export class Player {
     // Stunned: down on the floor, the view tipped over.
     const down = Math.min(1, (this._stun ?? 0) * 2);
     this.camera.position.set(this.pos.x, this.pos.y + EYE - 0.62 * this.crouch - 1.1 * down + b, this.pos.z);
-    this.camera.rotation.set(this.pitch * (1 - down), this.yaw, down * 0.9);
+    const K = this._kick;
+    this.camera.rotation.set((this.pitch + K.p + this.sway) * (1 - down), this.yaw, down * 0.9 + K.r);
     this.camera.updateMatrixWorld();
   }
 
