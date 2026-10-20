@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { KIND } from '../render/materials.js';
 import { box, cylinder } from '../render/geometry.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
 // What you are holding, as meshes in the viewmodel scene. Built from the same
 // materials as the building, so the sledge's handle has the same grain as a desk.
@@ -10,6 +11,37 @@ const mat = (kind, tint) => {
   if (tint !== undefined) m.color = new THREE.Color(tint);
   return m;
 };
+
+// Your hand, in a work glove, round something `r` thick that runs along the
+// local y axis, with the forearm in its jacket sleeve going off towards the
+// elbow along `elbow` (in the same local space). Every tool is held, so the
+// handle never ends in the air.
+const GLOVE = 0x5e4630, SLEEVE = 0x1e2228, CUFF = 0x4a3826;
+export function hand(r, elbow, { len = 0.42, grip = 1 } = {}) {
+  const g = new THREE.Group();
+  const glove = new THREE.MeshStandardMaterial({ color: GLOVE, roughness: 0.85 });
+  // The fingers wrapped round the handle, the back of the hand behind it.
+  const fingers = new THREE.Mesh(new THREE.TorusGeometry(r + 0.016, 0.019, 8, 18, Math.PI * 1.35 * grip), glove);
+  fingers.rotation.set(Math.PI / 2, 0, -0.4);
+  fingers.scale.set(1, 1, 2.2);
+  const back = new THREE.Mesh(new RoundedBoxGeometry(0.07, 0.085, 0.04, 2, 0.015), glove);
+  back.position.set(0, 0, r + 0.03);
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.014, 0.04, 4, 8), glove);
+  thumb.position.set(-r - 0.012, 0.035, 0.012);
+  thumb.rotation.z = 0.5;
+  g.add(fingers, back, thumb);
+  // The forearm: cuff, then sleeve, off to the elbow.
+  const arm = new THREE.Group();
+  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.04, 0.07, 12), new THREE.MeshStandardMaterial({ color: CUFF, roughness: 0.85 }));
+  cuff.position.y = 0.06;
+  const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.058, len, 12), new THREE.MeshStandardMaterial({ color: SLEEVE, roughness: 0.9 }));
+  sleeve.position.y = 0.09 + len / 2;
+  arm.add(cuff, sleeve);
+  arm.position.set(0, 0, r + 0.02);
+  arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), elbow.clone().normalize());
+  g.add(arm);
+  return g;
+}
 
 export function sledgeModel() {
   const g = new THREE.Group();
@@ -28,6 +60,14 @@ export function sledgeModel() {
   g.add(handle, grip, head, faceL, faceR);
   // The pivot is the grip: that is where your hands are.
   g.children.forEach((c) => { c.position.y += 0.8; });
+  // Both hands on it: the right at the end of the handle, the left up it.
+  // (Elbow directions in the hammer's own frame at rest: down and back, the
+  // left arm coming in from the lower left.)
+  const right = hand(0.026, new THREE.Vector3(-0.12, -0.94, 0.31));
+  right.position.y = 0.04;
+  const left = hand(0.02, new THREE.Vector3(-0.75, -0.54, 0.38), { len: 0.45 });
+  left.position.y = 0.34;
+  g.add(right, left);
   const pivot = new THREE.Group();
   pivot.add(g);
   return pivot;
@@ -41,7 +81,9 @@ export function sprayModel() {
   band.position.y = 0.02;
   const cap = new THREE.Mesh(cylinder(0.012, 0.02, 10), mat('plastic', 0x222222));
   cap.position.y = 0.11;
-  g.add(can, band, cap);
+  const h = hand(0.033, new THREE.Vector3(0.2, -0.7, 0.7), { grip: 0.8 });
+  h.position.y = -0.03;
+  g.add(can, band, cap, h);
   g.userData.band = band;
   return g;
 }
@@ -59,7 +101,10 @@ export function extinguisherModel() {
   const nozzle = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.12, 10), mat('plastic', 0x111111));
   nozzle.position.set(0.12, 0.09, 0.12);
   nozzle.rotation.x = Math.PI / 2;
-  g.add(body, top, lever, hose, nozzle);
+  // Held by the neck under the lever, the arm hanging down behind.
+  const h = hand(0.03, new THREE.Vector3(0.25, -0.5, 0.85), { grip: 0.9 });
+  h.position.y = 0.2;
+  g.add(body, top, lever, hose, nozzle, h);
   return g;
 }
 
@@ -88,6 +133,9 @@ export function detonatorModel() {
   const charge = chargeModel();
   charge.scale.setScalar(0.9);
   charge.position.set(-0.12, -0.02, 0.02);
-  g.add(body, btn, ant, charge);
+  const h = hand(0.028, new THREE.Vector3(0.2, -0.6, 0.8), { grip: 0.7 });
+  h.position.y = -0.03;
+  h.scale.set(1, 1, 0.8);
+  g.add(body, btn, ant, charge, h);
   return g;
 }
