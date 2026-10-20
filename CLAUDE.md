@@ -230,6 +230,31 @@ over 70 brings the off-duty guards out of the **break room behind the lobby desk
 or are carrying the sledgehammer** (`security.spotted`, `fx.armed`); after searching every
 floor without a sighting they leave: "He is not here."
 
+**Two modes** on the title screen (`ui/menu.js`): Deconstruction (the jobs, difficulties,
+guards, police, the crime meter, achievements) and Creative (`CREATIVE` in
+`data/difficulty.js`: every tool, endless charges and powder, no guards, police, meter,
+dying or target).
+
+**The crime ladder** (`sim/wanted.js`): eight laws, the highest reached is your level —
+1 carrying the sledge or charges, 2 menacing people with it, 3 tagging, 4 vandalism,
+5 heavy vandalism (a wall, slab, column or core — judge by role: furniture is marked
+`structural` too), 6 public menace (knocking people over, `people.strike`), 7 explosives,
+8 threat to New York City (a collapse or topple, or a fifth of the tower gone). **Nothing
+counts unless someone sees it** (`fx.seen`: an agent seeing you, or anyone within 12 m);
+charges are yours only if someone saw one planted or you are already known (3+). Levels
+ebb while nobody chases you; the vest hides 1, 2 and 4 and marks on structure; dying leaves
+at most 2. A thermometer and a charge sheet, both switchable in Settings
+(`data/settings.js`); the results show a Midtown Herald clipping. Level 8 calls **SWAT**
+(`sim/swat.js`): a van over the kerb to the doors, a riot shield, a helicopter that ropes
+a team onto the roof and patrols **the avenue only** (the blocks round the tower reach
+160 m) with a spotlight that tells SWAT your floor; SWAT search twice as fast and hold
+cleared floors' stair doors.
+
+**Achievements** (`data/achievements.js`, `sim/achieve.js`, `ui/achievements.js`): 32 in
+bronze, silver and gold, Deconstruction only, told by events from the systems
+(`achieve.event`) or checked twice a second; tagged pieces (`vault`, `boardroom`,
+`penthousepiano`, `oven`, `freezer`, `waterfall`) say what was smashed.
+
 **Sprinklers, smoke and water** (`sim/water.js`, `sim/smoke.js`): heads every 3.5 m under
 every ceiling of the tower (instanced, not pieces; each remembers its slab), fed by red
 mains hung under the slabs (pieces, role `pipe`). A head opens over a fire after about a
