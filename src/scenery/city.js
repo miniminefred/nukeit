@@ -118,12 +118,16 @@ export function buildCity(scene, physics) {
   };
 
   const tints = [0xb9b2a6, 0x9ea3a8, 0xc7b89c, 0x8f9499, 0xa89586];
+  // The tower is the one you look at: what stands near it is lower than it,
+  // and the city only climbs to its full height further off — the big towers
+  // are on the skyline, not next door.
+  const below = (x, z, h) => Math.min(h, Math.max(22, 26 + Math.max(0, Math.hypot(x, z) - 38) * 1.1));
   // Along our side of the avenue, left and right of the plot.
   for (const side of [-1, 1]) {
     let x = side * 36;
     while (Math.abs(x) < 300) {
       const w = 14 + rand() * 18;
-      const h = 30 + rand() * 120;
+      const h = below(x + side * w / 2, -4, 30 + rand() * 120);
       tower(x + side * w / 2, -4, w, 36, h, tints[(rand() * tints.length) | 0], 1, Math.abs(x) < 37);
       x += side * (w + 2);
     }
@@ -134,13 +138,13 @@ export function buildCity(scene, physics) {
   for (let x = -280; x < 280;) {
     const w = 16 + rand() * 20;
     const z = x + w > -17 && x < 17 ? -66 : -48;
-    tower(x + w / 2, z, w, 40, 40 + rand() * 140, tints[(rand() * tints.length) | 0]);
+    tower(x + w / 2, z, w, 40, below(x + w / 2, z, 40 + rand() * 140), tints[(rand() * tints.length) | 0]);
     x += w + 3;
   }
   // Across the avenue.
   for (let x = -280; x < 280;) {
     const w = 14 + rand() * 20;
-    tower(x + w / 2, 70, w, 40, 25 + rand() * 110, tints[(rand() * tints.length) | 0], -1, Math.abs(x + w / 2) < 22);
+    tower(x + w / 2, 70, w, 40, below(x + w / 2, 70, 25 + rand() * 110), tints[(rand() * tints.length) | 0], -1, Math.abs(x + w / 2) < 22);
     x += w + 2;
   }
 
