@@ -197,6 +197,7 @@ const fear = new Fear({
   lounge: () => lounging,
 });
 security.fx.fear = fear;
+security.fx.wanted = () => wanted.now;
 // What you are wanted for (sim/wanted.js): the crime ladder, the thermometer,
 // the charge sheet.
 const wanted = new Wanted({

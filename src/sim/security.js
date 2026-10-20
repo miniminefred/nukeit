@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { T, FLOOR_H, CORE, PODIUM_FLOORS, TOP_FLOOR, LOWER, HQ } from '../building/plan.js';
 import { BREAK_ROOM } from '../building/interiors.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { Swat } from './swat.js';
 
 // Guards, and the police.
 //
@@ -136,7 +137,12 @@ export class Security {
       a.f = Math.round((a.pos.y - T(0)) / FLOOR_H); a.post = null;
     }
     this.agents = this.agents.filter((a) => a.kind !== 'guard');
-    this.call('SWAT are on their way');
+    // SWAT come at once: the van down the avenue, the helicopter over the roof.
+    this.squad = new Swat(this);
+    this.squad.start();
+    this.police = true;
+    this.eta = null;
+    this.fx.audio?.siren?.(true);
   }
 
   // A swing or a jet that might land on a guard or an officer: knocked down,
@@ -149,6 +155,12 @@ export class Security {
       if (along < 0 || along > range + 0.4) continue;
       const off = _w.copy(c).sub(origin).addScaledVector(dir, -along).length();
       if (off > (kind === 'spray' ? 0.9 : 0.55)) continue;
+      // A riot shield takes it: a clang, sparks, and nothing more.
+      if (this.squad?.blocks(a, dir)) {
+        this.fx.audio?.hit?.('steel', c.x, c.y, c.z, 1);
+        for (let i = 0; i < 8; i++) this.fx.particles.spawn('spark', c.x - dir.x * 0.5, c.y, c.z - dir.z * 0.5, (Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3, 0xffd27a);
+        return true;
+      }
       a.state = 'down'; a.daze = kind === 'spray' ? 2.5 : 4.5; a.target = null; a.armUp = 0;
       a.angry++;
       this.fx.fear?.scare(a.pos, 8);
@@ -186,6 +198,7 @@ export class Security {
       if (this.eta <= 0) this._arrive();
     }
     if (this.police) { this._lights(dt); this._drive(dt); this._search(dt); }
+    this.squad?.update(dt);
     const eye = this.fx.camera.position;
     this.seesYou = false;
     for (const a of this.agents) {
@@ -204,7 +217,9 @@ export class Security {
       // Seen at it — by a guard or an officer — and everyone knows who to look for.
       if (sees && this.time - this.lastBlow < 1.5) this.spotted = this.time;
       // An officer seeing someone who looks like they belong has seen nobody.
-      const noticed = sees && (a.kind !== 'cop' || this.time - this.spotted < 60 || this.fx.armed?.());
+      // High on the crime ladder, every officer knows your face.
+      const known = (this.fx.wanted?.() ?? 0) >= 6;
+      const noticed = sees && (a.kind !== 'cop' || known || this.time - this.spotted < 60 || this.fx.armed?.());
       if (noticed) { a.seen = this.time; a.last = player.pos.clone(); }
       // Off duty: out of the break room when the building gets frightened.
       if (a.mode === 'rest') {
@@ -218,7 +233,7 @@ export class Security {
       // Nobody lays a hand on you unless someone has seen you break something.
       // Walking about with a sledgehammer gets you followed and watched, and
       // asked to put it down; otherwise you are just someone in a building.
-      const witnessed = this.time - this.spotted < 60;
+      const witnessed = known || this.time - this.spotted < 60;
       if (noticed && witnessed) {
         if (a.mode !== 'chase') { a.mode = 'chase'; a.minD = 99; this._call(a); }
       } else if (noticed && this.fx.armed?.() && a.mode !== 'chase') a.mode = 'watch';
@@ -251,6 +266,11 @@ export class Security {
           break;
         }
         case 'look': if (a.last) this._go(a, a.last, GUARD_RUN * 0.7); break;
+        case 'stair':
+          // SWAT holding a cleared floor's stair door.
+          a.state = 'calm';
+          if (a.pos.distanceTo(a.post) > 0.4) this._go(a, a.post, WALK * 2); else { a.target = null; a.yaw = 0; }
+          break;
         case 'chase': this._chase(a, dist, sees, dt); break;
         case 'watch':
           // Keeping an eye on you, a few metres off, and asking you nicely.
@@ -295,6 +315,7 @@ export class Security {
     a.state = 'running';
     a.minD = Math.min(a.minD ?? 99, dist);
     if (a.kind === 'cop') {
+      if (a.swat && a.arm !== 'catch' && dist > CATCH * 1.5 && this._ranged(a, dist, sees)) return;
       if (dist < CATCH && this.busted === undefined) this._bust(a);
       else this._go(a, player.pos, run);
       return;
@@ -340,6 +361,34 @@ export class Security {
       default:
         this._tackleOr(a, dist, run);
     }
+  }
+
+  // SWAT with a net, a taser or (Insane) a gun: fire when it can. True if fired.
+  _ranged(a, dist, sees) {
+    const { player, particles, audio, hud } = this.fx;
+    if (!sees || a.cool > 0) return false;
+    if (a.arm === 'net' && dist > 2.5 && dist < 9) {
+      a.cool = 6; this._face(a, player.pos); a.target = null;
+      audio?.thwip?.(a.pos.x, a.pos.y, a.pos.z);
+      this._trail(a, 0xd8d8c8, 14);
+      if (Math.random() < 0.7) { player.tangle?.(3.5); hud?.flash('Caught in a net!', 1.5); this.fx.onZapped?.(); }
+      return true;
+    }
+    if (a.arm === 'taser' && dist > 1.5 && dist < 7) {
+      a.cool = 5; this._face(a, player.pos); a.target = null; a.armUp = 1;
+      audio?.buzz?.(a.pos.x, a.pos.y, a.pos.z);
+      this._trail(a, 0x9fd8ff, 18);
+      if (Math.random() < 0.75) { player.stun?.(2.2); this.fx.shake?.add(0.35); hud?.flash('Tasered!', 1.5); this.fx.onZapped?.(); }
+      return true;
+    }
+    if (a.arm === 'gun' && dist < 24) {
+      a.cool = 0.9 + Math.random() * 0.6; this._face(a, player.pos); a.target = null; a.armUp = 1;
+      audio?.shot?.(a.pos.x, a.pos.y, a.pos.z);
+      particles.spawn('flash', a.pos.x + Math.sin(a.yaw) * 0.5, a.pos.y + 1.4, a.pos.z + Math.cos(a.yaw) * 0.5, 0, 0, 0, 0xffd27a);
+      if (Math.random() < 0.3) player.damage(18, 'shot');
+      return true;
+    }
+    return false;
   }
 
   _tackleOr(a, dist, run) {
@@ -504,10 +553,21 @@ export class Security {
     for (const a of cops) {
       if (a.hidden || a.mode !== 'search') { a.onFloor = 0; continue; }
       a.onFloor = (a.onFloor ?? 0) + dt;
-      if (a.onFloor > 20) {
+      // SWAT search in half the time; a known face, quicker still.
+      const per = (a.swat ? 10 : 20) * ((this.fx.wanted?.() ?? 0) >= 6 ? 0.75 : 1);
+      if (a.onFloor > per) {
         this.searched.add(a.f);
         a.onFloor = 0;
-        for (let f = LOWER; f <= TOP_FLOOR; f++) if (!this.searched.has(f) && !cops.some((b) => b !== a && b.goal === f)) { this._toFloor(a, f); break; }
+        // SWAT leave one of theirs at the stair door of a floor they have cleared.
+        const squad = cops.filter((b) => b.swat);
+        if (a.swat && squad.filter((b) => b.mode === 'stair').length < squad.length - 2 && !squad.some((b) => b.mode === 'stair' && b.f === a.f)) {
+          a.mode = 'stair'; a.post = this._door(a.f).add(new THREE.Vector3(0.9, 0, 0.6));
+          continue;
+        }
+        const order = [];
+        for (let f = LOWER; f <= TOP_FLOOR; f++) order.push(f);
+        if (a.down) order.reverse();
+        for (const f of order) if (!this.searched.has(f) && !cops.some((b) => b !== a && b.goal === f)) { this._toFloor(a, f); break; }
       }
     }
     if (this.searched.size >= TOP_FLOOR - LOWER + 1 && this.time - lastSeen > 30) this._leave();
@@ -521,6 +581,8 @@ export class Security {
     this.agents = this.agents.filter((a) => a.kind !== 'cop');
     for (const c of this.cars) c.car.removeFromParent();
     this.cars.length = 0;
+    this.squad?.clear();
+    this.squad = null;
     this.police = false;
     this.calls++;
     this.heat = HEAVY * 0.5;
@@ -568,6 +630,8 @@ export class Security {
     this.busted = undefined;
     this.swatCalled = false;
     this.level = null;
+    this.squad?.clear();
+    this.squad = null;
     this.fx.audio?.siren?.(false);
   }
 }

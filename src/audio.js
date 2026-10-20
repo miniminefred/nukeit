@@ -285,6 +285,17 @@ export class Audio {
     }
   }
 
+  // A helicopter's rotor: a low, quick thud-thud-thud, all the time it is up.
+  rotor(on) { this._rotor = on; this._rotorT = 0; }
+  _rotorTick(dt) {
+    if (!this._rotor || !this.ctx) return;
+    this._rotorT += dt;
+    if (this._rotorT > 0.085) {
+      this._rotorT = 0;
+      this._noise(this._out(0.06, 0), { type: 'lowpass', f: 160, q: 0.8, len: 0.07, gain: 1, attack: 0.003 });
+    }
+  }
+
   // The ding-dong before an announcement.
   chime() {
     if (!this.ctx) return;
@@ -353,6 +364,7 @@ export class Audio {
     if (!this.ctx) return;
     this._alarmTick(dt);
     this._sirenTick(dt);
+    this._rotorTick(dt);
     this.loops.rumble.gain.setTargetAtTime(this._rumble * 1.4, this.ctx.currentTime, 0.2);
     this._rumble = Math.max(0, this._rumble - dt * 0.35);
     // Voices rise and fall: talk is a murmur that is never steady.
