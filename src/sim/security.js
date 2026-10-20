@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { T, FLOOR_H, PODIUM_FLOORS, TOP_FLOOR, LOWER, HQ, STAIR_DOOR } from '../building/plan.js';
-import { BREAK_ROOM } from '../building/interiors.js';
 import { SITE } from '../site.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Swat } from './swat.js';
@@ -57,12 +56,14 @@ export class Security {
     this.cars = [];
   }
 
-  start(level) {
+  start(level, job = {}) {
     this.clear();
     this.level = level;
+    // A job may have more guards than its difficulty gives (the bank does).
+    const guards = level.guards ? level.guards + (job.guards ?? 0) : 0;
     const { people } = this.fx;
     const POSTS = posts();
-    for (let n = 0; n < level.guards && n < POSTS.length; n++) {
+    for (let n = 0; n < guards && n < POSTS.length; n++) {
       const [f, x, z] = POSTS[n];
       const at = people._spot(f, new THREE.Vector3(x, T(f), z), 1) ?? people._spot(f);
       if (!at) continue;
@@ -75,7 +76,7 @@ export class Security {
     // the building gets frightened.
     const off = { supereasy: 0, easy: 1, normal: 2, hard: 3, insane: 4 }[level.id] ?? 0;
     for (let n = 0; n < off; n++) {
-      const [x, z, yaw] = BREAK_ROOM.seats[n];
+      const [x, z, yaw] = SITE.breakRoom[n];
       const at = new THREE.Vector3(x, T(0), z);
       const arm = level.arms[(Math.random() * level.arms.length) | 0];
       const a = people.agent(0, at, { ...GUARD, head: SKIN[(Math.random() * SKIN.length) | 0] }, 1);

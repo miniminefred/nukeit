@@ -159,6 +159,7 @@ export class SprayCan {
     const size = 0.1 + hit.distance * 0.09;
     spray(ctx.pieces, hit.owner, hit.point, hit.normal, hex, size);
     ctx.wanted?.tagged(hit.owner, hit.point, 0.045);
+    ctx.bankSecurity?.sprayed(hit.owner);
   }
 
   unequip(ctx) { if (this.spraying) { this.spraying = false; ctx.audio?.spray(false); } }

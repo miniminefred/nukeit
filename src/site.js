@@ -49,6 +49,8 @@ export const FIFTH_AVENUE = {
   ],
   menuCamera: { at: [19, 2.2, 31], look: [0, 42, 0] },
   respawn: [0, 1, 20],
+  // The guards' break room, behind the lobby desk: where the off-duty sit [x, z, yaw].
+  breakRoom: [[-11.4, 1.15, 0], [-10.6, 1.15, 0], [-8.5, 2.35, 0], [-8.5, 3.65, Math.PI]],
 };
 
 useSite(FIFTH_AVENUE);
@@ -71,6 +73,8 @@ export const WALL_STREET = {
   pigeons: [[-10, 21], [12, 21.5], [-32, 21], [34, 20.5], [-55, 21], [50, 21], [-24, 35], [20, 35.5], [-45, 35], [42, 34.5]],
   menuCamera: { at: [26, 2.2, 31], look: [0, 70, 0] },
   respawn: [0, 1, 21],
+  // Off duty round the meeting table in the back of the banking hall.
+  breakRoom: [[12.6, -9, Math.PI / 2], [15.4, -9, -Math.PI / 2], [14, -10.3, 0], [14, -7.7, Math.PI]],
   // The getaway van, parked in the bay east of the bank, its back doors open.
   van: { x: 34, z: 24.6, yaw: -Math.PI / 2 },
 };

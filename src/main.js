@@ -30,6 +30,7 @@ import { Body } from './body.js';
 import { Senses } from './fx/senses.js';
 import { Pigeons } from './sim/pigeons.js';
 import { Heist } from './sim/heist.js';
+import { BankSecurity } from './sim/bank-security.js';
 import { settings } from './data/settings.js';
 import { signs, places } from './building/shops.js';
 import { Topple } from './sim/topple.js';
@@ -214,7 +215,7 @@ security.fx.wanted = () => wanted.now;
 const wanted = new Wanted({
   security, people, player, hud, audio, settings,
   // Somebody sees you right now: a guard or an officer, or anyone near you.
-  seen: () => !player.dead && (security.seesYou || people.witnesses(player.pos)),
+  seen: () => !player.dead && (security.seesYou || bankSecurity.sees || people.witnesses(player.pos)),
 });
 security.fx.onOffence = (n, at) => wanted.offend(n, at);
 // Being there (fx/senses.js): dust in your eyes, ringing ears, heat, a trembling floor.
@@ -246,11 +247,14 @@ let heistTip = null;
 // The money, on a heist job (sim/heist.js): bags from the vault to the van, and
 // the van ends the job.
 const heist = new Heist({ scene, vmScene, pieces, player, input, hud, audio, onEscape: () => finish() });
+// The bank's cameras, lasers and lockdown (sim/bank-security.js).
+const bankSecurity = new BankSecurity({ scene, world, pieces, physics, player, camera, security, water, hud, audio, shake });
 let rig = null;           // dev: { at, look } to hold the camera there
 let toppling = false;
 let waterfall = null;     // the sheet of water down the atrium wall, while it stands
 
 const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene, world, powder, security, wanted, achieve };
+ctx.bankSecurity = bankSecurity;     // the spray can blinds its cameras
 
 // ---------------------------------------------------------------- state
 
@@ -315,7 +319,8 @@ async function start(jobId, toolIds, levelId = 'normal') {
   people.populate(pieces);
   pigeons.populate();
   heist.reset(job, difficulty);
-  security.start(difficulty);
+  bankSecurity.reset(job, difficulty);
+  security.start(difficulty, job);
   fear.reset();
   wanted.reset(difficulty);
   achieve.reset(difficulty, job.id);
@@ -364,6 +369,7 @@ function unloadJob() {
   rubble.clear();
   pigeons.clear();
   heist.clear();
+  bankSecurity.clear();
   security.clear();
   traffic.clear();
   people.clear();
@@ -549,7 +555,7 @@ function frame(dt) {
     water.update(dt);
     powder.update();
     if (state === 'play') {
-      security.update(dt); fear.update(dt);
+      security.update(dt); fear.update(dt); bankSecurity.update(dt);
       // Bringing it down — a collapse, a tower going over, a fifth of it gone — is a threat to the city.
       if (topple.active || structure.collapsing || fear.wreck > 0.2) wanted.offend(8, camera.position);
       if (fear.fx.chasing()) wanted.offend(2, player.pos, true);
@@ -680,7 +686,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, body, senses, pigeons, heist, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, body, senses, pigeons, heist, bankSecurity, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.

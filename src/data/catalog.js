@@ -59,6 +59,7 @@ export const JOBS = [
     entry: BANK_ENTRY,
     strength: 1.8,            // much stronger than Trump Tower: more charges, better placed
     charges: 6,               // more in the detonator than the difficulty gives
+    guards: 3,                // bank guards, more than the difficulty's
     requires: 'trump',        // finish Trump Tower first
     heist: true,              // money to the van, and the van ends the job
     unlocks: 'jackhammer',

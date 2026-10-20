@@ -19,9 +19,27 @@ import { T, U, LOWER, ATRIUM, floorUse } from './plan.js';
 
 const HALF = Math.PI / 2;
 
+// The bank's cameras, as they are built (sim/bank-security.js watches through
+// them): { piece, kind 'dome' | 'swivel', x, y (the ceiling), z, yaw, f }.
+export const CAMERAS = [];
+
+// A camera under the ceiling over (x, z) on floor f, the ceiling at yTop: a
+// black dome, or the bracket of a swivel camera (its head is drawn by
+// sim/bank-security.js). `yaw`: which way a swivel camera looks at rest.
+function cam(P, kind, f, x, yTop, z, yaw = 0) {
+  const y = yTop - 0.03;
+  const boxes = kind === 'dome'
+    ? [{ cyl: [0, -0.015, 0], r: 0.19, h: 0.03, seg: 16 }, { ball: [0, -0.06, 0], s: [0.15, 0.12, 0.15] }]
+    : [{ cyl: [0, -0.015, 0], r: 0.08, h: 0.03, seg: 10 }, { cyl: [0, -0.22, 0], r: 0.025, h: 0.42, seg: 8 }];
+  const piece = assembly(P, x, y, z, 0, [{ kind: 'plastic', boxes, tint: 0x16181a }], 'lamp', { floor: f, hang: true, structural: false, tag: 'camera' });
+  if (piece) CAMERAS.push({ piece, kind, x, y, z, yaw, f });
+}
+
 export function furnishBank(P, f) {
   const y = T(f);
   const use = floorUse(f);
+  if (f === LOWER) CAMERAS.length = 0;
+  cameras(P, f, use);
   if (f === LOWER) vault(P, y);
   else if (use === 'banking hall') hall(P, y);
   else if (use === 'mezzanine') gallery(P, f, y);
@@ -33,6 +51,30 @@ export function furnishBank(P, f) {
   else if (use === 'ceo') ceo(P, y);
   // A spare extinguisher on the core's east wall, every third floor.
   if (f >= 0 && f % 3 === 0) W.extinguisher(P, 5.12, y, 1.6, HALF, true);
+}
+
+// Where the cameras are, floor by floor.
+function cameras(P, f, use) {
+  const top = U(f);
+  if (f === LOWER) {
+    cam(P, 'dome', f, -14, top, -2.5);
+    cam(P, 'dome', f, -14, top, -11.5);
+    cam(P, 'swivel', f, -2.5, top, -5, -HALF);
+  } else if (use === 'banking hall') {
+    for (const x of [-8, 8]) cam(P, 'dome', f, x, U(ATRIUM.top), 11);
+    for (const x of [-19, 19]) cam(P, 'dome', f, x, top, 9);
+    cam(P, 'dome', f, 0, top, -10);
+    cam(P, 'swivel', f, -11, top, 4.4, 0);
+    cam(P, 'swivel', f, 11, top, 4.4, 0);
+  } else if (use === 'mezzanine') {
+    cam(P, 'dome', f, -18, top, -6);
+    cam(P, 'dome', f, 18, top, -6);
+  } else if (use === 'private banking' || use === 'trading') {
+    cam(P, 'swivel', f, 0, top, -6, Math.PI);
+  } else if (use === 'executive' || use === 'boardroom' || use === 'ceo') {
+    cam(P, 'dome', f, -8, top, 6);
+    cam(P, 'dome', f, 8, top, -6);
+  }
 }
 
 // ---------------------------------------------------------------- the vault
@@ -69,7 +111,9 @@ function vault(P, y) {
   F.transformer(P, 15.2, y, -13, 0);
   W.boiler(P, 10.5, y, -12.6, 0);
   F.electricalCabinet(P, 7, y, -13.8, 0);
-  F.electricalCabinet(P, 8, y, -13.8, 0);
+  // The fuse box the vault's lasers run on (sim/bank-security.js), beside the others.
+  const fuse = F.electricalCabinet(P, 8, y, -13.8, 0);
+  if (fuse) fuse.tag = 'fusebox';
   W.palletCrates(P, 18, y, 6, 0, 2);
   W.palletCrates(P, 15.5, y, 6, 0, 1);
   W.extinguisher(P, 12, y, -6, 0);
