@@ -129,7 +129,9 @@ export class Structure {
       if (p.state !== 'static') continue;
       const lost = this._lostNear(p, ADJACENT);
       const load = this.loadOf(p);
-      const chain = load > 0 && lost >= chainAt(p.role);
+      // (A support that falling debris cannot break — the bank's old hall — does
+      // not give way in a chain either: only to what you do to it.)
+      const chain = load > 0 && lost >= chainAt(p.role) && p.tough !== Infinity;
       if (!chain && !this.mustFail(p)) continue;
       if (p.warned) continue;
       p.warned = true;
@@ -334,7 +336,7 @@ export class Structure {
         const p = f.stump[n];
         if (p.state !== 'static') continue;
         if (p.box.max.y < bottom - reach) break;
-        const cost = p.volume * p.kind.density * 9.81 * 3 * (p.structural || p.role === 'slab' ? 1 : 0.1);
+        const cost = p.volume * p.kind.density * 9.81 * 3 * (p.structural || p.role === 'slab' ? 1 : 0.1) * (p.tough ?? 1);
         if (cost > f.energy) return this._stop(f);
         f.energy -= cost;
         this._crush(p, 0, f);

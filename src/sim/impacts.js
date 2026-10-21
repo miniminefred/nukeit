@@ -145,7 +145,7 @@ export class Impacts {
   absorb(q, blows, from, by) {
     if (!(q.structural || q.role === 'slab')) return this._take(q, blows, from, by);
     const J = blows * BLOW;
-    const cap = q.volume * q.kind.density * 9.81 * 3;
+    const cap = q.volume * q.kind.density * 9.81 * 3 * (q.tough ?? 1);
     if (q.shockT !== undefined) q.shock *= Math.exp(-(this.time - q.shockT) / 2);
     q.shockT = this.time;
     q.shock = (q.shock ?? 0) + J;

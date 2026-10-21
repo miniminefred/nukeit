@@ -75,6 +75,7 @@ export class Pieces {
       hp: null,
       hpMax: null,
       load: spec.load ?? 0,        // storeys this piece carries, for columns and core
+      tough: spec.tough ?? 1,      // times what falling debris needs to break it (the bank's old stone hall)
       burning: 0,
       charred: 0,
       crack: null,

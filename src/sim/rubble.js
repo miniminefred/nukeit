@@ -180,7 +180,7 @@ export class Rubble {
     q.burden = (q.burden ?? 0) + m;
     p.bears = q;
     p.bearing = m;
-    if (q.burden > q.volume * q.kind.density * OVERLOAD) this.fx.onOverload?.(q);
+    if (q.burden > q.volume * q.kind.density * OVERLOAD * (q.tough ?? 1)) this.fx.onOverload?.(q);
   }
 
   // How far the lowest of five points under a piece's footprint is above

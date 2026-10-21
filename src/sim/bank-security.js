@@ -181,7 +181,7 @@ export class BankSecurity {
     this._tape.texture.offset.x = (this._tape.texture.offset.x + dt * (this.crashed ? 0.09 : 0.05)) % 1;
     for (const t of this.tickers) t.mesh.visible = t.piece.state === 'static';
     if ((fear?.level ?? 0) > 35 || this.crashed) {
-      for (const p of people?.list ?? []) if (!p.agent && !p.street && p.f >= 7 && p.f <= 14 && p.state !== 'down') p.armUp = 1;
+      for (const p of people?.list ?? []) if (!p.agent && !p.street && p.f >= 3 && p.f <= 12 && p.state !== 'down') p.armUp = 1;
     }
   }
 

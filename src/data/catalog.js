@@ -46,10 +46,10 @@ export const JOBS = [
     id: 'bank',
     title: 'Big Boy Bank',
     where: 'Wall Street, New York',
-    brief: 'A stone banking hall of 1924 with a glass tower of 2008 rising out of it, 120 metres of it. The client liked the place as it was: '
+    brief: 'A three-storey stone banking hall of 1924 with a glass tower of 2008 rising out of it, 120 metres of it. The client liked the place as it was: '
       + 'bring the glass tower down to the old hall’s roof — the hall stays — and empty the vault, so there is no money to build it again. '
       + 'Carry the money out in bags to the van waiting in the street, and get in: that is the job done.',
-    target: 31,               // the hall's roof and parapet: the tower below it
+    target: 14,               // the hall's roof and parapet: the tower below it
     storeys: 30,
     height: 120,
     build: bankAndStreet,

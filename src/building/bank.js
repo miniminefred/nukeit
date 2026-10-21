@@ -9,24 +9,29 @@ import { furnishBank } from './bank-interiors.js';
 // Big Boy Bank: a stone banking hall of 1924 with a glass tower of 2008 rising
 // out of the middle of it (the plan is building/bank-plan.js).
 //
-// The hall is Indiana limestone over a concrete frame: seven storeys, punched
+// The hall is Indiana limestone over a concrete frame: three storeys, punched
 // windows, a temple front of six columns on Wall Street with the bank's name
-// on the frieze, the banking hall behind it three storeys high under a gilded
+// on the frieze, the banking hall behind it two storeys high under a gilded
 // ceiling. The tower is a concrete frame and core in a blue-green curtain wall,
-// twenty-three storeys to a helipad at 120 m. Its columns come down through
+// twenty-seven storeys to a helipad at 120 m. Its columns come down through
 // the hall on the hall's own grid, so the tower stands on the hall's frame.
 
 export const ENTRY = { x: 0, z: 21, yaw: 0 };
 // Limestone: concrete, pale and warm (the marble's texture is Trump Tower's pink).
 const STONE = 0xf0e6d2, STONE_DARK = 0xdcd0b8;
 const GLASS = 0x86aec4;
+// The old hall is built like a fortress: a falling tower may break its roof
+// (floor 3), but its three storeys under it and the vault below can never be
+// broken by falling debris, a pancake or a pile of rubble — so the money can
+// always be reached. Charges and blows break it as usual.
+const toughAt = (f) => (f < PODIUM_FLOORS ? Infinity : 1);
 
 export function buildBank(P) {
   for (let f = LOWER; f <= ROOF; f++) {
     slabs(P, f);
     if (f > TOP_FLOOR) continue;
     columns(P, f);
-    core(P, f);
+    core(P, f, toughAt(f));
     stair(P, f);
     if (f === LOWER) retaining(P);
     else if (f < PODIUM_FLOORS) stoneFacade(P, f);
@@ -42,7 +47,7 @@ export function buildBank(P) {
 
 function retaining(P) {
   const { x0, x1, z0, z1 } = BASEMENT, y0 = T(LOWER), y1 = U(LOWER), t = 0.5;
-  const w = (a0, b0, a1, b1) => block(P, 'concrete', a0, y0, b0, a1, y1, b1, 'wall', { floor: LOWER, load: ROOF });
+  const w = (a0, b0, a1, b1) => block(P, 'concrete', a0, y0, b0, a1, y1, b1, 'wall', { floor: LOWER, load: ROOF, tough: Infinity });
   w(x0, z0, x0 + t, z1);
   w(x1 - t, z0, x1, z1);
   w(x0 + t, z0, x1 - t, z0 + t);
@@ -54,7 +59,7 @@ function retaining(P) {
 function finishOf(f) {
   if (f === LOWER || f === ROOF) return null;
   if (f === 0) return null;                       // the hall's floor is marble right through
-  if (f <= 2 || f >= 27) return 'wood';
+  if (f <= ATRIUM.top || f >= 27) return 'wood';
   return 'carpet';
 }
 
@@ -62,9 +67,9 @@ function slabs(P, f) {
   const y0 = f * FLOOR_H, y1 = T(f);
   const finish = finishOf(f);
   const add = (x0, z0, x1, z1, kind, { outdoors = false, gilded = false } = {}) => {
-    block(P, kind, x0, y0, z0, x1, y1, z1, 'slab', { floor: f, lateral: true });
+    block(P, kind, x0, y0, z0, x1, y1, z1, 'slab', { floor: f, lateral: true, tough: toughAt(f) });
     if (f > LOWER) block(P, 'plaster', x0, y0 - 0.03, z0, x1, y0, z1, 'ceiling', { floor: f - 1, hang: true, tint: gilded ? 0xd8b46a : f <= PODIUM_FLOORS ? 0xf2e8d6 : 0xeeeeea });
-    if (finish && !outdoors) block(P, finish, x0, y1, z0, x1, y1 + 0.02, z1, 'carpet', { floor: f, structural: false, tint: finish === 'wood' ? 0xe8cfa6 : f >= 7 && f <= 14 ? 0x4e545c : 0x6a5a52 });
+    if (finish && !outdoors) block(P, finish, x0, y1, z0, x1, y1 + 0.02, z1, 'carpet', { floor: f, structural: false, tint: finish === 'wood' ? 0xe8cfa6 : f >= 3 && f <= 12 ? 0x4e545c : 0x6a5a52 });
   };
   const inShaft = (x, z) => x > TOWER_XS[0] && x < TOWER_XS[TOWER_XS.length - 1] && z > TOWER_ZS[0] && z < TOWER_ZS[TOWER_ZS.length - 1];
   const inHall = (x, z) => x > ATRIUM.x0 && x < ATRIUM.x1 && z > ATRIUM.z0 && z < ATRIUM.z1;
@@ -111,7 +116,7 @@ function columns(P, f) {
       // In the banking hall, columns of marble; elsewhere bare concrete.
       const hall = f >= 0 && f <= ATRIUM.top && z0 >= ATRIUM.z0;
       const y1 = tall && f === 0 ? U(ATRIUM.top) : U(f);
-      block(P, hall ? 'creammarble' : 'concrete', x - s, T(f), z - s, x + s, y1, z + s, 'column', { floor: f, load: ROOF - f, tint: undefined });
+      block(P, hall ? 'creammarble' : 'concrete', x - s, T(f), z - s, x + s, y1, z + s, 'column', { floor: f, load: ROOF - f, tough: toughAt(f) });
     }
 }
 
@@ -144,16 +149,16 @@ function stoneFacade(P, f) {
       const door = front && f === 0 && Math.min(ax, bx) < 2.2 && Math.max(ax, bx) > -2.2;
       const pier = 0.6;
       // Next to the door, the pier on the door's side is left out: the opening is there.
-      if (!(door && ax >= 0)) panel(P, 'concrete', pt(0), pt(pier), y0, yHead, 0.45, off, 'wall', { floor: f, tint });
-      if (!(door && ax < 0)) panel(P, 'concrete', pt(len - pier), pt(len), y0, yHead, 0.45, off, 'wall', { floor: f, tint });
+      if (!(door && ax >= 0)) panel(P, 'concrete', pt(0), pt(pier), y0, yHead, 0.45, off, 'wall', { floor: f, tint, tough: toughAt(f) });
+      if (!(door && ax < 0)) panel(P, 'concrete', pt(len - pier), pt(len), y0, yHead, 0.45, off, 'wall', { floor: f, tint, tough: toughAt(f) });
       if (door) {
         // Stone to the door's edge (x = ±2.2), a bronze frame, then the opening.
         const edge = ax < 0 ? len - 2.2 : 2.2;
         const [s0, s1] = ax < 0 ? [pier, edge] : [edge, len - pier];
-        panel(P, 'concrete', pt(s0), pt(s1), y0, yHead, 0.45, off, 'wall', { floor: f, tint });
+        panel(P, 'concrete', pt(s0), pt(s1), y0, yHead, 0.45, off, 'wall', { floor: f, tint, tough: toughAt(f) });
         panel(P, 'bronze', pt(edge - 0.12), pt(edge + 0.12), y0, yHead, 0.5, off, 'mullion', { floor: f, tint: 0x6a5232 });
       } else {
-        panel(P, 'concrete', pt(pier), pt(len - pier), y0, ySill, 0.4, off, 'wall', { floor: f, tint });
+        panel(P, 'concrete', pt(pier), pt(len - pier), y0, ySill, 0.4, off, 'wall', { floor: f, tint, tough: toughAt(f) });
         panel(P, 'glass', pt(pier + 0.05), pt(len - pier - 0.05), ySill, yHead, 0.04, off, 'glass', { floor: f, tint: 0x9aaab0 });
         // Bronze mullions down the window, three lights to a bay.
         for (const k of [1 / 3, 2 / 3]) {
@@ -161,7 +166,7 @@ function stoneFacade(P, f) {
           panel(P, 'bronze', pt(m - 0.04), pt(m + 0.04), ySill, yHead, 0.1, off, 'mullion', { floor: f, tint: 0x5a4a32 });
         }
       }
-      panel(P, 'concrete', pt(0), pt(len), yHead, yTop, 0.5, off, 'wall', { floor: f, tint });
+      panel(P, 'concrete', pt(0), pt(len), yHead, yTop, 0.5, off, 'wall', { floor: f, tint, tough: toughAt(f) });
     }
   }
 }
@@ -172,7 +177,7 @@ function portico(P) {
   const z0 = 14.2, z1 = 18.6, w = 18;
   block(P, 'concrete', -w, 0, z0, w, 1.2, z1, 'slab', { floor: 0, tint: STONE_DARK });
   block(P, 'concrete', -w + 0.5, 0, z1, w - 0.5, 0.6, z1 + 0.8, 'slab', { floor: 0, tint: STONE_DARK });
-  const top = 20;
+  const top = 8.6;
   for (const x of [-16.25, -9.75, -3.25, 3.25, 9.75, 16.25]) {
     assembly(P, x, 1.2, 16.6, 0, [
       { kind: 'concrete', boxes: [{ cyl: [0, (top - 1.2) / 2, 0], r: 0.95, r2: 0.82, h: top - 1.2 - 0.6, seg: 20 }, [-1.1, top - 1.2 - 0.6, -1.1, 1.1, top - 1.2, 1.1], [-1.1, 0, -1.1, 1.1, 0.4, 1.1]], tint: STONE },
@@ -182,8 +187,9 @@ function portico(P) {
   // The pediment: a low gable over the entablature, in steps of stone.
   const steps = 6;
   for (let i = 0; i < steps; i++) {
-    const a = w * (1 - i / steps), y = top + 2.4 + i * 0.6;
-    block(P, 'concrete', -a, y, z0 + 0.2, a, y + 0.6, z1 - 0.2, 'cladding', { floor: 0, structural: false, tint: STONE });
+    // Low, so the whole front stays under the job's 14 m.
+    const a = w * (1 - i / steps), y = top + 2.4 + i * 0.3;
+    block(P, 'concrete', -a, y, z0 + 0.2, a, y + 0.3, z1 - 0.2, 'cladding', { floor: 0, structural: false, tint: STONE });
   }
   signs.list.push({ piece: frieze, text: 'BIG BOY BANK', style: 'bronze', w: 16, h: 1.5, at: new THREE.Vector3(0, top + 1.2, z1 + 0.02), yaw: 0 });
   signs.list.push({ piece: frieze, text: 'MCMXXIV', style: 'bronze', w: 4, h: 0.6, at: new THREE.Vector3(0, top + 0.35, z1 + 0.02), yaw: 0 });

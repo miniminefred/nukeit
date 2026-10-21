@@ -169,13 +169,13 @@ function columns(P, f) {
 }
 
 // Shared with the bank, whose core is this one in the same place.
-export function core(P, f) {
+export function core(P, f, tough = 1) {
   const { x0, x1, z0, z1, t } = CORE;
   // Full storey height, through the slab line: there is no slab inside the core
   // for a wall to stand on, so each storey's walls stand on the ones below.
   const y0 = f === LOWER ? T(f) : f * FLOOR_H, y1 = U(f);
   const kind = f === 0 ? 'darkmarble' : 'concrete';
-  const wall = (a0, b0, a1, b1, ya = y0, yb = y1) => block(P, kind, a0, ya, b0, a1, yb, b1, 'core', { floor: f, load: ROOF - f });
+  const wall = (a0, b0, a1, b1, ya = y0, yb = y1) => block(P, kind, a0, ya, b0, a1, yb, b1, 'core', { floor: f, load: ROOF - f, tough });
   wall(x0, z0, x0 + t, z1);
   wall(x1 - t, z0, x1, z1);
   wall(x0 + t, z0, x1 - t, z0 + t);
@@ -189,7 +189,7 @@ export function core(P, f) {
   wall(3.4, z1 - t, x1 - t, z1, y0, head);
   wall(x0 + t, z1 - t, x1 - t, z1, head, y1);
   // Between stair and lift.
-  block(P, 'concrete', -0.2, y0, z0 + t, 0.2, y1, z1 - t, 'core', { floor: f, load: ROOF - f });
+  block(P, 'concrete', -0.2, y0, z0 + t, 0.2, y1, z1 - t, 'core', { floor: f, load: ROOF - f, tough });
   // Brass lift doors — the only thing between the lobby and the shaft.
   // They stand just outside the wall, on the corridor slab: there is no floor
   // inside the shaft for them to stand on.

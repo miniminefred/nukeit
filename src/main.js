@@ -248,7 +248,7 @@ const bang2 = blast.explode;
 blast.explode = (at, r, power) => {
   senses.blast(at, r);
   // A blast on a trading floor: a blizzard of paper out of its windows.
-  if (job?.id === 'bank' && at.y > T(7) - 1 && at.y < U(14)) for (let i = 0; i < 160; i++) { const a = Math.random() * Math.PI * 2, v = 2 + Math.random() * 6; particles.spawn('paper', at.x, at.y + Math.random() * 2, at.z, Math.cos(a) * v, Math.random() * 2, Math.sin(a) * v); } if (state === 'play') { wanted.offend(7, at); achieve.event('blast', power ?? 1); } security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); fear.scare(at, 25 * (power ?? 1), 0.8); return bang2(at, r, power); };
+  if (job?.id === 'bank' && at.y > T(3) - 1 && at.y < U(12)) for (let i = 0; i < 160; i++) { const a = Math.random() * Math.PI * 2, v = 2 + Math.random() * 6; particles.spawn('paper', at.x, at.y + Math.random() * 2, at.z, Math.cos(a) * v, Math.random() * 2, Math.sin(a) * v); } if (state === 'play') { wanted.offend(7, at); achieve.event('blast', power ?? 1); } security.noise(at, 12 * (power ?? 1), false); traffic.alarm(at, Math.max(30, r * 6)); fear.scare(at, 25 * (power ?? 1), 0.8); return bang2(at, r, power); };
 let liftTip = null;
 let heistTip = null;
 let hallStart = 0;
