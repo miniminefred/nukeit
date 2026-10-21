@@ -176,21 +176,56 @@ export class Damage {
     } else if (tough >= 8) {
       // Stone: a head-sized lump comes away, bigger as it weakens.
       this._chunk(p, point, normal, dir, (0.19 + weak * 0.14 + Math.random() * 0.04) * Math.sqrt(energy), kind);
+    } else if (p.role === 'furniture' && RIGID.has(kind.name) && this._thick(p, point) > 0.25) {
+      // A cabinet, a counter, a solid stand: a jagged piece of it splits off
+      // and falls, splinters round the break — a smooth deep bite carved it
+      // out like a bowl.
+      const r = THREE.MathUtils.clamp((0.17 + weak * 0.15) * Math.sqrt(energy), 0.14, 0.38);
+      this._chunk(p, point, normal, dir, r, kind);
+      if (p.state !== 'dead' && kind.splinters) addSplinters(this.pieces, p, this.toLocal(p, point), this.dirToLocal(p, normal), r, 0);
+    } else if (p.role === 'furniture' && !RIGID.has(kind.name) && this._thick(p, point) > 0.25) {
+      // Upholstery tears: a shallow ragged rip showing the stuffing, not a
+      // tunnel through a sofa.
+      const r = THREE.MathUtils.clamp((0.2 + weak * 0.14) * Math.sqrt(energy), 0.16, 0.34);
+      this._bite(p, point, normal, dir, r, r * 0.9, kind);
     } else {
       // Soft things lose most of what you hit.
       const r = THREE.MathUtils.clamp((0.36 + weak * 0.3) * Math.sqrt(energy), 0.2, 0.8);
       this._bite(p, point, normal, dir, r, r * (kind.splinters ? 2.2 : 1.8), kind);
     }
     if (p.state === 'dead') return kind;
-    crack(this.pieces, p, point, normal, 0.7 + weak * 1.6);
+    // Cracks are for brittle things: on metal, fabric or timber the crack
+    // drawing looked like broken glass.
+    if (!kind.metal && (tough >= 8 || CRACKS.has(kind.name))) crack(this.pieces, p, point, normal, 0.7 + weak * 1.6);
     if (p.structural || p.role === 'slab') this.onStructure?.();
 
     const load = p.role === 'column' || p.role === 'core';
     if (p.hp <= 0 || (load && this.fx.mustFail?.(p))) {
       if (load) this.fail(p, point, dir);
+      else if (kind.metal && p.role === 'furniture' && !p.toppled) this._topple(p, point, dir);
       else this.fracture(p, point, dir, energy + 1);
     }
     return kind;
+  }
+
+  // A metal cabinet, a fridge, a locker that has had enough goes over, dented
+  // — it does not slice into slivers. Keep at it and it comes apart.
+  _topple(p, point, dir) {
+    p.toppled = true;
+    p.hp = p.hpMax * 0.5;
+    if (p.state === 'static' || p.state === 'rubble') this.pieces.makeDynamic(p);
+    if (!p.body) return;
+    const m = p.body.mass(), up = Math.max(0.3, (point.y - p.box.min.y) / Math.max(0.5, p.box.max.y - p.box.min.y));
+    const J = Math.min(m, 400) * 2.2 * up;
+    p.body.applyImpulseAtPoint({ x: dir.x * J, y: 0, z: dir.z * J }, { x: point.x, y: Math.max(point.y, p.box.max.y - 0.2), z: point.z }, true);
+  }
+
+  // How thick the part hit at `point` is, at its thinnest.
+  _thick(p, point) {
+    const q = p.parts[this.partAt(p, this.toLocal(p, point))];
+    if (!q.geometry.boundingBox) q.geometry.computeBoundingBox();
+    const s = q.geometry.boundingBox.getSize(_v);
+    return Math.min(s.x, s.y, s.z);
   }
 
   // Knock a lump off a piece: the lump is a real piece of it — its outside is
@@ -504,6 +539,10 @@ export class Damage {
   }
 }
 
+// What shows cracks when struck (stone and concrete do too, by toughness).
+const CRACKS = new Set(['plaster', 'tiles', 'ceramic', 'mirror', 'screen']);
+// Furniture that splits rather than gives: a jagged piece comes off it.
+const RIGID = new Set(['wood', 'lacquer', 'plastic', 'vinyl']);
 const LOOSE = new Set(['furniture', 'tank', 'fragment', 'shard', 'rebar', 'stub']);
 
 function chipKind(kind) {

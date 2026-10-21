@@ -435,7 +435,13 @@ things carry less; big falling things break what they land on; small bits go.
   of the face and moving away, or it sits in its own hole held by friction.
 - **Glass**: the first blow draws a spider-web crack (`glass.js`); the next shatters it
   into shards along the same web, and some of the edge shards stay in the frame.
-- **Metal**: sparks and a ring; nothing comes away.
+- **Metal**: sparks and a ring; nothing comes away. Metal furniture that has had enough
+  is knocked over first (`_topple`), and only comes apart if you keep at it.
+- **Furniture**: a thick rigid piece (wood, lacquer, plastic, `RIGID`) splits: a jagged lump
+  comes off as off stone, with splinters — a smooth deep bite carved cabinets like bowls.
+  Upholstery tears shallowly. **Cracks are drawn only on brittle things** (stone, concrete,
+  plaster, tiles, ceramic, mirror, screens: `CRACKS`); on metal and fabric they looked like
+  broken glass. Found by building one of every furniture type on open ground and breaking it.
 - **Gas tanks**: a puncture hisses for a second, then goes off (`sim/blast.js`).
 
 ### What holds what up, and weight
