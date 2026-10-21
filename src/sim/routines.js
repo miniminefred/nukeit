@@ -33,6 +33,8 @@ import { places } from '../building/shops.js';
 // way in and the way out; desk workers get up for a coffee, the printer or the
 // water cooler and come back; porters take boxes off the pallets to the racks;
 // a few come to work by car and go down to the garage at the end of the day.
+// At lunch some go down to the staff canteen to eat, and some out to the
+// cafés in the street, and come back to their desks.
 //
 // Trouble stops them: frightened, they stand, stare, film; calm again, they
 // go back to work. In a panic they are the crowd's (sim/people.js) and leave.
@@ -115,6 +117,12 @@ export class Routines {
     // The things people use: coffee, the printer, water, the lockers, the racks, the cars.
     this.things = {};
     for (const t of ['coffee', 'printer', 'water', 'lockers', 'rack', 'car']) this.things[t] = list.filter((p) => p.tag === t);
+    // The canteen's places: a chair either side of each table, facing it.
+    this.canteen = [];
+    for (const t of list.filter((p) => p.tag === 'canteen')) {
+      const c = t.box.getCenter(new THREE.Vector3());
+      for (const s of [-1, 1]) this.canteen.push({ table: t, x: c.x + s * 0.6, z: c.z, y: t.box.min.y, yaw: Math.atan2(-s, 0), until: 0 });
+    }
     if (this.crates.length) for (let n = 0; n < 2; n++) this.posts.push({ kind: 'porter', f: this.crates[0].floor, active: true });
     // Cleaners: one for every few floors by day, more at night.
     for (let f = LOWER; f <= TOP_FLOOR; f += 2) this.posts.push({ kind: 'cleaner', f, active: true, night: true, day: (f - LOWER) % 6 === 0 });
@@ -513,6 +521,9 @@ export class Routines {
     switch (post.kind) {
       case 'desk':
         p.armUp = 0.2 + 0.1 * Math.abs(Math.sin(t * 9));
+        // Lunch: once a day, between twelve and a quarter past one.
+        if (!this.fx.clock.within(11.5, 14)) post.lunched = false;
+        else if (!post.lunched && this.fx.clock.within(12, 13.25) && Math.random() < dt * 0.025) { post.lunched = true; if (Math.random() < 0.6) { this._lunch(p, post); break; } }
         post.breakT ??= 20 + Math.random() * 160;
         if ((post.breakT -= dt) <= 0) { post.breakT = 60 + Math.random() * 220; this._break(p, post); }
         break;
@@ -550,6 +561,36 @@ export class Routines {
         break;
       }
     }
+  }
+
+  // Off to lunch: down to the canteen if there is a place free, or out to a
+  // café in the street; then back to the desk.
+  _lunch(p, post) {
+    const now = this.fx.clock.hour;
+    const free = this.canteen.filter((c) => c.until < now && c.table.state === 'static');
+    const desk = new THREE.Vector3(post.x, post.y, post.z);
+    const back = [{ stand: true }, { carry: null }];
+    let away = null;
+    if (free.length && Math.random() < 0.65) {
+      const c = free[(Math.random() * free.length) | 0];
+      const eat = 40 + Math.random() * 40;
+      c.until = now + (eat + 60) / 100;              // game hours (a hundred seconds an hour by day)
+      const at = new THREE.Vector3(c.x, c.y, c.z);
+      away = [...this._route(p, post.f, LOWER, at), { sit: true, yaw: c.yaw, y: c.y }, { linger: eat, kind: 'eat' }, ...back, ...this._route(p, LOWER, post.f, desk)];
+    } else {
+      const out = this.visits.filter((pl) => !this._inside(pl.x, pl.z) && (pl.kind === 'queue' || pl.kind === 'seat'));
+      if (!out.length) return;
+      const pl = out[(Math.random() * out.length) | 0];
+      const at = new THREE.Vector3(pl.x, pl.y, pl.z);
+      const x = this._doorX(), D = SITE.doors;
+      const leave = [...this._route(p, post.f, 0, this._doorIn()), { go: new THREE.Vector3(x, T(0), D.inside) }, { go: new THREE.Vector3(x, 0, D.outside + 0.8) }];
+      const there = pl.kind === 'seat'
+        ? [{ go: at }, { sit: true, yaw: pl.yaw, y: pl.y }, { linger: 40 + Math.random() * 40, kind: 'eat' }]
+        : [{ go: at }, { face: pl.yaw }, { linger: 6 + Math.random() * 5, kind: 'queue', at }, { carry: 'cup' }];
+      away = [...leave, ...there, ...back, ...this._enter(), ...this._route(p, 0, post.f, desk)];
+    }
+    p.sitting = false;
+    p.plan.unshift(...away, ...this._work(post).slice(0, -1));
   }
 
   // Up from the desk for a coffee, the printer or a cup of water, and back.

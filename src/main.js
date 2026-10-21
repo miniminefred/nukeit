@@ -34,6 +34,7 @@ import { BankSecurity } from './sim/bank-security.js';
 import { ControlRoom } from './sim/control-room.js';
 import { Clock, STARTS } from './sim/clock.js';
 import { Routines } from './sim/routines.js';
+import { CarAlarms } from './sim/car-alarms.js';
 import { wallet, dollars } from './data/wallet.js';
 import { FEE, HALL_BONUS } from './data/shop.js';
 import { COLOURS } from './damage/paint.js';
@@ -281,6 +282,7 @@ let roomTip = null;
 // The time of day, and the working day of the building's people (sim/clock.js,
 // sim/routines.js).
 const clock = new Clock({ scene, lights, renderer });
+const carAlarms = new CarAlarms({ pieces, audio, people, security, scene });
 const routines = new Routines({ people, pieces, clock, security, scene, hud, bank: bankSecurity, vaultDoor: () => pieces.list.find((p) => p.tag === 'vault') });
 let startAt = 'morning';
 heist.fx.bankSecurity = bankSecurity; // the vault's code opens its door
@@ -351,6 +353,7 @@ async function start(jobId, toolIds, levelId = 'normal', at = startAt) {
   clock.start(STARTS[startAt] ?? STARTS.morning);
   people.populate(pieces, { managed: true });
   routines.attach(job);
+  carAlarms.attach();
   pigeons.populate();
   security.start(difficulty, job);
   // After the guards: the bank's own security adds its operator to them.
@@ -418,6 +421,7 @@ function unloadJob() {
   rubble.clear();
   pigeons.clear();
   routines.clear();
+  carAlarms.clear();
   heist.clear();
   bankSecurity.clear();
   controlRoom.clear();
@@ -638,7 +642,7 @@ function frame(dt) {
     powder.update();
     if (state === 'play') {
       security.update(dt); fear.update(dt); bankSecurity.update(dt);
-      clock.update(dt); routines.update(dt);
+      clock.update(dt); routines.update(dt); carAlarms.update(dt);
       // Bringing it down — a collapse, a tower going over, a fifth of it gone — is a threat to the city.
       if (topple.active || structure.collapsing || fear.wreck > 0.2) wanted.offend(8, camera.position);
       if (fear.fx.chasing()) wanted.offend(2, player.pos, true);
@@ -794,7 +798,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, body, senses, pigeons, heist, bankSecurity, controlRoom, clock, routines, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, body, senses, pigeons, heist, bankSecurity, controlRoom, clock, routines, carAlarms, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.

@@ -220,7 +220,7 @@ function lowerLevel(P, y) {
   S.lockerBench(P, -2.5, y, -10.3, 0, 2.4);
   S.noticeboard(P, -8.74, y, -8, HALF);
   for (const [x, z] of [[-6.9, -8.5], [2.4, -9.4], [2.4, -6.4]]) {
-    SF.woodTable(P, x, y, z);
+    tagged(SF.woodTable(P, x, y, z), 'canteen');
     SF.woodChair(P, x - 0.6, y, z, HALF);
     SF.woodChair(P, x + 0.6, y, z, -HALF);
   }

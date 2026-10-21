@@ -135,7 +135,8 @@ function backOfHouse(P, y) {
   S.coffeeMachine(P, 23.2, y, -7.5, -HALF);
   S.vending(P, 23.2, y, -5.9, -HALF);
   for (const z of [-7.8, -5.4]) {
-    SF.woodTable(P, 20.3, y, z);
+    const t = SF.woodTable(P, 20.3, y, z);
+    if (t) t.tag = 'canteen';
     SF.woodChair(P, 19.7, y, z, HALF);
     SF.woodChair(P, 20.9, y, z, -HALF);
   }
