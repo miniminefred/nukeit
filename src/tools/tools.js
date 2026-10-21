@@ -111,6 +111,7 @@ export class Sledge {
     this.lastHit = kind?.name ?? null;
     ctx.security?.noise(hit.point, 1, true);
     ctx.wanted?.struck(p, hit.point);
+    ctx.controlRoom?.struck(p, 1);
     // The jolt: a hard stop goes up your arms into your head.
     if (this.feel === 'hard') { ctx.shake?.add(0.22); player.punch?.(0.08, (Math.random() - 0.5) * 0.04); player.slow?.(0.35); }
     else if (this.feel === 'ring') { ctx.shake?.add(0.28); player.punch?.(0.1, (Math.random() - 0.5) * 0.06); player.slow?.(0.25); }
@@ -353,6 +354,7 @@ export class Jackhammer {
     ctx.damage.hit(p, hit.point, hit.normal, dir, hard ? 1.2 : 0.3);
     ctx.security?.noise(hit.point, 1.5, true);
     ctx.wanted?.struck(p, hit.point);
+    ctx.controlRoom?.struck(p, 0.25);
   }
 
   unequip(ctx) { this.running = false; ctx.player.burden = 0; }

@@ -96,6 +96,7 @@ export class BankSecurity {
     this.shutters = [];
     this.time = 0;
     this.opened = false;            // the door opened with the code
+    this.camsOff = false;           // hacked off in the control room (sim/control-room.js)
   }
 
   // Spray paint landed on piece p: a camera under it is blind.
@@ -108,7 +109,10 @@ export class BankSecurity {
   }
 
   // Does any camera see you right now? (For the law: being seen.)
-  get sees() { return this.on && this.cams.some((c) => c.seen > SEEN) && !!this.fx.suspect?.(); }
+  // Is anyone watching the screens? Not with the cameras hacked off, nor with
+  // the operator knocked out (sim/control-room.js).
+  get watched() { return this.on && !this.camsOff && (this.fx.room?.operatorUp ?? true); }
+  get sees() { return this.watched && this.cams.some((c) => c.seen > SEEN) && !!this.fx.suspect?.(); }
 
   update(dt) {
     if (!this.on) return;
@@ -117,7 +121,7 @@ export class BankSecurity {
     this._trading(dt);
     const eye = camera.position;
     for (const c of this.cams) {
-      const live = c.piece.state === 'static' && !c.blind;
+      const live = c.piece.state === 'static' && !c.blind && !this.camsOff;
       c.group.visible = c.piece.state === 'static';
       c.t += dt;
       // A swivel camera pans to and fro.
@@ -141,7 +145,7 @@ export class BankSecurity {
       // A camera watches everyone; the control room only acts on someone up
       // to something — breaking things, carrying the bank's money, or already
       // wanted. A customer walking in is just a customer.
-      const bad = c.seen > SEEN && !!this.fx.suspect?.();
+      const bad = c.seen > SEEN && this.watched && !!this.fx.suspect?.();
       c.light.material.color.set(!live ? 0x101010 : bad ? (Math.floor(this.time * 6) % 2 ? 0xff2a1a : 0x601010) : 0x401010);
       // Seen at it: the control room sends the guards, every few seconds while it lasts.
       if (bad && this.time - c.alerted > 4) {

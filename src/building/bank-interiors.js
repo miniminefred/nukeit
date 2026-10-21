@@ -117,7 +117,41 @@ function vault(P, y) {
   W.palletCrates(P, 18, y, 6, 0, 2);
   W.palletCrates(P, 15.5, y, 6, 0, 1);
   W.extinguisher(P, 12, y, -6, 0);
+  controlRoom(P, y);
   F.ceilingLight(P, 14, top, -8);
+}
+
+// ---------------------------------------------------------------- the control room
+
+// In the lower level's south-west corner, behind a locked steel door: a wall
+// of screens on the old retaining wall, the operator's desk facing it, the
+// servers. sim/bank-security.js puts the operator in the chair, the camera
+// pictures on the screens, and lets you watch or hack them from the desk.
+export const CONTROL = {
+  x0: -23.5, x1: -14.5, z0: 5, z1: 13.5,
+  desk: [-20.4, 9.2], seat: [-19.6, 9.2, -HALF],
+  door: { x: -14.7, z0: 8.4, z1: 10 },
+  screens: { x: -23.42, z0: 6.4, z1: 12.2, y0: 0.9, y1: 2.8 },
+};
+function controlRoom(P, y) {
+  const { x0, x1, z0, z1, door, screens } = CONTROL, top = U(LOWER), t = 0.4;
+  const o = { floor: LOWER, structural: false, tint: 0x4e545a };
+  block(P, 'steel', x0, y, z0, x1, top, z0 + t, 'wall', o);                         // north
+  block(P, 'steel', x1 - t, y, z0 + t, x1, y + 2.4, door.z0, 'wall', o);             // east, either side of the door,
+  block(P, 'steel', x1 - t, y, door.z1, x1, y + 2.4, z1, 'wall', o);
+  block(P, 'steel', x1 - t, y + 2.4, z0 + t, x1, top, z1, 'wall', o);                // and one band over it all
+  // The door, locked: no key — break it.
+  block(P, 'steel', x1 - t + 0.08, y, door.z0, x1 - 0.08, y + 2.4, door.z1, 'wall', { ...o, tint: 0x6a7076, tag: 'controldoor' });
+  // The screens on the old wall, the desk facing them, the operator's chair.
+  block(P, 'screen', screens.x - 0.08, y + screens.y0, screens.z0, screens.x, y + screens.y1, screens.z1, 'cladding', { floor: LOWER, structural: false, tag: 'screens' });
+  const [dx, dz] = CONTROL.desk;
+  const desk = F.desk(P, dx, y, dz, HALF);
+  if (desk) desk.tag = 'controldesk';
+  for (const k of [-0.45, 0.45]) F.monitor(P, dx - 0.18, y + 0.74, dz + k, HALF);
+  F.officeChair(P, CONTROL.seat[0], y, CONTROL.seat[1], CONTROL.seat[2]);
+  // The servers, humming.
+  for (const x of [-17.2, -16.2]) F.electricalCabinet(P, x, y, z0 + 0.75, 0);
+  F.ceilingLight(P, -19, top, 9);
 }
 
 // ---------------------------------------------------------------- the banking hall

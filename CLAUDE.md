@@ -250,7 +250,16 @@ six extra charges, three more guards. Its security (`sim/bank-security.js`): 32 
 count as witnessed; spray blinds, a blow kills), lasers across the vault (step over, crouch
 under; the alarm to the police; the `fusebox` piece turns them off), and the lockdown when
 the vault door is blown (steel shutters over the front doors and the lower level's stair
-door for 90 s). On the CEO's desk the vault code (opens the door quietly) and the trading
+door for 90 s). The cameras only report someone up to something (breaking, spraying,
+carrying the bank's money, already wanted — `suspect` in `main.js`). **The control room**
+(`sim/control-room.js`, built as `CONTROL` in `bank-interiors.js`): on the lower level, a
+locked steel door with no key (seven sledge blows, a jackhammer, a charge; the operator
+hears it and raises everyone), an operator at a wall of camera feeds who radios when he
+sees you and is knocked out for good by one blow (then nobody watches: `bank.watched`), and
+a desk: E to sit and look through the cameras (left/right click to flick, E to stand), hold
+F 8 s then match four codes to switch every camera off. The old hall is three storeys
+(target 14 m); falling debris can break its roof but nothing under it (`tough: Infinity`),
+and the vault's money is never lost to a collapse. On the CEO's desk the vault code (opens the door quietly) and the trading
 books (a bonus at the van); a gold statue, a safe (blown, it drops cash), a helicopter on
 the roof, a money cart hidden downstairs (six bags), locked offices with stashes in the
 old buildings (`lockedOffice`, built in the city's carved ground floors), tickers that go

@@ -121,6 +121,25 @@ export class Security {
     }
   }
 
+  // The operator in his chair at the bank's control room (sim/bank-security.js).
+  addOperator(at, yaw) {
+    const a = this.fx.people.agent(-1, at, { ...GUARD, head: SKIN[(Math.random() * SKIN.length) | 0] }, 1);
+    Object.assign(a, { kind: 'guard', arm: 'shout', post: at.clone(), mode: 'operator', cool: 0, seen: -99, last: null, shout: 0, daze: 0, angry: 0, radioed: false, yaw, sitting: true, seatY: at.y + 0.47, capped: true });
+    this.agents.push(a);
+    return a;
+  }
+
+  // The operator raises the alarm, once: every guard to where you are, you
+  // are known, and the police are called.
+  raise(a, text) {
+    if (!a || a.ko || a.radioed2) return;
+    a.radioed2 = true;
+    this.fx.hud?.flash(text, 2.5);
+    this.spotted = this.time;
+    for (const b of this.agents) if (b.kind === 'guard' && b !== a && b.state !== 'down' && b.mode !== 'rest') { b.mode = 'look'; b.last = this.fx.player.pos.clone(); }
+    this.call('The control room has called the police');
+  }
+
   // Someone calls the police (if they are not on their way already).
   call(why) {
     if (!this.level || this.level.police === null) return;
@@ -163,6 +182,14 @@ export class Security {
       if (this.squad?.blocks(a, dir)) {
         this.fx.audio?.hit?.('steel', c.x, c.y, c.z, 1);
         for (let i = 0; i < 8; i++) this.fx.particles.spawn('spark', c.x - dir.x * 0.5, c.y, c.z - dir.z * 0.5, (Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3, 0xffd27a);
+        return true;
+      }
+      // The control room's operator, at his desk: one blow and he is out for
+      // good — a heap in his chair, a few stars, and nobody watching the screens.
+      if (a.mode === 'operator') {
+        a.state = 'down'; a.daze = 1e9; a.ko = true; a.sitting = false; a.target = null;
+        this.fx.audio?.boing?.(a.pos.x, a.pos.y, a.pos.z);
+        this.fx.onOperatorOut?.(a);
         return true;
       }
       a.state = 'down'; a.daze = kind === 'spray' ? 2.5 : 4.5; a.target = null; a.armUp = 0;
@@ -211,7 +238,7 @@ export class Security {
       // Knocked down: stars, then up, and angrier.
       if (a.state === 'down') {
         a.daze -= dt;
-        if (Math.random() < dt * 6) particles.spawn('spark', a.pos.x + (Math.random() - 0.5) * 0.4, a.pos.y + 0.45, a.pos.z + (Math.random() - 0.5) * 0.4, 0, 0.6, 0, 0xfff27a);
+        if ((!a.ko || a.daze > 1e9 - 4) && Math.random() < dt * 6) particles.spawn('spark', a.pos.x + (Math.random() - 0.5) * 0.4, a.pos.y + 0.45, a.pos.z + (Math.random() - 0.5) * 0.4, 0, 0.6, 0, 0xfff27a);
         if (a.daze <= 0) { a.state = 'calm'; a.mode = 'chase'; a.last = player.pos.clone(); }
         continue;
       }
@@ -225,6 +252,12 @@ export class Security {
       const known = (this.fx.wanted?.() ?? 0) >= 6;
       const noticed = sees && (a.kind !== 'cop' || known || this.time - this.spotted < 60 || this.fx.armed?.());
       if (noticed) { a.seen = this.time; a.last = player.pos.clone(); }
+      // The operator stays at his desk; seeing you in his room, he radios
+      // every guard there is and the police.
+      if (a.mode === 'operator') {
+        if (sees && !a.radioed2) this.raise(a, 'Control room: "Intruder in the control room!"');
+        continue;
+      }
       // Off duty: out of the break room when the building gets frightened.
       if (a.mode === 'rest') {
         if ((this.fx.fear?.level ?? 0) > 70) {

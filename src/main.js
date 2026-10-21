@@ -31,6 +31,7 @@ import { Senses } from './fx/senses.js';
 import { Pigeons } from './sim/pigeons.js';
 import { Heist } from './sim/heist.js';
 import { BankSecurity } from './sim/bank-security.js';
+import { ControlRoom } from './sim/control-room.js';
 import { wallet, dollars } from './data/wallet.js';
 import { FEE, HALL_BONUS } from './data/shop.js';
 import { COLOURS } from './damage/paint.js';
@@ -268,6 +269,13 @@ let waterfall = null;     // the sheet of water down the atrium wall, while it s
 
 const ctx = { input, camera, physics, pieces, damage, particles, chips, fire, blast, audio, shake, player, scene, world, powder, security, wanted, achieve };
 ctx.bankSecurity = bankSecurity;     // the spray can blinds its cameras
+// The bank's control room (sim/control-room.js): the operator, the door, the
+// desk you watch or hack the cameras from.
+const controlRoom = new ControlRoom({ bank: bankSecurity, security, player, input, hud, audio, camera, renderer, pieces, scene, shake });
+bankSecurity.fx.room = controlRoom;
+ctx.controlRoom = controlRoom;
+security.fx.onOperatorOut = () => controlRoom.operatorOut();
+let roomTip = null;
 heist.fx.bankSecurity = bankSecurity; // the vault's code opens its door
 
 // ---------------------------------------------------------------- state
@@ -332,9 +340,11 @@ async function start(jobId, toolIds, levelId = 'normal') {
   smoke.attach();
   people.populate(pieces);
   pigeons.populate();
+  security.start(difficulty, job);
+  // After the guards: the bank's own security adds its operator to them.
   heist.reset(job, difficulty);
   bankSecurity.reset(job, difficulty);
-  security.start(difficulty, job);
+  controlRoom.reset(bankSecurity.on);
   fear.reset();
   wanted.reset(difficulty);
   achieve.reset(difficulty, job.id);
@@ -397,6 +407,7 @@ function unloadJob() {
   pigeons.clear();
   heist.clear();
   bankSecurity.clear();
+  controlRoom.clear();
   security.clear();
   traffic.clear();
   people.clear();
@@ -412,6 +423,7 @@ input.onLockChange((locked) => {
     hud.show(true);
   } else if (!locked && state === 'play') {
     state = 'paused';
+    controlRoom.leave();
     audio.spray(false); audio.foam(false);
     screens.pause({
       onResume: () => input.lock(),
@@ -575,18 +587,21 @@ function frame(dt) {
   if (state === 'play' || state === 'paused' || state === 'done') {
     if (playing) {
       // A spare extinguisher in reach comes first; then the lift.
-      heistTip = state === 'play' ? heist.update(dt, height !== null && height < job.target) : null;
-      liftTip = player.dead ? null : spareTip() ?? lift.control(input, player);
+      roomTip = state === 'play' ? controlRoom.update(dt) : null;
+      heistTip = state === 'play' && !controlRoom.busy ? heist.update(dt, height !== null && height < job.target) : null;
+      liftTip = player.dead || controlRoom.busy ? null : spareTip() ?? lift.control(input, player);
       lift.update(dt, player, { collapsing: structure.collapsing || topple.active });
-      player.update(dt);
-      body.update(player, !rig);
+      // At the control room's desk you stay where you are; watching, you see
+      // through the camera.
+      if (!controlRoom.busy) { player.update(dt); body.update(player, !rig); }
+      else { input.takeMouse(); body.update(player, false); controlRoom.look(camera); }
       // A camera held somewhere else — the collapse bench's, over the avenue.
       if (rig) { camera.position.copy(rig.at); camera.lookAt(rig.look); }
     } else lift.update(dt, null, { collapsing: structure.collapsing || topple.active });
     const t = tools[current];
     for (const tool of tools) {
-      tool.model.visible = tool === t && playing && !player.dead;
-      if (tool === t && playing && !player.dead) tool.update(dt, ctx);
+      tool.model.visible = tool === t && playing && !player.dead && !controlRoom.busy;
+      if (tool === t && playing && !player.dead && !controlRoom.busy) tool.update(dt, ctx);
       else tool.background?.(dt, ctx);
     }
     doors.update(dt);
@@ -677,7 +692,7 @@ function frame(dt) {
     hud.setSlots(tools, current);
     hud.update(dt, {
       health: player.health, height, fires: fire.count, done: doneT >= 0,
-      tip: heistTip ?? liftTip ?? tipFor(t), alert: [security.status, heist.status].filter(Boolean).join(' · '),
+      tip: roomTip ?? heistTip ?? liftTip ?? tipFor(t), alert: [security.status, heist.status].filter(Boolean).join(' · '),
     });
   }
   input.endFrame();
@@ -740,7 +755,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, body, senses, pigeons, heist, bankSecurity, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, body, senses, pigeons, heist, bankSecurity, controlRoom, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.
