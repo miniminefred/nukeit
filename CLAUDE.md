@@ -197,6 +197,26 @@ They arrive with sirens and lit cars on the avenue, search floor by floor, chang
 only by the stairs (out of sight for a few seconds a floor), and one catching you is a
 comic heap, "BUSTED", and the job failed.
 
+**The working day** (`sim/clock.js`, `sim/routines.js`): a clock from the start time chosen on
+the tools page (morning, lunch, evening, night) — about twenty minutes from 8:00 to evening,
+a fast night; the light follows it. The building's people are workers with posts found from
+what it was built with (a chair by a desk, a shop's staff place, a cooker, the bar and tables,
+the crates, a floor to clean, a teller's window) and visitors to the shops, tables and
+counters. Workers come in from the street at their own hours (a morning rush, a lunch rush,
+the evening going home), by the lift or the stairs; staff in uniform change at the lockers
+downstairs on the way in and out; desk workers get up for coffee, the printer or water; porters
+carry boxes from the pallets to the racks; some drive in and leave from the garage. People walk
+round the core by its corners (`_round`). Only pieces of `building === 'tower'` are posts; the
+street cafés' people come and go along the pavement. **Furniture gets its floor from
+`onFloor` in `tower.js`** — it was all floor 0 once, and every desk worker went to the lobby.
+
+**The back of house** (`building/furniture-service.js`): under each building a staff room
+(lockers, canteen, coffee and vending machines, laundry, cleaners' carts), stores and an
+archive, more plant (tank, pumps, workbench) and a garage of cars; on office floors coffee,
+printers, whiteboards, paper and bins; pictures on the core. E uses some of it (`USES` in
+`main.js`): coffee (quicker for 30 s), the vending machine and the water cooler (health), the
+lockers (overalls that work as the vest does). Coloured plastic is `vinyl`: `plastic` is black.
+
 **Shops are real places** (`building/shops.js`, fixtures in `furniture-shop.js`), after the
 owner's photograph of a café-bakery (`~/Downloads/Screenshot 2026-10-18 122332.png`): "an
 actual place, not just some random stuff sitting". A unit is its own walls (each wall a
