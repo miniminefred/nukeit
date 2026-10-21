@@ -256,7 +256,12 @@ let hallStart = 0;
 // the van ends the job.
 const heist = new Heist({ scene, vmScene, pieces, physics, player, input, hud, audio, onEscape: () => finish(), onBooks: () => achieve.event('books') });
 // The bank's cameras, lasers and lockdown (sim/bank-security.js).
-const bankSecurity = new BankSecurity({ scene, world, pieces, physics, player, camera, security, water, hud, audio, shake, fear, people, structure, topple });
+const bankSecurity = new BankSecurity({
+  scene, world, pieces, physics, player, camera, security, water, hud, audio, shake, fear, people, structure, topple,
+  // What the control room acts on: breaking something just now, spraying,
+  // carrying the bank's money, or being someone already wanted.
+  suspect: () => security.time - security.lastBlow < 2 || (tools[current]?.id === 'spray' && input.mouse.left) || heist.bags > 0 || wanted.now >= 3,
+});
 let rig = null;           // dev: { at, look } to hold the camera there
 let toppling = false;
 let waterfall = null;     // the sheet of water down the atrium wall, while it stands

@@ -108,7 +108,7 @@ export class BankSecurity {
   }
 
   // Does any camera see you right now? (For the law: being seen.)
-  get sees() { return this.on && this.cams.some((c) => c.seen > SEEN); }
+  get sees() { return this.on && this.cams.some((c) => c.seen > SEEN) && !!this.fx.suspect?.(); }
 
   update(dt) {
     if (!this.on) return;
@@ -138,9 +138,13 @@ export class BankSecurity {
         }
       }
       c.seen = sees ? c.seen + dt : Math.max(0, c.seen - dt * 2);
-      c.light.material.color.set(!live ? 0x101010 : c.seen > SEEN ? (Math.floor(this.time * 6) % 2 ? 0xff2a1a : 0x601010) : 0x401010);
-      // Seen: the control room sends the guards, every few seconds while it lasts.
-      if (c.seen > SEEN && this.time - c.alerted > 4) {
+      // A camera watches everyone; the control room only acts on someone up
+      // to something — breaking things, carrying the bank's money, or already
+      // wanted. A customer walking in is just a customer.
+      const bad = c.seen > SEEN && !!this.fx.suspect?.();
+      c.light.material.color.set(!live ? 0x101010 : bad ? (Math.floor(this.time * 6) % 2 ? 0xff2a1a : 0x601010) : 0x401010);
+      // Seen at it: the control room sends the guards, every few seconds while it lasts.
+      if (bad && this.time - c.alerted > 4) {
         c.alerted = this.time;
         security?.summon?.(player.pos, true);
         security.spotted = security.time;

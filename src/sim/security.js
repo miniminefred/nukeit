@@ -240,9 +240,16 @@ export class Security {
       const witnessed = known || this.time - this.spotted < 60;
       if (noticed && witnessed) {
         if (a.mode !== 'chase') { a.mode = 'chase'; a.minD = 99; this._call(a); }
-      } else if (noticed && this.fx.armed?.() && a.mode !== 'chase') a.mode = 'watch';
+      } else if (noticed && this.fx.armed?.() && a.mode !== 'chase' && a.mode !== 'watch' && this.time > (a.easy ?? 0)) { a.mode = 'watch'; a.watched = this.time; }
       if (a.mode === 'chase' && !witnessed) { a.mode = a.kind === 'cop' ? 'search' : 'look'; this.fx.onLost?.(a); }
-      if (a.mode === 'watch' && (!this.fx.armed?.() || this.time - a.seen > 8)) a.mode = a.kind === 'cop' ? 'search' : 'patrol';
+      // Watching is a warning, not a shadow: put the hammer away, or let a
+      // quarter of a minute go by doing nothing, and they leave you to it —
+      // and leave you be for a minute after.
+      if (a.mode === 'watch' && (!this.fx.armed?.() || this.time - a.seen > 8 || this.time - a.watched > 15)) {
+        if (this.fx.armed?.() && this.time - a.watched > 15) this.fx.hud?.flash(a.kind === 'cop' ? 'Police: "Keep it that way."' : 'Security: "Fine. I’ve got my eye on you."', 2);
+        a.mode = a.kind === 'cop' ? 'search' : 'patrol';
+        a.easy = this.time + 60;
+      }
       if (a.mode === 'chase' && this.time - a.seen > (a.kind === 'cop' ? 10 : 7)) { a.mode = 'look'; this.fx.onLost?.(a); }
       if (a.mode === 'look' && a.last && a.pos.distanceTo(a.last) < 1) { a.mode = a.kind === 'cop' ? 'search' : 'patrol'; a.last = null; }
       // Off on another floor: the police follow by the stairs; a guard stays and radios.
