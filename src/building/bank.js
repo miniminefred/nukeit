@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { block, panel, plate, assembly } from './kit.js';
 import { FLOOR_H, SLAB, PODIUM_FLOORS, TOP_FLOOR, ROOF, LOWER, BASEMENT, ATRIUM, T, U, OUTLINE, inPoly, inCore } from './plan.js';
 import { HALL_XS, HALL_ZS, TOWER_XS, TOWER_ZS, TOWER_COL_XS, TOWER_COL_ZS } from './bank-plan.js';
-import { core, stair } from './tower.js';
+import { core, stair, onFloor } from './tower.js';
 import { signs } from './shops.js';
 import { furnishBank } from './bank-interiors.js';
 
@@ -36,7 +36,7 @@ export function buildBank(P) {
     if (f === LOWER) retaining(P);
     else if (f < PODIUM_FLOORS) stoneFacade(P, f);
     else glassFacade(P, f);
-    furnishBank(P, f);
+    onFloor(P, f, () => furnishBank(P, f));
   }
   portico(P);
   parapets(P);

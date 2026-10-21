@@ -24,6 +24,14 @@ export { FLOOR_H, PODIUM_FLOORS, TOP_FLOOR } from './plan.js';
 export const SITE = { x0: -21, x1: 21, z0: -13, z1: 14 };      // what the job measures
 export const ENTRY = { x: 0, z: 20, yaw: 0 };                   // where you arrive, facing the door
 
+// Furnish floor f, and mark everything it adds as on floor f (furniture is
+// built without one, and the people who use it find it by floor).
+export function onFloor(P, f, fn) {
+  const n = P.list.length;
+  fn();
+  for (let i = n; i < P.list.length; i++) if (!P.list[i].floor) P.list[i].floor = f;
+}
+
 export function buildTower(P) {
   for (let f = LOWER; f <= ROOF; f++) {
     slabs(P, f);
@@ -33,7 +41,7 @@ export function buildTower(P) {
       stair(P, f);
       if (f === LOWER) retaining(P);
       else facade(P, f);
-      furnish(P, f);
+      onFloor(P, f, () => furnish(P, f));
     }
   }
   terraces(P);
