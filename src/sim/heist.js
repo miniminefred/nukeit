@@ -55,6 +55,8 @@ export class Heist {
     if (!this.on) return;
     const list = this.fx.pieces.list;
     this.pallets = list.filter((p) => p.tag === 'money');
+    // Where each pallet stands: one crushed leaves its money on the floor there.
+    for (const p of this.pallets) p.cashAt = p.box.getCenter(new THREE.Vector3());
     this.total = this.pallets.length * BAG;
     this.need = Math.round(this.pallets.length * (NEED[level.id] ?? 0.65)) * BAG;
     this.statue = list.find((p) => p.tag === 'statue');
@@ -106,7 +108,8 @@ export class Heist {
     const prop = this.props.find((q) => q.mesh.visible && near(q.mesh.position));
     const bag = this.dropped.find((b) => near(b.mesh.position));
     const stash = this.stashes.find((s) => close(s.piece));
-    const pallet = this.pallets.find(close);
+    // A pallet shaken loose by a collapse is still a pallet of money.
+    const pallet = this.pallets.find((p) => p.state !== 'dead' && p.box.distanceToPoint(_v.copy(player.pos).setY(player.pos.y + 0.5)) < REACH);
     if (this.cart && !pushing && near(this.cart.mesh.position) && !this.cart.found) { this.cart.found = true; hud?.flash('A money cart! E to push it', 2); }
     if (this.cart && !pushing && near(this.cart.mesh.position) && this.bags <= CART.load) {
       tip = 'E — push the money cart';
@@ -128,7 +131,7 @@ export class Heist {
       if (input.pressed('KeyE')) { this.fx.pieces.destroy(this.statue); this.statue = null; take({ kind: 'statue', value: VALUE.statue }, 'The gold statue: heavy as a bag of money'); }
     } else if (pallet && this.bags < cap) {
       tip = `E — fill a bag ($${this.money(BAG)})`;
-      if (input.pressed('KeyE')) { this.fx.pieces.destroy(pallet); audio?.flutter?.(player.pos.x, player.pos.y, player.pos.z, 3); take({ kind: 'money', value: BAG }, this.bags > 1 && !pushing ? 'Two bags: you can barely move' : 'A bag of money'); }
+      if (input.pressed('KeyE')) { pallet.taken = true; this.fx.pieces.destroy(pallet); audio?.flutter?.(player.pos.x, player.pos.y, player.pos.z, 3); take({ kind: 'money', value: BAG }, this.bags > 1 && !pushing ? 'Two bags: you can barely move' : 'A bag of money'); }
     } else if (close(this.vault) && this.code) {
       tip = 'E — key in the code: 4 7 1 9';
       if (input.pressed('KeyE')) this.fx.bankSecurity?.openVault();
@@ -137,6 +140,8 @@ export class Heist {
       if (pushing) { this.cart.held = false; hud?.flash('You let go of the cart', 1.2); }
       else if (this.bags) this._drop(1);
     }
+    // A pallet crushed: the money is not lost — a bag of it lies where it stood.
+    for (const p of this.pallets) if (p.state === 'dead' && !p.taken) { p.taken = true; this._dropAt({ kind: 'money', value: BAG }, p.cashAt.x, p.cashAt.y - 0.2, p.cashAt.z); }
     // The CEO's safe, blown: a bag of cash on the floor where it stood.
     if (this.safe && this.safe.state !== 'static') {
       const c = this.safe.box.getCenter(new THREE.Vector3());
@@ -204,7 +209,9 @@ export class Heist {
 
   _dropAt(item, x, y, z) {
     const m = item.kind === 'books' ? booksMesh() : bagMesh();
-    m.position.set(x, y, z);
+    // On whatever is under it — the floor, or the rubble of the floor that went.
+    const hit = this.fx.physics.raycast(_v.set(x, y + 0.3, z), _down, 300);
+    m.position.set(x, hit ? y + 0.3 - hit.distance + 0.25 : 0.25, z);
     m.rotation.y = Math.random() * Math.PI;
     this.fx.scene.add(m);
     this.dropped.push({ mesh: m, item });
