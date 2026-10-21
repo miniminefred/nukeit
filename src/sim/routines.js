@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { T, LOWER, TOP_FLOOR, CORE, STAIR_DOOR, floorUse } from '../building/plan.js';
+import { T, LOWER, TOP_FLOOR, CORE, STAIR_DOOR, BASEMENT, floorUse } from '../building/plan.js';
 import { SITE } from '../site.js';
 import { places } from '../building/shops.js';
 
@@ -29,6 +29,11 @@ import { places } from '../building/shops.js';
 //            behind him); and a cash delivery comes in the morning: boxes
 //            carried down and stacked in a corner of the lower level.
 //
+// The back of house: staff in uniform change at the lockers downstairs, on the
+// way in and the way out; desk workers get up for a coffee, the printer or the
+// water cooler and come back; porters take boxes off the pallets to the racks;
+// a few come to work by car and go down to the garage at the end of the day.
+//
 // Trouble stops them: frightened, they stand, stare, film; calm again, they
 // go back to work. In a panic they are the crowd's (sim/people.js) and leave.
 
@@ -47,6 +52,8 @@ const HOURS = {
   desk: [8, 17.5], server: [9, 20, 14.5], teller: [9, 17], cook: [10, 21, 15.5], waiter: [11, 22, 16.5],
   porter: [7, 16], cleaner: [0, 24, 14], late: [19, 23],
 };
+// Who changes into a uniform at the lockers.
+const CHANGES = new Set(['server', 'teller', 'cook', 'waiter', 'cleaner', 'porter']);
 const BAG_COLOURS = [0xf2f0ea, 0x1a1a1a, 0xc8261d, 0x2a4a6a, 0xd8b25a];
 
 const _v = new THREE.Vector3(), _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = new THREE.Vector3(1, 1, 1), _c = new THREE.Color();
@@ -73,7 +80,8 @@ export class Routines {
     this.on = true;
     this.bank = job.id === 'bank';
     const { pieces } = this.fx;
-    const list = pieces.list.filter((p) => p.state === 'static');
+    // The job's building only: not the office block next door, not the city.
+    const list = pieces.list.filter((p) => p.state === 'static' && p.building === 'tower');
     // Desks: an office chair by a desk is somebody's place.
     const desks = list.filter((p) => p.tag === 'desk');
     for (const ch of list.filter((p) => p.tag === 'chair')) {
@@ -85,10 +93,12 @@ export class Routines {
       this.posts.push({ kind: 'desk', f: ch.floor, x: c.x, z: c.z, y: floorY, yaw: Math.atan2(dc.x - c.x, dc.z - c.z), sit: true, active: Math.random() < 0.55, late: Math.random() < 0.07 });
     }
     // Shop counters and the bank's windows.
+    // (The street cafés across the avenue and either side are staffed too:
+    // their people come and go along the pavement, not through the building.)
     for (const pl of places.list) {
       if (pl.kind !== 'staff' || !pieces.list.length) continue;
       const f = Math.round((pl.y - T(0)) / 4);
-      this.posts.push({ kind: pl.teller ? 'teller' : 'server', f, x: pl.x, z: pl.z, y: pl.y, yaw: pl.yaw, sit: !!pl.sit, active: true, cash: 6 });
+      this.posts.push({ kind: pl.teller ? 'teller' : 'server', f, x: pl.x, z: pl.z, y: pl.y, yaw: pl.yaw, sit: !!pl.sit, active: true, cash: 6, out: !this._inside(pl.x, pl.z) });
     }
     // Cooks at the cookers and food counters.
     for (const k of list.filter((p) => p.tag === 'cooker')) {
@@ -102,6 +112,9 @@ export class Routines {
     for (const b of bars) for (let n = 0; n < 2; n++) this.posts.push({ kind: 'waiter', f: b.floor, bar: b.box.getCenter(new THREE.Vector3()), active: true });
     // Porters among the crates.
     this.crates = list.filter((p) => p.tag === 'crates');
+    // The things people use: coffee, the printer, water, the lockers, the racks, the cars.
+    this.things = {};
+    for (const t of ['coffee', 'printer', 'water', 'lockers', 'rack', 'car']) this.things[t] = list.filter((p) => p.tag === t);
     if (this.crates.length) for (let n = 0; n < 2; n++) this.posts.push({ kind: 'porter', f: this.crates[0].floor, active: true });
     // Cleaners: one for every few floors by day, more at night.
     for (let f = LOWER; f <= TOP_FLOOR; f += 2) this.posts.push({ kind: 'cleaner', f, active: true, night: true, day: (f - LOWER) % 6 === 0 });
@@ -148,6 +161,9 @@ export class Routines {
     return (C.within(12, 13.75) ? 0.32 : 0.12) * (this.bank ? 0.7 : 1);
   }
 
+  // Is (x, z) in the building (its lower level's footprint)?
+  _inside(x, z) { return x > BASEMENT.x0 && x < BASEMENT.x1 && z > BASEMENT.z0 && z < BASEMENT.z1; }
+
   _workers() { let n = 0; for (const p of this.managed) if (p.job !== 'visitor') n++; return n; }
 
   get cap() { return this.fx.clock.within(20, 7) ? CAP.night : CAP.day; }
@@ -185,14 +201,39 @@ export class Routines {
 
   // ---------------------------------------------------------------- people
 
-  _new(f, at, kind) {
-    const p = this.fx.people.person(f, at, UNIFORM[kind] ?? null);
+  _new(f, at, kind, dressed = true) {
+    const p = this.fx.people.person(f, at, null);
     if (!p) return null;
     p.post = kind;                                // a panic takes them (sim/people.js)
     p.plan = [];
     p.job = kind;
+    p.own = { ...p.colours };
+    p.uniform = UNIFORM[kind] ?? null;
+    p.car = null;
+    if (dressed) this._dress(p, true);
     this.managed.add(p);
     return p;
+  }
+
+  // Into a uniform, or back into their own clothes.
+  _dress(p, on) {
+    if (!p.uniform) return;
+    Object.assign(p.colours, on ? p.uniform : p.own);
+    this.fx.people.repaint(p);
+  }
+
+  // The lockers, if the building has them standing: where staff change.
+  _lockers() {
+    const L = this.things?.lockers.filter((k) => k.state === 'static') ?? [];
+    return L.length ? this._front(L[(Math.random() * L.length) | 0], 0.5) : null;
+  }
+
+  // Where to stand to use a thing: in front of it (its +z, as it was built).
+  _front(piece, gap = 0.5) {
+    const c = piece.box.getCenter(new THREE.Vector3());
+    const d = _v.set(0, 0, 1).applyQuaternion(piece.quat).setY(0).normalize();
+    const half = Math.abs(d.x) > Math.abs(d.z) ? (piece.box.max.x - piece.box.min.x) / 2 : (piece.box.max.z - piece.box.min.z) / 2;
+    return c.addScaledVector(d, half + gap).setY(piece.box.min.y);
   }
 
   _release(p) {
@@ -215,10 +256,35 @@ export class Routines {
   _arrive(post) {
     const at = this._postAt(post);
     if (!at) return;
-    const p = this._new(0, this._pavement(), post.kind === 'teller' ? 'server' : post.kind === 'desk' ? null : post.kind);
+    const kind = post.kind === 'teller' ? 'server' : post.kind === 'desk' ? null : post.kind;
+    if (post.out) {
+      const p = this._new(0, this._pavement(at.x, at.z), kind);
+      if (!p) return;
+      post.person = p;
+      p.outside = true;
+      p.plan = [{ go: at }, ...this._work(post)];
+      return;
+    }
+    // Some drive in, and come up from the garage.
+    const cars = post.kind === 'desk' ? this.things.car.filter((c) => c.state === 'static') : [];
+    if (cars.length && Math.random() < 0.15) {
+      const car = cars[(Math.random() * cars.length) | 0];
+      const side = new THREE.Vector3(1, 0, 0).applyQuaternion(car.quat);
+      const from = car.box.getCenter(new THREE.Vector3()).addScaledVector(side, 1.4).setY(car.box.min.y);
+      const p = this._new(LOWER, from, kind);
+      if (!p) return;
+      p.car = from;
+      post.person = p;
+      p.plan = [...this._route(p, LOWER, post.f, at), ...this._work(post)];
+      return;
+    }
+    // Staff come in in their own clothes and change downstairs.
+    const locker = CHANGES.has(post.kind) ? this._lockers() : null;
+    const p = this._new(0, this._pavement(), kind, !locker);
     if (!p) return;
     post.person = p;
-    p.plan = [...this._enter(), ...this._route(p, 0, post.f, at), ...this._work(post)];
+    const change = locker ? [...this._route(p, 0, LOWER, locker), { wait: 3 + Math.random() * 3 }, { fn: () => this._dress(p, true) }] : [];
+    p.plan = [...this._enter(), ...change, ...this._route(p, locker ? LOWER : 0, post.f, at), ...this._work(post)];
   }
 
   // Off home, the way they came.
@@ -227,7 +293,15 @@ export class Routines {
     // Out of sight in the lift or the stairs: finish that, then go home from there.
     const riding = p.plan[0]?.ride !== undefined ? p.plan[0] : null;
     const from = riding ? riding.ride : p.f;
-    p.plan = [...(riding ? [riding] : []), ...this._route(p, from, 0, this._doorIn()), ...this._exit()];
+    const head = riding ? [riding] : [];
+    if (p.outside) { p.plan = [{ stand: true }, ...this._away(p.pos.x, p.pos.z)]; return; }
+    if (p.car) { p.plan = [...head, ...this._route(p, from, LOWER, p.car), { wait: 1 }, { gone: true }]; return; }
+    const locker = p.uniform && CHANGES.has(p.job) ? this._lockers() : null;
+    if (locker) {
+      p.plan = [...head, ...this._route(p, from, LOWER, locker), { wait: 3 + Math.random() * 3 }, { fn: () => this._dress(p, false) }, ...this._route(p, LOWER, 0, this._doorIn()), ...this._exit()];
+      return;
+    }
+    p.plan = [...head, ...this._route(p, from, 0, this._doorIn()), ...this._exit()];
   }
 
   _visitor(direct) {
@@ -255,10 +329,13 @@ export class Routines {
       what = { kind: 'wander' };
     }
     if (!target) return;
-    const p = this._new(direct ? f : 0, direct ? target : this._pavement(), 'visitor');
+    const out = !this._inside(target.x, target.z);
+    const p = this._new(direct ? f : 0, direct ? target : this._pavement(target.x, target.z), 'visitor');
     if (!p) return;
     p.job = 'visitor';
-    p.plan = [...(direct ? [] : [...this._enter(), ...this._route(p, 0, f, target)]), ...this._visit(p, what, target, f)];
+    p.outside = out;
+    const way = direct ? [] : out ? [{ go: target }] : [...this._enter(), ...this._route(p, 0, f, target)];
+    p.plan = [...way, ...this._visit(p, what, target, f)];
   }
 
   // ---------------------------------------------------------------- plans
@@ -281,7 +358,17 @@ export class Routines {
 
   _doorX() { const D = SITE.doors; return D.x[(Math.random() * D.x.length) | 0]; }
   _doorIn() { return new THREE.Vector3(this._doorX(), T(0), SITE.doors.inside - 0.5); }
-  _pavement() { return new THREE.Vector3((Math.random() - 0.5) * 16, 0.003, SITE.street.pavements[0] + (Math.random() - 0.5) * 2); }
+  _pavement(x = 0, z = 0) {
+    // The pavement nearest (x, z): the building's side, or across the avenue for a café there.
+    const P = SITE.street.pavements, pz = z > (P[0] + P[1]) / 2 ? P[1] : P[0];
+    return new THREE.Vector3(x + (Math.random() - 0.5) * 16, 0.003, pz + (Math.random() - 0.5) * 2);
+  }
+
+  // Off along the pavement and out of the picture (from a café in the street).
+  _away(x, z) {
+    const side = Math.random() < 0.5 ? -1 : 1, a = this._pavement(x, z);
+    return [{ go: a }, { go: new THREE.Vector3(x + side * 25, 0.003, a.z) }, { gone: true }];
+  }
 
   _enter() {
     const x = this._doorX(), D = SITE.doors;
@@ -314,7 +401,7 @@ export class Routines {
     else if (what.kind === 'queue') steps.push({ face: what.yaw }, { linger: 6 + Math.random() * 5, kind: what.teller ? 'bank' : 'queue', at }, { carry: what.teller ? null : Math.random() < 0.5 ? 'bag' : 'cup' });
     else if (what.kind === 'browse') steps.push({ face: what.yaw }, { linger: 10 + Math.random() * 25, kind: 'browse' }, { carry: Math.random() < 0.4 ? 'bag' : null });
     else for (let n = 0; n < 2; n++) { const s = this.fx.people._spot(f, at, 3); if (s) steps.push({ go: s }, { wait: 3 + Math.random() * 6 }); }
-    steps.push({ stand: true }, ...this._route(p, f, 0, this._doorIn()), ...this._exit());
+    steps.push({ stand: true }, ...(p.outside ? this._away(at.x, at.z) : [...this._route(p, f, 0, this._doorIn()), ...this._exit()]));
     return steps;
   }
 
@@ -329,6 +416,14 @@ export class Routines {
     if (s.scared && fear < 30) { s.scared = false; const post = s.work; if (post?.sit) p.plan.unshift({ sit: true, yaw: post.yaw, y: post.y ?? T(post.f) }); return; }
     const next = () => { p.plan.shift(); p.target = null; };
     if (s.go) {
+      // The core is in the way: round it by its corners.
+      if (!s.routed) {
+        s.routed = true;
+        if (!p.outside && p.f >= LOWER && this._inside(p.pos.x, p.pos.z)) {
+          const via = this._round(p.pos, s.go);
+          if (via.length) { p.plan.splice(0, 0, ...via.map((v) => ({ go: v, routed: true }))); return; }
+        }
+      }
       p.target ??= new THREE.Vector3();
       p.target.set(s.go.x, p.pos.y, s.go.z);
       p.speed = p.job === 'cleaner' ? 0.9 : 1.3 + (p.phase % 1) * 0.3;
@@ -369,6 +464,38 @@ export class Routines {
     }
   }
 
+  // The way round the core from a to b: the corners of a box just outside it,
+  // the shorter way round (none if the straight line is clear).
+  _round(a, b) {
+    const m = 0.75, x0 = CORE.x0 - m, x1 = CORE.x1 + m, z0 = CORE.z0 - m, z1 = CORE.z1 + m;
+    const blocked = (p, q) => {
+      const n = Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / 0.25);
+      for (let i = 1; i < n; i++) {
+        const x = p.x + (q.x - p.x) * i / n, z = p.z + (q.z - p.z) * i / n;
+        if (x > x0 + 0.1 && x < x1 - 0.1 && z > z0 + 0.1 && z < z1 - 0.1) return true;
+      }
+      return false;
+    };
+    if (!blocked(a, b)) return [];
+    const C = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]].map(([x, z]) => new THREE.Vector3(x, b.y, z));
+    const d = (p, q) => Math.hypot(p.x - q.x, p.z - q.z);
+    let best = null, bestL = Infinity;
+    for (let i = 0; i < 4; i++) {
+      if (blocked(a, C[i])) continue;
+      for (let j = 0; j < 4; j++) {
+        if (blocked(C[j], b)) continue;
+        for (const dir of [1, 3]) {
+          const path = [C[i]];
+          let k = i, L = d(a, C[i]);
+          while (k !== j) { const n = (k + dir) % 4; L += d(C[k], C[n]); k = n; path.push(C[k]); }
+          L += d(C[j], b);
+          if (L < bestL) { bestL = L; best = path; }
+        }
+      }
+    }
+    return best ?? [];
+  }
+
   // A visitor at a counter: the nearest server serves them (the teller counts
   // the money in or out).
   _served(p, s) {
@@ -384,7 +511,11 @@ export class Routines {
     p.target = null;
     const t = this.fx.clock.hour * 3600 * 0.03 + p.phase;
     switch (post.kind) {
-      case 'desk': p.armUp = 0.2 + 0.1 * Math.abs(Math.sin(t * 9)); break;
+      case 'desk':
+        p.armUp = 0.2 + 0.1 * Math.abs(Math.sin(t * 9));
+        post.breakT ??= 20 + Math.random() * 160;
+        if ((post.breakT -= dt) <= 0) { post.breakT = 60 + Math.random() * 220; this._break(p, post); }
+        break;
       case 'cook': p.armUp = 0.4 + 0.3 * Math.abs(Math.sin(t * 4)); break;
       case 'server': case 'teller':
         p.armUp = post.serving > 0 ? 0.5 + 0.4 * Math.abs(Math.sin(t * 5)) : 0;
@@ -402,13 +533,43 @@ export class Routines {
         p.plan.unshift({ carry: 'cup' }, { go: new THREE.Vector3(c.x + 0.8, T(post.f), c.z) }, { wait: 2 }, { carry: null }, { go: new THREE.Vector3(bar.x + 1.2, T(post.f), bar.z + (Math.random() - 0.5) * 3) }, { wait: 3 + Math.random() * 3 });
         break;
       }
-      case 'cleaner': case 'porter': {
+      case 'porter': {
+        // A box off a pallet, onto the racks.
+        const crates = this.crates.filter((k) => k.state === 'static'), racks = this.things.rack.filter((k) => k.state === 'static' && k.floor === post.f);
+        if (crates.length && racks.length) {
+          const a = this.fx.people._spot(post.f, crates[(Math.random() * crates.length) | 0].box.getCenter(new THREE.Vector3()), 1.2);
+          const b = this._front(racks[(Math.random() * racks.length) | 0], 0.45);
+          if (a) { p.plan.unshift({ go: a }, { wait: 2 + Math.random() * 2 }, { carry: 'box' }, { go: b }, { wait: 2.5 }, { carry: null }, { wait: 2 + Math.random() * 6 }); break; }
+        }
+      }
+      // falls through: about the crates
+      case 'cleaner': {
         const to = post.kind === 'porter' && this.crates.length ? this.fx.people._spot(post.f, this.crates[(Math.random() * this.crates.length) | 0].box.getCenter(new THREE.Vector3()), 1.2) : this.fx.people._spot(post.f, p.pos, 4);
         if (to) p.plan.unshift({ go: to }, { wait: 4 + Math.random() * 8 });
         p.armUp = post.kind === 'cleaner' ? 0.35 : 0.6;
         break;
       }
     }
+  }
+
+  // Up from the desk for a coffee, the printer or a cup of water, and back.
+  _break(p, post) {
+    const near = (t) => (this.things[t] ?? []).filter((k) => k.state === 'static' && k.floor === post.f);
+    const options = [['coffee', 0.5], ['printer', 0.3], ['water', 0.2]].filter(([t]) => near(t).length);
+    if (!options.length) return;
+    let r = Math.random() * options.reduce((a, [, w]) => a + w, 0), what = options[0][0];
+    for (const [t, w] of options) if ((r -= w) <= 0) { what = t; break; }
+    const list = near(what);
+    const thing = list.reduce((a, k) => (k.box.getCenter(_v).distanceTo(p.pos) < a.box.getCenter(_v).distanceTo(p.pos) ? k : a), list[0]);
+    const at = this._front(thing, 0.45);
+    const c = thing.box.getCenter(new THREE.Vector3());
+    p.sitting = false;
+    p.plan.unshift(
+      { go: at }, { face: Math.atan2(c.x - at.x, c.z - at.z) }, { wait: 4 + Math.random() * 6 },
+      { carry: what === 'printer' ? null : 'cup' },
+      { go: new THREE.Vector3(post.x, post.y, post.z) }, { carry: null },
+      ...this._work(post).slice(0, -1),
+    );
   }
 
   // ---------------------------------------------------------------- the bank

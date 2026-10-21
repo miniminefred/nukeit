@@ -46,6 +46,8 @@ const KINDS = {
   roofing:     { surf: 'roofing', repeat: 2, density: 1800, toughness: 10, structural: true, inside: 'broken', sound: 'concrete' },
   gastank:     { surf: 'metal', repeat: 0.6, density: 600, toughness: 4, explodes: 4, metal: 0.4, tint: 0xc0302a, sound: 'steel' },
   transformer: { surf: 'metal', repeat: 1, density: 3000, toughness: 12, explodes: 6, metal: 0.5, tint: 0x6f7a6c, sound: 'steel' },
+  // Coloured plastic — a cleaner's cart, a wheelie bin, a printer (plastic itself is black).
+  vinyl:       { surf: 'plaster', repeat: 0.5, density: 950, toughness: 1.2, burns: 16, inside: 'plastic', sound: 'drywall', rough: 0.45 },
   screen:      { surf: 'plastic', repeat: 0.5, density: 900, toughness: 0.8, burns: 12, inside: 'plastic', sound: 'glass', emissive: 0x1c2a3a },
   lamp:        { density: 300, toughness: 0.5, sound: 'glass', light: true },
   // A home and a restaurant need a few things an office does not.
@@ -61,7 +63,7 @@ const KINDS = {
 // steel beam a dozen. See damage/damage.js.
 const HITS = {
   concrete: 3, marble: 3, darkmarble: 3, creammarble: 3, mirror: 0.6, flag: 0.5, tiles: 1.2, roofing: 2.5, steel: 9, bronze: 6, brass: 6, gold: 6, metal: 3,
-  wood: 1.5, plaster: 1.2, carpet: 1, fabric: 0.8, leather: 1, plastic: 1, paper: 0.8,
+  wood: 1.5, plaster: 1.2, carpet: 1, fabric: 0.8, leather: 1, plastic: 1, vinyl: 1, paper: 0.8,
   soil: 1, leaves: 0.5, ceramic: 1.2, lacquer: 1.5, linen: 0.6, gastank: 2, transformer: 5,
   screen: 0.8, lamp: 0.3, glass: 1, clearglass: 1,
 };

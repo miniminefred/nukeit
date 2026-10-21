@@ -214,7 +214,6 @@ function lowerLevel(P, y) {
   S.wheelieBin(P, -15.2, y, 11, 0, 0x2a3a6a);
   // The staff room, north of the core: lockers, a bench, the canteen's
   // tables, coffee and a vending machine, the laundry, the cleaners' carts.
-  partition(P, f, 'x', -5.2, -8.8, 5.55, -2.2, -1.2);
   partition(P, f, 'z', -8.8, -11.6, -5.25);
   S.lockers(P, -2.5, y, -11.3, 0, 8);
   S.lockers(P, -6.95, y, -11.3, 0, 6);

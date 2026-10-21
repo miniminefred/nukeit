@@ -92,7 +92,7 @@ export function vending(P, x, y, z, yaw) {
   const snacks = [];
   const C = [0xc8261d, 0xe8b020, 0x2a6a3a, 0x2a4a8a, 0xe86a1a];
   for (let r = 0; r < 5; r++) for (let c = 0; c < 4; c++) snacks.push({ part: C[(r + c) % C.length], b: [-0.38 + c * 0.17, 0.75 + r * 0.24, 0.2, -0.26 + c * 0.17, 0.9 + r * 0.24, 0.3] });
-  const byColour = C.map((c) => ({ kind: 'plastic', boxes: snacks.filter((s) => s.part === c).map((s) => s.b), tint: c }));
+  const byColour = C.map((c) => ({ kind: 'vinyl', boxes: snacks.filter((s) => s.part === c).map((s) => s.b), tint: c }));
   return assembly(P, x, y, z, yaw, [
     { kind: 'metal', round: 0.02, boxes: [[-0.45, 0, -0.4, 0.45, 1.9, 0.32]], tint: 0x2a2e3a },
     { kind: 'lamp', boxes: [[-0.42, 0.7, 0.18, 0.3, 1.88, 0.2]], tint: 0xf4f0e6 },
@@ -105,7 +105,7 @@ export function vending(P, x, y, z, yaw) {
 // A big office printer, paper in its tray.
 export function printer(P, x, y, z, yaw) {
   return assembly(P, x, y, z, yaw, [
-    { kind: 'plastic', round: 0.03, boxes: [[-0.4, 0, -0.3, 0.4, 1.0, 0.3], [-0.38, 1.0, -0.28, 0.38, 1.12, 0.28]], tint: 0xdedcd6 },
+    { kind: 'vinyl', round: 0.03, boxes: [[-0.4, 0, -0.3, 0.4, 1.0, 0.3], [-0.38, 1.0, -0.28, 0.38, 1.12, 0.28]], tint: 0xdedcd6 },
     { kind: 'plastic', boxes: [[-0.38, 0.12, 0.3, 0.38, 0.14, 0.31], [-0.38, 0.4, 0.3, 0.38, 0.42, 0.31], [0.1, 1.12, 0.1, 0.35, 1.16, 0.26]], tint: 0x3a3a3a },
     { kind: 'paper', boxes: [[-0.3, 0.86, 0.15, 0.15, 0.9, 0.42]], tint: 0xf8f8f4 },
   ], 'furniture', { tag: 'printer', colliders: [[-0.4, 0, -0.3, 0.4, 1.16, 0.42]] });
@@ -117,8 +117,8 @@ export function whiteboard(P, x, y, z, yaw, w = 1.6) {
   for (let n = 0; n < 5; n++) lines.push([-w / 2 + 0.15, 1.75 - n * 0.16, 0.035, -w / 2 + 0.3 + ((n * 37) % 9) * 0.1, 1.765 - n * 0.16, 0.04]);
   return assembly(P, x, y, z, yaw, [
     { kind: 'metal', boxes: [[-w / 2 - 0.03, 0.85, 0, w / 2 + 0.03, 1.95, 0.03], [-w / 2 + 0.05, 0, -0.3, -w / 2 + 0.09, 0.9, 0.3], [w / 2 - 0.09, 0, -0.3, w / 2 - 0.05, 0.9, 0.3], [-w / 2 + 0.05, 0, -0.3, -w / 2 + 0.09, 0.04, 0.3]], tint: 0xa0a4a8 },
-    { kind: 'plastic', boxes: [[-w / 2, 0.88, 0.03, w / 2, 1.92, 0.035]], tint: 0xf8f8f6 },
-    { kind: 'plastic', boxes: lines, tint: 0x2a4a9a },
+    { kind: 'vinyl', boxes: [[-w / 2, 0.88, 0.03, w / 2, 1.92, 0.035]], tint: 0xf8f8f6 },
+    { kind: 'vinyl', boxes: lines, tint: 0x2a4a9a },
   ], 'furniture', { colliders: [[-w / 2, 0, -0.3, w / 2, 1.95, 0.3]] });
 }
 
@@ -133,8 +133,8 @@ export function bin(P, x, y, z, tint = 0x3a3e42) {
 // A big wheelie bin by the loading bay.
 export function wheelieBin(P, x, y, z, yaw, tint = 0x2a5a3a) {
   return assembly(P, x, y, z, yaw, [
-    { kind: 'plastic', round: 0.04, boxes: [[-0.6, 0.15, -0.5, 0.6, 1.25, 0.5]], tint },
-    { kind: 'plastic', round: 0.02, boxes: [[-0.62, 1.25, -0.55, 0.62, 1.32, 0.52]], tint: 0x1a2a1e },
+    { kind: 'vinyl', round: 0.04, boxes: [[-0.6, 0.15, -0.5, 0.6, 1.25, 0.5]], tint },
+    { kind: 'vinyl', round: 0.02, boxes: [[-0.62, 1.25, -0.55, 0.62, 1.32, 0.52]], tint: 0x1a2a1e },
     { kind: 'plastic', boxes: [{ cylZ: [-0.45, 0.1, 0.4], r: 0.1, h: 0.08 }, { cylZ: [0.45, 0.1, 0.4], r: 0.1, h: 0.08 }, { cylZ: [-0.45, 0.1, -0.4], r: 0.1, h: 0.08 }, { cylZ: [0.45, 0.1, -0.4], r: 0.1, h: 0.08 }], tint: 0x111111 },
   ], 'furniture', { colliders: [[-0.62, 0, -0.55, 0.62, 1.32, 0.55]] });
 }
@@ -192,8 +192,8 @@ export function workbench(P, x, y, z, yaw, len = 2) {
 // A cleaner's cart: a yellow trolley, a bucket, a mop, a bin bag.
 export function cleaningCart(P, x, y, z, yaw) {
   return assembly(P, x, y, z, yaw, [
-    { kind: 'plastic', round: 0.02, boxes: [[-0.45, 0.1, -0.25, 0.45, 0.16, 0.25], [-0.45, 0.16, -0.25, -0.4, 1.0, 0.25], [-0.45, 0.6, -0.25, 0.1, 0.65, 0.25]], tint: 0xe8c020 },
-    { kind: 'plastic', boxes: [{ cyl: [0.2, 0.32, 0], r: 0.18, r2: 0.15, h: 0.32, seg: 16 }], tint: 0x2a5aa0 },
+    { kind: 'vinyl', round: 0.02, boxes: [[-0.45, 0.1, -0.25, 0.45, 0.16, 0.25], [-0.45, 0.16, -0.25, -0.4, 1.0, 0.25], [-0.45, 0.6, -0.25, 0.1, 0.65, 0.25]], tint: 0xe8c020 },
+    { kind: 'vinyl', boxes: [{ cyl: [0.2, 0.32, 0], r: 0.18, r2: 0.15, h: 0.32, seg: 16 }], tint: 0x2a5aa0 },
     { kind: 'wood', boxes: [{ cyl: [0.25, 0.85, 0.05], r: 0.015, h: 1.3, seg: 6 }], tint: 0xc8b490 },
     { kind: 'plastic', boxes: [{ ball: [-0.2, 0.85, 0], s: [0.18, 0.2, 0.18] }], tint: 0x111111 },
   ], 'furniture', { tag: 'cleancart', colliders: [[-0.45, 0, -0.25, 0.45, 1.0, 0.25]] });
