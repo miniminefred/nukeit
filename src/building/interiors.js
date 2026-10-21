@@ -7,9 +7,10 @@ import * as W from './furniture-work.js';
 import * as L from './furniture-lobby.js';
 import * as SH from './shops.js';
 import * as SF from './furniture-shop.js';
+import * as S from './furniture-service.js';
 import {
   PODIUM_FLOORS, PENTHOUSE, RESIDENCES, HQ, LOWER, T, U, ATRIUM, podiumFront, inCore, inAtrium,
-  TOWER_COLUMNS, PODIUM_COLUMNS, clearOf, floorUse,
+  TOWER_COLUMNS, PODIUM_COLUMNS, clearOf, floorUse, CORE,
 } from './plan.js';
 
 // What is on each floor — the real tower's programme on twelve storeys:
@@ -209,6 +210,46 @@ function lowerLevel(P, y) {
   F.counter(P, 12.4, y, 7.6, 0, 3.2);
   for (const x of [16.2, 17, 17.8]) F.fridge(P, x, y, 11.1, Math.PI);
   F.counter(P, 18.9, y, 6.5, -HALF, 2.4);
+  S.wheelieBin(P, -16.5, y, 11, 0);
+  S.wheelieBin(P, -15.2, y, 11, 0, 0x2a3a6a);
+  // The staff room, north of the core: lockers, a bench, the canteen's
+  // tables, coffee and a vending machine, the laundry, the cleaners' carts.
+  partition(P, f, 'x', -5.2, -8.8, 5.55, -2.2, -1.2);
+  partition(P, f, 'z', -8.8, -11.6, -5.25);
+  S.lockers(P, -2.5, y, -11.3, 0, 8);
+  S.lockers(P, -6.95, y, -11.3, 0, 6);
+  S.lockerBench(P, -2.5, y, -10.3, 0, 2.4);
+  S.noticeboard(P, -8.74, y, -8, HALF);
+  for (const [x, z] of [[-6.9, -8.5], [2.4, -9.4], [2.4, -6.4]]) {
+    SF.woodTable(P, x, y, z);
+    SF.woodChair(P, x - 0.6, y, z, HALF);
+    SF.woodChair(P, x + 0.6, y, z, -HALF);
+  }
+  S.coffeeMachine(P, 5.1, y, -10, -HALF);
+  S.vending(P, 5.1, y, -8.5, -HALF);
+  S.laundry(P, 2.5, y, -5.62, Math.PI);
+  S.linenCart(P, 4.3, y, -6.1, 0);
+  S.cleaningCart(P, -4, y, -5.65, 0);
+  S.cleaningCart(P, -3.1, y, -5.65, 0);
+  // The stores, east of the core: racks of boxes, the archive, furniture
+  // put away under sheets, the lost property cage.
+  for (const x of [7.6, 12.5, 17.3]) S.rack(P, x, y, -2.6, 0);
+  for (const x of [12.5, 17.3]) S.rack(P, x, y, -0.2, Math.PI, 2.4, true);
+  S.sheeted(P, 7.4, y, -0.3, 0.3, 1.8, 0.9, 0.9);
+  S.sheeted(P, 8.4, y, 1.5, -0.2, 1.2, 1.0, 1.3);
+  for (let n = 0; n < 6; n++) F.filingCabinet(P, 11.3 + n * 0.48, y, 2.9, Math.PI);
+  S.lostProperty(P, 17.3, y, 2.4, Math.PI);
+  // More plant: a water tank, the pumps, the maintenance bench.
+  S.waterTank(P, 12.5, y, -6.2);
+  S.pump(P, 7.6, y, -5.6, 0);
+  S.pump(P, 9.0, y, -5.6, 0);
+  S.workbench(P, 12.5, y, -11.15, Math.PI);
+  // The garage, south of the core: three cars in their bays.
+  [0x2a3a5a, 0xc8c8c4, 0x1a1a1a].forEach((tint, i) => {
+    const x = -8.5 + i * 5.5;
+    S.bayLines(P, x, y, 9.3, HALF, 2.6, 5);
+    S.car(P, x, y, 9.3, HALF, tint);
+  });
 }
 
 // ---------------------------------------------------------------- the podium
@@ -445,6 +486,25 @@ function offices(P, f, y) {
   F.fridge(P, 8.4, y, 1.2, -HALF);
   F.waterCooler(P, 8.5, y, 2.4, -HALF);
   if (f % 2) F.gasTank(P, 8.6, y, -3.2);
+  S.kitchenThings(P, 8.2, y, -1.5, HALF);
+  S.coffeeMachine(P, 6.6, y, -4.7, 0);
+  S.printer(P, 6.6, y, 3.8, Math.PI);
+  S.whiteboard(P, podium ? -18.6 : -13, y, -0.5, HALF);
+  // In the rooms: paper on the desks, a bin each.
+  for (const [a] of rooms) for (const [z, face] of [[zMin + 1.4, Math.PI], [zMax - 1.4, 0]]) {
+    const x = a + 2.1;
+    if (!clearOf(cols, x, z, 1.0)) continue;
+    if ((a * 3 + z) % 2 < 1) S.paperwork(P, x + (face === 0 ? -0.5 : 0.5), y, z, face);
+    if (clearOf(cols, a + 0.5, z, 0.6)) S.bin(P, a + 0.5, y, z);
+  }
+  coreArt(P, f, y);
+}
+
+// Down the corridors: pictures on the core's walls.
+function coreArt(P, f, y) {
+  const hang = y + 1.2;
+  for (const x of [-2.5, 2.5]) SF.picture(P, x, hang, CORE.z0, Math.PI, 1.2, 0.8, [[0xc8a070, 0x2a4a6a, 0xe8e0d0], [0x8a2a2a, 0xd8c8a0, 0x2a2a2a]][(f + (x > 0)) % 2]);
+  SF.picture(P, CORE.x0, hang, 0, -HALF, 1.0, 0.7, [0x3a5a3a, 0xc8b490, 0x7a9ab0]);
 }
 
 // ---------------------------------------------------------------- the Trump Organization
@@ -485,6 +545,10 @@ function headquarters(P, f, y) {
   }
   F.plant(P, -4.8, y, 5.8, true);
   F.plant(P, 4.8, y, 5.8, true);
+  S.printer(P, -5.4, y, -6, HALF);
+  S.coffeeMachine(P, 4.9, y, -6, -HALF);
+  for (const x of [-4, 1.5]) S.paperwork(P, x - 0.5, y, -7.6, 0);
+  coreArt(P, f, y);
 }
 
 // ---------------------------------------------------------------- the residences
@@ -516,6 +580,15 @@ function condominiums(P, f, y) {
   H.bed(P, 8.8, y, 4, HALF, 1.6, 0x2a3a6a);
   H.nightstand(P, 9.4, y, 2.8, HALF);
   H.toilet(P, 8.8, y, -1.8, -HALF);
+  // What makes them lived in: a lamp by the sofa, books, the kettle and fruit.
+  for (const side of [-1, 1]) {
+    const cx = side < 0 ? -9 : 5.5;
+    S.floorLamp(P, cx + 1.4, y, 5.7);
+    S.kitchenThings(P, cx + (side < 0 ? 2.2 : -2.2), y, -8, 0);
+    F.bookshelf(P, side < 0 ? -1.55 : -0.85, y, 5.2, side < 0 ? -HALF : HALF);
+    F.plant(P, cx - 1.6, y, 5.9, false);
+  }
+  coreArt(P, f, y);
 }
 
 // ---------------------------------------------------------------- the penthouse
@@ -548,6 +621,10 @@ function living(P, f, y) {
   F.fridge(P, 9.2, y, -7.2, -HALF);
   F.counter(P, 7.4, y, -5.6, 0, 2.4);
   for (const x of [6.6, 7.4, 8.2]) E.barStool(P, x, y, -4.8);
+  S.kitchenThings(P, 8.3, y, -8.2, 0);
+  for (const z of [4.6, 5.5]) F.bookshelf(P, -13.2, y, z, HALF);
+  S.floorLamp(P, -12.3, y, 1.4);
+  S.floorLamp(P, -12.3, y, -1.4);
 }
 
 // The top floor: the master bedroom, a dressing room, a bathroom and a study.
@@ -581,6 +658,8 @@ function master(P, f, y) {
   H.rug(P, 7.9, y, -4.6, 2.6, 2.4, 0x2a2030);
   F.plant(P, 9, y, -8, true);
   H.coffeeTable(P, 8.2, y, 2.6, 0);
+  S.floorLamp(P, -13, y, 5.2);
+  S.floorLamp(P, 7.1, y, -5.6);
 }
 
 // ---------------------------------------------------------------- lighting

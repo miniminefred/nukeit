@@ -68,6 +68,7 @@ export function forklift(P, x, y, z, yaw) {
 export function boiler(P, x, y, z, yaw) {
   return assembly(P, x, y, z, yaw, [
     { kind: 'steel', boxes: [{ cyl: [0, 1.2, 0], r: 0.7, h: 2.2, seg: 24 }, { ball: [0, 2.3, 0], s: [0.7, 0.25, 0.7], rough: 0 }], tint: 0xa05a3a },
+    { kind: 'concrete', boxes: [[-0.65, 0, -0.65, 0.65, 0.12, 0.65]], tint: 0x8a8680 },
     { kind: 'steel', boxes: [{ cyl: [0.5, 2.9, 0], r: 0.12, h: 1.2 }, { cylX: [1.2, 3.45, 0], r: 0.12, h: 1.5 }, { cylZ: [-0.8, 0.5, 0], r: 0.08, h: 1.6 }], tint: 0x8a8d90 },
   ], 'furniture', { colliders: [[-0.75, 0, -0.75, 0.75, 2.5, 0.75]] });
 }

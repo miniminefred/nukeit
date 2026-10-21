@@ -6,7 +6,7 @@ import { createRenderer, createScene, createCamera, createLights, createPost, ha
 import { Physics } from './physics.js';
 import { createWorld } from './world.js';
 import { createInput } from './input.js';
-import { Player } from './player.js';
+import { Player, MAX_HEALTH } from './player.js';
 import { Audio } from './audio.js';
 import { Particles } from './fx/particles.js';
 import { Chips } from './fx/chips.js';
@@ -734,6 +734,19 @@ function spareTip() {
     }
     return 'E — put on the hi-vis vest and hard hat';
   }
+  const use = hit?.owner?.state === 'static' && USES[hit.owner.tag];
+  if (use) {
+    const o = hit.owner;
+    if ((o.usedAt ?? -1e9) > (performance.now() / 1000) - use.again) return use.empty;
+    if (input.pressed('KeyE')) {
+      o.usedAt = (performance.now() / 1000);
+      use.fn();
+      audio.click();
+      hud.flash(use.done);
+      return null;
+    }
+    return use.tip;
+  }
   if (hit?.owner?.tag !== 'extinguisher' || hit.owner.state !== 'static') return null;
   const ext = tools.find((t) => t.id === 'extinguisher');
   if (!ext) return null;
@@ -747,6 +760,18 @@ function spareTip() {
   return ext.charge < 0.98 ? 'E — take the extinguisher' : 'A spare extinguisher (yours is still full)';
 }
 const _look = new THREE.Vector3();
+// The building's things you can use yourself (building/furniture-service.js):
+// each once in a while (`again`: seconds).
+const USES = {
+  coffee: { tip: 'E — a coffee', done: 'A strong coffee: you are quicker for half a minute', empty: 'The coffee machine is still heating up', again: 60,
+    fn: () => { player.coffee = 30; } },
+  vending: { tip: 'E — something from the vending machine', done: 'A chocolate bar: you feel better', empty: 'That row is empty — try again later', again: 45,
+    fn: () => { player.health = Math.min(MAX_HEALTH, player.health + 30); } },
+  water: { tip: 'E — a cup of water', done: 'A cup of cold water', empty: 'The cooler is gurgling', again: 20,
+    fn: () => { player.health = Math.min(MAX_HEALTH, player.health + 10); } },
+  lockers: { tip: 'E — look in the lockers', done: 'Staff overalls from a locker: you look like you work here', empty: 'Nothing else in these lockers', again: 1e9,
+    fn: () => { player.disguised = true; } },
+};
 const _spectacle = new THREE.Vector3();
 
 function tipFor(t) {

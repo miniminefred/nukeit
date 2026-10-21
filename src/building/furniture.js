@@ -126,10 +126,10 @@ export function plant(P, x, y, z, big = false) {
 }
 
 export function waterCooler(P, x, y, z, yaw) {
-  return assembly(P, x, y, z, yaw, [
+  return named(assembly(P, x, y, z, yaw, [
     { kind: 'plastic', round: 0.03, boxes: [[-0.17, 0, -0.17, 0.17, 1.0, 0.17]], tint: 0xe8e8ea },
     { kind: 'clearglass', boxes: [{ cyl: [0, 1.2, 0], r: 0.13, h: 0.38, seg: 18 }, { cyl: [0, 1.02, 0], r: 0.05, r2: 0.13, h: 0.05, seg: 18 }] },
-  ], 'furniture', { colliders: [[-0.17, 0, -0.17, 0.17, 1.4, 0.17]] });
+  ], 'furniture', { colliders: [[-0.17, 0, -0.17, 0.17, 1.4, 0.17]] }), 'water');
 }
 
 export function fridge(P, x, y, z, yaw) {

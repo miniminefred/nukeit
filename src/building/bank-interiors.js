@@ -3,7 +3,9 @@ import * as F from './furniture.js';
 import * as W from './furniture-work.js';
 import * as H from './furniture-home.js';
 import * as L from './furniture-lobby.js';
-import { T, U, LOWER, ATRIUM, floorUse } from './plan.js';
+import * as S from './furniture-service.js';
+import * as SF from './furniture-shop.js';
+import { T, U, LOWER, ATRIUM, CORE, PODIUM_FLOORS, floorUse } from './plan.js';
 import { places } from './shops.js';
 
 // What is on each of Big Boy Bank's floors (the plan is building/bank-plan.js):
@@ -120,6 +122,40 @@ function vault(P, y) {
   W.extinguisher(P, 12, y, -6, 0);
   controlRoom(P, y);
   F.ceilingLight(P, 14, top, -8);
+  backOfHouse(P, y);
+}
+
+// The rest of the lower level: the staff room (lockers, the canteen, coffee,
+// the laundry, the cleaners' carts) and the archive east of the core, the
+// pumps, a tank and the workshop by the plant, and the garage along the front.
+function backOfHouse(P, y) {
+  const f = LOWER;
+  S.lockers(P, 15, y, -9.6, 0, 8);
+  S.lockerBench(P, 15, y, -8.6, 0, 2.4);
+  S.coffeeMachine(P, 23.2, y, -7.5, -HALF);
+  S.vending(P, 23.2, y, -5.9, -HALF);
+  for (const z of [-7.8, -5.4]) {
+    SF.woodTable(P, 20.3, y, z);
+    SF.woodChair(P, 19.7, y, z, HALF);
+    SF.woodChair(P, 20.9, y, z, -HALF);
+  }
+  S.laundry(P, 8.5, y, -9.6, 0);
+  S.linenCart(P, 10.6, y, -9.3, 0);
+  S.cleaningCart(P, 7, y, -7.6, HALF);
+  S.cleaningCart(P, 7, y, -6.6, HALF);
+  for (const x of [8.5, 15, 21]) { S.rack(P, x, y, -1.2, 0, 2.4, true); S.rack(P, x, y, 1.2, Math.PI); }
+  for (let n = 0; n < 5; n++) F.filingCabinet(P, 13.6 + n * 0.48, y, 3.0, Math.PI);
+  S.sheeted(P, 21, y, 3.0, 0.2, 1.8, 0.9, 1.1);
+  S.waterTank(P, 21, y, -14.5);
+  S.pump(P, 7.5, y, -11.6, 0);
+  S.pump(P, 9, y, -11.6, 0);
+  S.workbench(P, 12.6, y, -14.8, Math.PI);
+  [0x1a1a1a, 0x5a1a1a, 0xc8c8c4, 0x2a3a5a, 0x1a1a1a].forEach((tint, i) => {
+    const x = -10 + i * 5.5;
+    S.bayLines(P, x, y, 11, HALF, 2.6, 5);
+    S.car(P, x, y, 11, HALF, tint);
+  });
+  for (const x of [-12, 0, 12]) F.ceilingLight(P, x, U(f), 11);
 }
 
 // ---------------------------------------------------------------- the control room
@@ -226,11 +262,24 @@ function trading(P, f, y) {
     if (Math.abs(Math.abs(x) - 8.5) < 0.8) continue;          // the column lines at x = ±8.5
     const s = z < 0 ? 1 : -1;
     F.desk(P, x, y, z, s > 0 ? 0 : Math.PI);
-    F.monitor(P, x, y + 0.74, z - 0.18 * s, s > 0 ? 0 : Math.PI);
+    for (const k of [-0.31, 0.31]) F.monitor(P, x + k, y + 0.74, z - 0.18 * s, s > 0 ? 0 : Math.PI);
     if ((x * 10 + f) % 3 < 2) F.officeChair(P, x, y, z + 0.85 * s, s > 0 ? Math.PI : 0);
   }
   block(P, 'screen', -11, U(f) - 0.4, -9.6, 11, U(f) - 0.03, -9.5, 'lamp', { floor: f, hang: true, structural: false, tag: 'ticker' });
   F.waterCooler(P, 8.5, y, -1.5, -HALF);
+  S.coffeeMachine(P, 8.6, y, 0, -HALF);
+  S.printer(P, 8.6, y, 1.6, -HALF);
+  // A wall of screens on the core: the markets, the news.
+  block(P, 'screen', -4.2, y + 0.9, CORE.z0 - 0.06, 4.2, y + 2.9, CORE.z0, 'cladding', { floor: f, structural: false, tag: 'videowall' });
+  coreArt(P, f, y, false);
+}
+
+// Down the corridors: pictures on the core's walls (the north one when the
+// trading floors' screens are not there).
+function coreArt(P, f, y, north = true) {
+  const hang = y + 1.2;
+  if (north) for (const x of [-2.5, 2.5]) SF.picture(P, x, hang, CORE.z0, Math.PI, 1.2, 0.8, [[0x2a3a5a, 0xc8b490, 0xe8e0d0], [0x5a2a1a, 0xd8c8a0, 0x1a1a1a]][(f + (x > 0)) % 2]);
+  SF.picture(P, CORE.x0, hang, 0, -HALF, 1.0, 0.7, [0x3a4a3a, 0xc8b490, 0x8a9ab0]);
 }
 
 function offices(P, f, y) {
@@ -241,6 +290,19 @@ function offices(P, f, y) {
   }
   if (f % 2) F.filingCabinet(P, -10.8, y, -1, HALF);
   F.plant(P, 10.8, y, 1.5);
+  for (const z of [-8, 6]) for (const x of [-10.4, -3.6, 3.6, 10.4]) {
+    const s = z < 0 ? 1 : -1;
+    F.monitor(P, x + 0.2, y + 0.74, z - 0.18 * s, s > 0 ? 0 : Math.PI);
+    if ((x + z + f) % 3 < 1.5) S.paperwork(P, x - 0.5 * s, y, z, s > 0 ? 0 : Math.PI);
+    S.bin(P, x + 1.1, y, z);
+  }
+  // A meeting room's table and whiteboard; the printer and the coffee.
+  F.meetingTable(P, 8.4, y, 0, HALF);
+  for (const z of [-1, 1]) { F.officeChair(P, 7.5, y, z, HALF); F.officeChair(P, 9.3, y, z, -HALF); }
+  S.whiteboard(P, 11.3, y, 0, -HALF);
+  S.printer(P, -8.5, y, 4.6, Math.PI);
+  S.coffeeMachine(P, -7, y, -4.6, 0);
+  coreArt(P, f, y);
 }
 
 function executive(P, y) {
