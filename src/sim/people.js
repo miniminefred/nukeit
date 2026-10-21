@@ -118,27 +118,29 @@ export class People {
     this._alarm = [];            // { at, r, t }: things that went bang
   }
 
-  // Fill the building. Called once the pieces are standing.
-  populate(pieces) {
+  // Fill the building. Called once the pieces are standing. With `managed`,
+  // the people who work in the building and visit it are sim/routines.js's to
+  // bring in: only the street is filled here.
+  populate(pieces, { managed = false } = {}) {
     this.clear();
     this.pieces = pieces;
     // New colliders are not in Rapier's query tree until it steps, and people
     // are placed by looking at the floors.
     this.physics.world.step(this.physics.events);
-    for (const [f, n] of Object.entries(CROWD)) for (let i = 0; i < n; i++) this._spawn(+f);
+    if (!managed) for (const [f, n] of Object.entries(CROWD)) for (let i = 0; i < n; i++) this._spawn(+f);
     // And people on the pavements of the avenue, both sides, walking by.
     for (let i = 0; i < SITE.street.walkers; i++) this._spawn(0, true);
     // And in the shops: staff at their posts, customers queuing, looking at
     // the shelves, sitting at the café tables.
     const want = { staff: 1, queue: 0.6, browse: 0.5, seat: 0.45 };
-    for (const pl of places.list) {
+    for (const pl of managed ? [] : places.list) {
       if (Math.random() > want[pl.kind] || this.list.length >= CIVILIANS) continue;
       const p = this._spawn(0, false, new THREE.Vector3(pl.x, pl.y, pl.z));
       if (!p) continue;
       p.agent = true; p.yaw = pl.yaw; p.sitting = pl.kind === 'seat'; p.post = pl.kind;
       p.seatY = pl.y + 0.47;
       if (pl.kind === 'staff') Object.assign(p.colours, { body: 0x1a1a1a, arm: 0x1a1a1a, hips: 0x2a2a2a, leg: 0x2a2a2a, skirt: 0x2a2a2a });
-      this._paint(this.list.length - 1);
+      this._paint(this.list.indexOf(p));
     }
     const n = this.list.length;
     for (const k in this.mesh) this.mesh[k].count = n * (PER[k] ?? 1);
@@ -170,10 +172,29 @@ export class People {
     p.colours.shin = p.colours.leg;
     if (!woman) p.colours.hips = p.colours.leg;          // one pair of trousers
     // Suits have a white shirt at the collar: the body's colour is the jacket.
-    this.list.push(p);
-    this._paint(this.list.length - 1);
+    // Someone who has gone leaves a slot for someone new (people come and go
+    // all day, sim/routines.js); otherwise a new one at the end, while there is room.
+    let i = this.list.findIndex((q) => q.state === 'gone');
+    if (i < 0 && this.list.length >= MAX_PEOPLE) return null;
+    if (i < 0) { i = this.list.length; this.list.push(p); } else this.list[i] = p;
+    this._paint(i);
+    for (const k in this.mesh) this.mesh[k].count = this.list.length * (PER[k] ?? 1);
     return p;
   }
+
+  // Someone new, for sim/routines.js: a worker or a visitor at `at` on floor f,
+  // in `colours` (a uniform) over their own — steered from outside.
+  person(f, at, colours = null) {
+    const p = this._spawn(f, false, at);
+    if (!p) return null;
+    p.agent = true;
+    p.wait = 0;
+    if (colours) { Object.assign(p.colours, colours); this._paint(this.list.indexOf(p)); }
+    return p;
+  }
+
+  // Put a person's colours back on the meshes (a change of uniform).
+  repaint(p) { const i = this.list.indexOf(p); if (i >= 0) this._paint(i); }
 
   _paint(i) {
     const p = this.list[i];

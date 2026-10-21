@@ -11,19 +11,19 @@ export function clothTable(P, x, y, z, radius = 0.6) {
     const a = (n / 4) * Math.PI * 2;
     set.push({ cyl: [Math.cos(a) * radius * 0.65, 0.78, Math.sin(a) * radius * 0.65], r: 0.12, h: 0.015, seg: 16 });
   }
-  return assembly(P, x, y, z, 0, [
+  return named(assembly(P, x, y, z, 0, [
     { kind: 'linen', boxes: [{ cyl: [0, 0.39, 0], r: radius + 0.05, r2: radius + 0.15, h: 0.76, seg: 24 }, { cyl: [0, 0.765, 0], r: radius + 0.05, h: 0.01, seg: 24 }] },
     { kind: 'ceramic', boxes: set },
     { kind: 'clearglass', boxes: [{ cyl: [0, 0.86, 0], r: 0.04, r2: 0.03, h: 0.16, seg: 12 }] },
-  ], 'furniture', { colliders: [[-radius - 0.15, 0, -radius - 0.15, radius + 0.15, 0.78, radius + 0.15]] });
+  ], 'furniture', { colliders: [[-radius - 0.15, 0, -radius - 0.15, radius + 0.15, 0.78, radius + 0.15]] }), 'table');
 }
 
 // A plain café table: a round top on one leg.
 export function cafeTable(P, x, y, z) {
-  return assembly(P, x, y, z, 0, [
+  return named(assembly(P, x, y, z, 0, [
     { kind: 'wood', round: 0.01, boxes: [{ cyl: [0, 0.73, 0], r: 0.38, h: 0.04, seg: 20 }], tint: 0xc9a47a },
     { kind: 'metal', boxes: [{ cyl: [0, 0.36, 0], r: 0.03, h: 0.7, seg: 10 }, { cyl: [0, 0.015, 0], r: 0.25, h: 0.03, seg: 18 }], tint: 0x222222 },
-  ], 'furniture', { colliders: [[-0.38, 0, -0.38, 0.38, 0.75, 0.38]] });
+  ], 'furniture', { colliders: [[-0.38, 0, -0.38, 0.38, 0.75, 0.38]] }), 'table');
 }
 
 // A stackable chair of the kind a food court has hundreds of.
@@ -51,25 +51,25 @@ export function bar(P, x, y, z, yaw, len = 4) {
     const h = r(0.24, 0.34);
     glass[(Math.random() * cols.length) | 0].boxes.push({ cyl: [bx, 1.35 + h / 2, -0.95], r: 0.035, h, seg: 10 });
   }
-  return assembly(P, x, y, z, yaw, [
+  return named(assembly(P, x, y, z, yaw, [
     { kind: 'wood', round: 0.02, boxes: [[-len / 2, 0, -0.35, len / 2, 1.05, 0.3]], tint: 0x4a2a18 },
     { kind: 'marble', round: 0.02, boxes: [[-len / 2 - 0.05, 1.05, -0.38, len / 2 + 0.05, 1.1, 0.36]] },
     { kind: 'brass', boxes: [{ cylX: [0, 0.2, 0.36], r: 0.025, h: len, seg: 10 }] },
     { kind: 'wood', boxes: [[-len / 2, 0, -1.1, len / 2, 2.2, -0.8], [-len / 2, 1.33, -1.1, len / 2, 1.35, -0.8], [-len / 2, 1.83, -1.1, len / 2, 1.85, -0.8]], tint: 0x3a2014 },
     ...glass.filter((g) => g.boxes.length),
-  ], 'furniture', { colliders: [[-len / 2, 0, -0.38, len / 2, 1.1, 0.36], [-len / 2, 0, -1.1, len / 2, 2.2, -0.8]] });
+  ], 'furniture', { colliders: [[-len / 2, 0, -0.38, len / 2, 1.1, 0.36], [-len / 2, 0, -1.1, len / 2, 2.2, -0.8]] }), 'bar');
 }
 
 // A food-court counter: a service counter, a griddle and a menu board.
 export function foodCounter(P, x, y, z, yaw, board = 0xc8261d) {
-  return assembly(P, x, y, z, yaw, [
+  return named(assembly(P, x, y, z, yaw, [
     { kind: 'metal', round: 0.02, boxes: [[-1.5, 0, -0.35, 1.5, 1.0, 0.35]], tint: 0xcfd2d4 },
     { kind: 'plastic', round: 0.01, boxes: [[-1.55, 1.0, -0.4, 1.55, 1.05, 0.4]], tint: 0x1a1a1a },
     { kind: 'metal', boxes: [[-1.4, 0, -1.6, 1.4, 0.92, -1.0]], tint: 0x9aa0a6 },
     { kind: 'metal', boxes: [[-0.6, 0.92, -1.55, 0.6, 0.95, -1.05]], tint: 0x202020 },
     { kind: 'plastic', round: 0.02, boxes: [[-1.4, 2.2, -1.75, 1.4, 2.9, -1.7]], tint: board },
     { kind: 'lamp', boxes: [[-1.3, 2.3, -1.705, 1.3, 2.8, -1.695]] },
-  ], 'furniture', { colliders: [[-1.5, 0, -0.4, 1.5, 1.05, 0.4], [-1.4, 0, -1.6, 1.4, 0.95, -1.0]] });
+  ], 'furniture', { colliders: [[-1.5, 0, -0.4, 1.5, 1.05, 0.4], [-1.4, 0, -1.6, 1.4, 0.95, -1.0]] }), 'cooker');
 }
 
 // A jeweller's case: a wooden base, a glass box, and what is on show in it.
@@ -99,3 +99,6 @@ export function bookRack(P, x, y, z, yaw) {
     ...parts.filter((p) => p.boxes.length),
   ], 'furniture', { colliders: [[-1, 0, -0.18, 1, 1.47, 0.18]] });
 }
+
+// A piece named for what it is, so the people who use it can find it (sim/routines.js).
+function named(p, tag) { if (p && !p.tag) p.tag = tag; return p; }

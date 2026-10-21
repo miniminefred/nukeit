@@ -34,6 +34,7 @@ export class Menu {
     this.level = 'normal';
     this.picked = new Set(['sledge']);
     this.mode = 'deconstruction';
+    this.at = 'morning';                 // the time of day the job starts (sim/clock.js)
     this.page = 'mode';
   }
 
@@ -135,7 +136,7 @@ export class Menu {
       go.onclick = () => {
         this.onClick?.();
         const all = TOOLS.filter((t) => !t.soon).map((t) => t.id);
-        this.onStart(this.jobId, all, 'creative');
+        this.onStart(this.jobId, all, 'creative', this.at);
       };
       bar.append(back, go);
       page.append(bar);
@@ -186,6 +187,18 @@ export class Menu {
       grid.append(card);
     }
     page.append(grid);
+    // What time of day you start: morning, lunch (packed), evening, night (empty).
+    page.append(el('h3', null, 'Time of day'));
+    const times = el('div', null);
+    times.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px';
+    for (const [id, name, note] of [['morning', 'Morning', '8:00 · the office rush'], ['lunch', 'Lunch', '11:45 · packed'], ['evening', 'Evening', '17:15 · going home'], ['night', 'Night', '22:00 · empty and dark']]) {
+      const on = this.at === id;
+      const b = el('button', null, `${name}<br><small style="opacity:.6">${note}</small>`);
+      b.style.cssText = `padding:8px 14px;border-radius:8px;border:1px solid ${on ? '#c9a043' : '#ffffff33'};background:${on ? '#c9a04333' : '#00000044'};color:#fff;cursor:pointer;text-align:left`;
+      b.onclick = () => { this.at = id; this.onClick?.(); this.render(); };
+      times.append(b);
+    }
+    page.append(times);
     // A disguise you own, worn from the start of the job.
     const disguises = SHOP.filter((i) => i.kind === 'disguises' && wallet.owns(i.id));
     if (disguises.length) {
@@ -215,7 +228,7 @@ export class Menu {
       this.onClick?.();
       const demolition = TOOLS.filter((t) => t.kind === 'demolition' && this.picked.has(t.id)).map((t) => t.id);
       const helpers = TOOLS.filter((t) => t.kind === 'helper').map((t) => t.id);
-      this.onStart(this.jobId, [...demolition, ...helpers], this.level);
+      this.onStart(this.jobId, [...demolition, ...helpers], this.level, this.at);
     };
     bar.append(back, go);
     page.append(bar);

@@ -32,6 +32,8 @@ import { Pigeons } from './sim/pigeons.js';
 import { Heist } from './sim/heist.js';
 import { BankSecurity } from './sim/bank-security.js';
 import { ControlRoom } from './sim/control-room.js';
+import { Clock, STARTS } from './sim/clock.js';
+import { Routines } from './sim/routines.js';
 import { wallet, dollars } from './data/wallet.js';
 import { FEE, HALL_BONUS } from './data/shop.js';
 import { COLOURS } from './damage/paint.js';
@@ -276,6 +278,11 @@ bankSecurity.fx.room = controlRoom;
 ctx.controlRoom = controlRoom;
 security.fx.onOperatorOut = () => controlRoom.operatorOut();
 let roomTip = null;
+// The time of day, and the working day of the building's people (sim/clock.js,
+// sim/routines.js).
+const clock = new Clock({ scene, lights, renderer });
+const routines = new Routines({ people, pieces, clock, security, scene, hud, bank: bankSecurity, vaultDoor: () => pieces.list.find((p) => p.tag === 'vault') });
+let startAt = 'morning';
 heist.fx.bankSecurity = bankSecurity; // the vault's code opens its door
 
 // ---------------------------------------------------------------- state
@@ -290,11 +297,12 @@ let height = null, heightT = 0, doneT = -1, started = 0, downT = 0;
 const menu = new Menu(document.getElementById('menu'), {
   onClick: () => audio.click(),
   quality,
-  onStart: (jobId, toolIds, levelId) => start(jobId, toolIds, levelId),
+  onStart: (jobId, toolIds, levelId, at) => start(jobId, toolIds, levelId, at),
 });
 
 function openMenu() {
   state = 'menu';
+  clock.stop();
   input.unlock();
   hud.show(false);
   screens.hidePause();
@@ -307,7 +315,8 @@ function openMenu() {
   camera.lookAt(...SITE.menuCamera.look);
 }
 
-async function start(jobId, toolIds, levelId = 'normal') {
+async function start(jobId, toolIds, levelId = 'normal', at = startAt) {
+  startAt = at;
   audio.start();
   menu.hide();
   state = 'loading';
@@ -338,7 +347,10 @@ async function start(jobId, toolIds, levelId = 'normal') {
   doors.attach(pieces);
   water.attach();
   smoke.attach();
-  people.populate(pieces);
+  // The clock first: who is in the building depends on the hour.
+  clock.start(STARTS[startAt] ?? STARTS.morning);
+  people.populate(pieces, { managed: true });
+  routines.attach(job);
   pigeons.populate();
   security.start(difficulty, job);
   // After the guards: the bank's own security adds its operator to them.
@@ -405,6 +417,7 @@ function unloadJob() {
   chips.clear();
   rubble.clear();
   pigeons.clear();
+  routines.clear();
   heist.clear();
   bankSecurity.clear();
   controlRoom.clear();
@@ -561,7 +574,7 @@ function haze(dt) {
   const k = dustiness;
   scene.fog.near = CLEAR.near + (DUSTY_AIR.near - CLEAR.near) * k;
   scene.fog.far = CLEAR.far + (DUSTY_AIR.far - CLEAR.far) * k;
-  scene.fog.color.copy(CLEAR.colour).lerp(DUSTY_AIR.colour, k);
+  scene.fog.color.copy(clock.fog).lerp(DUSTY_AIR.colour, k);
   // Your head in a room's smoke: you can barely see across it. Crouch.
   const want2 = smoke.at(camera.position);
   smoky += (want2 - smoky) * Math.min(1, dt * 3);
@@ -625,6 +638,7 @@ function frame(dt) {
     powder.update();
     if (state === 'play') {
       security.update(dt); fear.update(dt); bankSecurity.update(dt);
+      clock.update(dt); routines.update(dt);
       // Bringing it down — a collapse, a tower going over, a fifth of it gone — is a threat to the city.
       if (topple.active || structure.collapsing || fear.wreck > 0.2) wanted.offend(8, camera.position);
       if (fear.fx.chasing()) wanted.offend(2, player.pos, true);
@@ -755,7 +769,7 @@ const frames = (n) => new Promise((r) => {
 });
 
 if (import.meta.env.DEV) {
-  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, body, senses, pigeons, heist, bankSecurity, controlRoom, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
+  window.dev = { renderer, scene, camera, lights, world, pieces, physics, input, post, player, damage, structure, fire, blast, chips, rubble, people, particles, audio, ctx, water, smoke, powder, security, traffic, fear, wanted, body, senses, pigeons, heist, bankSecurity, controlRoom, clock, routines, get tools() { return tools; }, start, measure, impacts, lift, quality, topple,
     get state() { return state; }, set state(s) { state = s; },
     get rig() { return rig; }, set rig(r) { rig = r; },
     // Run whole frames by hand, for a tab that is not on screen.

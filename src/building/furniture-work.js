@@ -48,10 +48,10 @@ export function palletCrates(P, x, y, z, yaw, high = 2) {
     if (l === high - 1 && Math.random() < 0.3) continue;
     crates.push([cx - 0.28, 0.14 + l * 0.5, cz - 0.23, cx + 0.28, 0.62 + l * 0.5, cz + 0.23]);
   }
-  return assembly(P, x, y, z, yaw, [
+  return named(assembly(P, x, y, z, yaw, [
     { kind: 'wood', boxes: [[-0.6, 0, -0.5, 0.6, 0.03, 0.5], [-0.6, 0.1, -0.5, 0.6, 0.14, 0.5], [-0.6, 0.03, -0.5, -0.5, 0.1, 0.5], [0.5, 0.03, -0.5, 0.6, 0.1, 0.5]], tint: 0xb89a6a },
     { kind: 'wood', round: 0.01, boxes: crates, tint: 0xa8834e },
-  ], 'furniture', { colliders: [[-0.6, 0, -0.5, 0.6, 0.14 + high * 0.5, 0.5]] });
+  ], 'furniture', { colliders: [[-0.6, 0, -0.5, 0.6, 0.14 + high * 0.5, 0.5]] }), 'crates');
 }
 
 // A forklift, parked, forks down.
@@ -132,3 +132,6 @@ export function moneyStack(P, x, y, z, yaw) {
     { kind: 'paper', boxes: bands, tint: 0xe8e0c8 },
   ], 'furniture', { tag: 'money', colliders: [[-0.5, 0, -0.35, 0.5, 0.68, 0.35]] });
 }
+
+// A piece named for what it is, so the people who use it can find it (sim/routines.js).
+function named(p, tag) { if (p && !p.tag) p.tag = tag; return p; }

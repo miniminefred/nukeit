@@ -163,7 +163,7 @@ export class BankSecurity {
       hud?.flash('The vault lasers go dark', 2);
     }
     // A beam across you.
-    if (this.lasers && !player.dead) {
+    if (this.lasers && !this.ajar && !player.dead) {
       const foot = player.pos.y, head = player.pos.y + 1.75 - 0.62 * player.crouch;
       for (const b of this.beams) {
         b.mesh.material.opacity = 0.65 + 0.25 * Math.sin(this.time * 9 + b.z);
@@ -217,6 +217,16 @@ export class BankSecurity {
     for (const p of this.shutters) if (p.state === 'static') this.fx.pieces.destroy(p);
     this.shutters = [];
     this.fx.hud?.flash('The lockdown lifts: the shutters go up', 2);
+  }
+
+  // A teller fetching cash (sim/routines.js): the round door swings open — slid
+  // aside — and the lasers are off while it stands open; then shut again.
+  vaultOpen(open) {
+    const d = this.door;
+    if (!d || d.state !== 'static' || this.opened) return;
+    if (open && !this.ajar) { this.ajar = d.pos.clone(); this.fx.pieces.move(d, d.pos.clone().add(new THREE.Vector3(2.2, 0, 0.3))); }
+    else if (!open && this.ajar) { this.fx.pieces.move(d, this.ajar); this.ajar = null; }
+    for (const b of this.beams) b.mesh.visible = this.lasers && !this.ajar;
   }
 
   // The door opened with its code: quietly, no lockdown.

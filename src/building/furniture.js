@@ -15,11 +15,11 @@ export function desk(P, x, y, z, yaw) {
   const w = 1.4, d = 0.7, h = 0.74;
   const legs = [];
   for (const sx of [-w / 2 + 0.06, w / 2 - 0.06]) for (const sz of [-d / 2 + 0.06, d / 2 - 0.06]) legs.push({ cyl: [sx, (h - 0.03) / 2, sz], r: 0.022, h: h - 0.03, seg: 10 });
-  return assembly(P, x, y, z, yaw, [
+  return named(assembly(P, x, y, z, yaw, [
     { kind: 'wood', round: 0.012, boxes: [[-w / 2, h - 0.03, -d / 2, w / 2, h, d / 2]] },
     { kind: 'wood', round: 0.006, boxes: [[-w / 2 + 0.08, h - 0.36, d / 2 - 0.035, w / 2 - 0.08, h - 0.03, d / 2 - 0.015]], tint: 0xd8cfc2 },
     { kind: 'metal', boxes: legs, tint: 0x3a3c40 },
-  ], 'furniture', { colliders: [[-w / 2, 0, -d / 2, w / 2, h, d / 2]] });
+  ], 'furniture', { colliders: [[-w / 2, 0, -d / 2, w / 2, h, d / 2]] }), 'desk');
 }
 
 export function monitor(P, x, y, z, yaw) {
@@ -45,11 +45,11 @@ export function officeChair(P, x, y, z, yaw, tint = 0x2d3a55) {
     base.push({ cylX: [ex / 2, 0.075, ez / 2], r: 0.016, r2: 0.022, h: 0.28, rotY: -a });
     wheels.push({ ball: [ex, 0.03, ez], s: [0.03, 0.03, 0.03], rough: 0, detail: 1 });
   }
-  return assembly(P, x, y, z, yaw, [
+  return named(assembly(P, x, y, z, yaw, [
     { kind: 'fabric', round: 0.05, boxes: [[-0.25, 0.44, -0.24, 0.25, 0.54, 0.25], [-0.23, 0.6, 0.2, 0.23, 1.06, 0.28]], tint },
     { kind: 'plastic', round: 0.01, boxes: [...base, { cyl: [0, 0.08, 0], r: 0.05, h: 0.04 }, [-0.02, 0.5, 0.21, 0.02, 0.64, 0.25]] },
     { kind: 'plastic', boxes: wheels, tint: 0x111111 },
-  ], 'furniture', { colliders: [[-0.3, 0, -0.3, 0.3, 0.54, 0.3], [-0.23, 0.54, 0.2, 0.23, 1.06, 0.28]] });
+  ], 'furniture', { colliders: [[-0.3, 0, -0.3, 0.3, 0.54, 0.3], [-0.23, 0.54, 0.2, 0.23, 1.06, 0.28]] }), 'chair');
 }
 
 export function filingCabinet(P, x, y, z, yaw) {
@@ -157,11 +157,11 @@ export function cooker(P, x, y, z, yaw) {
   const b = [[-0.3, 0, -0.3, 0.3, 0.9, 0.3]];
   const rings = [];
   for (const [a, c] of [[-0.12, -0.12], [0.12, -0.12], [-0.12, 0.12], [0.12, 0.12]]) rings.push({ cyl: [a, 0.91, c], r: 0.07, h: 0.02, seg: 16 });
-  return assembly(P, x, y, z, yaw, [
+  return named(assembly(P, x, y, z, yaw, [
     { kind: 'metal', round: 0.02, boxes: b, tint: 0xcfd2d4 },
     { kind: 'metal', boxes: rings, tint: 0x1a1a1a },
     { kind: 'clearglass', boxes: [[-0.24, 0.2, 0.3, 0.24, 0.6, 0.31]] },
-  ], 'furniture', { colliders: b });
+  ], 'furniture', { colliders: b }), 'cooker');
 }
 
 // A propane cylinder. It is the thing in the building that explodes.
@@ -257,3 +257,6 @@ export function chandelier(P, x, yTop, z) {
     { kind: 'lamp', boxes: bulbs },
   ], 'lamp', { hang: true });
 }
+
+// A piece named for what it is, so the people who use it can find it (sim/routines.js).
+function named(p, tag) { if (p && !p.tag) p.tag = tag; return p; }

@@ -4,6 +4,7 @@ import * as W from './furniture-work.js';
 import * as H from './furniture-home.js';
 import * as L from './furniture-lobby.js';
 import { T, U, LOWER, ATRIUM, floorUse } from './plan.js';
+import { places } from './shops.js';
 
 // What is on each of Big Boy Bank's floors (the plan is building/bank-plan.js):
 //
@@ -169,7 +170,13 @@ function hall(P, y) {
       { kind: 'clearglass', boxes: [[-w / 2, 1.1, 0.0, w / 2, 2.1, 0.02]], tint: 0xe6f0ee },
       { kind: 'brass', boxes: [[-w / 2, 2.1, -0.03, w / 2, 2.16, 0.05]] },
     ], 'furniture', { colliders: [[-w / 2, 0, -0.38, w / 2, 2.16, 0.4]] });
-    for (let k = 0; k < 3; k++) F.officeChair(P, a + 1.2 + k * 2, y, 5.3, Math.PI);
+    for (let k = 0; k < 3; k++) {
+      const x = a + 1.2 + k * 2;
+      F.officeChair(P, x, y, 5.3, Math.PI);
+      // A teller at each window, a customer's place in front of it (sim/routines.js).
+      places.list.push({ kind: 'staff', teller: true, sit: true, x, y, z: 5.3, yaw: 0 });
+      places.list.push({ kind: 'queue', teller: true, x, y, z: 7.4, yaw: Math.PI });
+    }
   }
   L.stanchions(P, -7, y, 8.6, 0, 4, 1.2);
   L.stanchions(P, 7, y, 8.6, 0, 4, 1.2);
